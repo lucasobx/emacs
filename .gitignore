@@ -2,12 +2,12 @@ auto-save-list/
 custom-vars.el
 auto-saves/
 eln-cache/
+transient/
 devdocs/
 history
 recentf
-.tutor/
 .cache/
+.tutor/
 elpaca/
 places
 tramp
-

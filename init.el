@@ -43,7 +43,6 @@
 (add-hook 'after-init-hook #'elpaca-process-queues)
 (elpaca `(,@elpaca-order))
 
-;; install use-package support
 (elpaca elpaca-use-package
   (elpaca-use-package-mode))
 
@@ -122,9 +121,9 @@
   (electric-indent-mode -1)
   (defun display-startup-echo-area-message () (message ""))
   :config
-  (add-hook 'prog-mode-hook 'display-line-numbers-mode)
   (setq custom-file (locate-user-emacs-file "custom-vars.el"))
-  (setq native-comp-async-query-on-exit t)
+  (add-hook 'prog-mode-hook 'display-line-numbers-mode)
+  (setopt native-comp-async-query-on-exit t)
   (load custom-file 'noerror 'nomessage)
   (put 'narrow-to-region 'disabled nil)
 
@@ -151,22 +150,47 @@
             (lambda () (setq-local face-remapping-alist
                                    '((default :height 0.95)))))
   :bind
-  ("C-=" . text-scale-increase)
-  ("C--" . text-scale-decrease)
-  ("C-<tab>" . other-window)
-  ("C-c p" . check-parens))
+  ("C-="     . text-scale-increase)
+  ("C--"     . text-scale-decrease)
+  ("C-<tab>" . other-window))
+
+;;; ===============================================================
+;;; Custom functions
+
+(defun my/jump-to-end-of-block ()
+  (interactive)
+  (beginning-of-defun)
+  (forward-sexp))
+
+(defun my/vterm-only ()
+  (interactive)
+  (require 'vterm)
+  (let ((display-buffer-alist nil)) 
+    (vterm)
+    (delete-other-windows)
+    (let ((proc (get-buffer-process (current-buffer))))
+          (when proc (set-process-query-on-exit-flag proc nil)))))
+
+(defun my/kill-buffer-and-window ()
+  (interactive)
+  (let ((buffer (current-buffer)))
+    (when (and (> (count-windows) 1)
+               (not (one-window-p)))
+      (delete-window))
+    (kill-buffer buffer)))
 
 ;;; ===============================================================
 ;;; Keybindings
 
 (use-package which-key
   :ensure nil
-  :hook (after-init . which-key-mode)
+  :hook
+  (after-init . which-key-mode)
   :config
-  (setq which-key-idle-delay 0.2
-        which-key-add-column-padding 1
-        which-key-min-display-lines 6
-        which-key-separator " → "))
+  (setopt which-key-idle-delay 0.2
+          which-key-add-column-padding 1
+          which-key-min-display-lines 6
+          which-key-separator " → "))
 
 (use-package general
   :ensure (:wait t)
@@ -179,65 +203,90 @@
     :prefix "SPC"
     :global-prefix "M-SPC")
   (my/keys
-    "e" '(:ignore t :wk "emacs")
-    "e e" '((lambda () (interactive)
+    ;; --- navigation
+    "/"       '(flash-jump :wk "flash")
+    "<right>" '(evil-end-of-line :wk "end of line")
+    "<left>"  '(evil-beginning-of-line :wk "beg of line")
+    "<tab>"   '(other-window :wk "other window")
+
+    ;; --- buffers
+    "b"         '(:ignore t :wk "buffer")
+    "b r"       '(revert-buffer :wk "reload buffer")
+    "b b"       '(consult-buffer :wk "switch buffer")
+    "b <left>"  '(previous-buffer :wk "previous buffer")
+    "b <right>" '(next-buffer :wk "next buffer")
+
+    ;; --- dired
+    "d"   '(:ignore t :wk "dired")
+    "d d" '(dired :wk "open directory")
+    "d j" '(dired-jump :wk "jump to directory")
+    "d p" '((lambda () (interactive)
+              (dired "~/documents/org"))
+            :wk "open projects folder")
+    
+    ;; --- emacs
+    "e"   '(:ignore t :wk "emacs")
+    "e s" '(sudo-edit :wk "sudo edit file")
+    "e p" '(check-parens :wk "check parens")
+    "e r" '(restart-emacs :wk "restart emacs")
+    "e f" '(eval-last-sexp :wk "eval expression")
+    "e m" '(consult-mode-command :wk "mode commands")
+    "e e" '(my/jump-to-end-of-block :wk "jump to end of block")
+    "e c" '((lambda () (interactive)
               (find-file (locate-user-emacs-file "init.el")))
             :wk "edit config")
-    "e r" '(restart-emacs :wk "restart emacs")
-    "e s" '(sudo-edit :wk "sudo edit file")
-    "e m" '(consult-mode-command :wk "mode commands"))
-  (my/keys
-    "q" '(evil-beginning-of-line :wk "beg of line")
-    "p" '(evil-end-of-line :wk "end of line"))
-  (my/keys
-    "s"   '(:ignore t :wk "search")
-    "s f" '(consult-find :wk "find file")
-    "s s" '(consult-line :wk "search line")
-    "s S" '(consult-line-multi :wk "search all buffers")
-    "s r" '(consult-recent-file :wk "recent files")
-    "s g" '(consult-ripgrep :wk "ripgrep")
-    "s b" '(consult-buffer :wk "switch buffer"))
-  (my/keys
-    "h" '(:ignore t :wk "help")
+    
+    ;; --- help
+    "h"   '(:ignore t :wk "help")
+    "h d" '(devdocs-lookup :wk "devdocs")
     "h h" '(helpful-at-point :wk "at point")
     "h v" '(helpful-variable :wk "variable")
     "h f" '(helpful-function :wk "function")
-    "h d" '(devdocs-lookup :wk "devdocs"))
-  (my/keys
-    "w" '(:ignore t :wk "windows")
-    "w f" '(focus-mode :wk "focus mode")
-    "w k" '(my/kill-buffer-and-window :wk "kill buffer")
-    "w c" '(evil-window-delete :wk "close window")
-    "w n" '(evil-window-new :wk "new window")
-    "w w" '(evil-window-split :wk "horizontal split")
-    "w r" '(evil-window-vsplit :wk "vertical split")
-    "w <up>" '(buf-move-up :wk "buffer move up")
-    "w <down>" '(buf-move-down :wk "buffer move down")
-    "w <left>" '(buf-move-left :wk "buffer move left")
-    "w <right>" '(buf-move-right :wk "buffer move right"))
-  (my/keys
-    "t" '(:ignore t :wk "toggle")
-    "t l" '(visual-line-mode :wk "toggle truncated lines")
-    "t t" '(vterm-toggle :wk "toggle vterm"))
-  (my/keys
-    "o" '(:ignore t :wk "org")
+
+    ;; --- org
+    "o"   '(:ignore t :wk "org")
     "o o" '(org-toggle-checkbox :wk "toggle checkbox")
-    "o p" '(org-tidy-untidy-buffer :wk "edit property"))
-  (my/keys
-    "m" '(:ignore t :wk "modes")
-    "m p" '(markdown-live-preview-mode :wk "markdown preview")))
+    "o p" '(org-tidy-untidy-buffer :wk "edit property")
+
+    ;; --- search
+    "s"   '(:ignore t :wk "search")
+    "s s" '(consult-line :wk "line")
+    "s i" '(consult-imenu :wk "imenu")
+    "s f" '(consult-find :wk "find file")
+    "s g" '(consult-ripgrep :wk "ripgrep")
+    "s l" '(consult-line-multi :wk "line-multi")
+    "s d" '(consult-dir :wk "recent directories")
+    "s r" '(consult-recent-file :wk "recent files")
+
+    ;; --- toggles
+    "t"   '(:ignore t :wk "toggle")
+    "t f" '(focus-mode :wk "focus mode")
+    "t t" '(vterm-toggle :wk "toggle vterm")
+    "t l" '(visual-line-mode :wk "toggle truncated lines")
+
+    ;; --- windows
+    "w"         '(:ignore t :wk "windows")
+    "w k"       '(my/kill-buffer-and-window :wk "kill buffer")
+    "w w"       '(evil-window-split :wk "horizontal split")
+    "w v"       '(evil-window-vsplit :wk "vertical split")
+    "w c"       '(evil-window-delete :wk "close window")
+    "w n"       '(evil-window-new :wk "new window")
+    "w <right>" '(buf-move-right :wk "move right")
+    "w <left>"  '(buf-move-left :wk "move left")
+    "w <down>"  '(buf-move-down :wk "move down")
+    "w <up>"    '(buf-move-up :wk "move up")))
 
 (use-package evil
   :ensure (:wait t)
   :demand t
   :init
-  (setq evil-undo-system 'undo-redo
-        evil-want-fine-undo t
-        evil-want-integration t
-        evil-want-keybinding nil
-        evil-vsplit-window-right t
-        evil-split-window-below t
-        evil-shift-width 2)
+  (setopt evil-undo-system 'undo-redo
+          evil-want-fine-undo t
+          evil-want-integration t
+          evil-want-keybinding nil
+          evil-vsplit-window-right t
+          evil-split-window-below t
+          evil-shift-width 2)
   :config
   (evil-set-initial-state 'vterm-mode 'emacs)
   (evil-mode 1))
@@ -246,7 +295,7 @@
   :ensure t
   :after evil
   :config
-  (setq evil-collection-mode-list '(dashboard dired ibuffer magit))
+  (setopt evil-collection-mode-list '(dashboard dired ibuffer magit))
   (evil-collection-init))
 
 (use-package evil-commentary
@@ -260,14 +309,15 @@
   :config
   (global-evil-surround-mode 1))
 
-;; (use-package evil-tutor
-;;   :ensure t
-;;   :defer t)
+(use-package evil-tutor
+  :ensure t
+  :defer t)
 
 ;;; ===============================================================
 ;;; UI
 
-(use-package nerd-icons :ensure t)
+(use-package nerd-icons 
+  :ensure t)
 
 (use-package rg-themes
   :ensure t
@@ -293,7 +343,7 @@
   (doom-modeline-total-line-number t)
   (nerd-icons-scale-factor 1.0)
   :config
-  (setq doom-modeline-always-show-macro-register t)
+  (setopt doom-modeline-always-show-macro-register t)
   (dolist (face '(mode-line mode-line-inactive))
     (set-face-attribute face nil :font my/font :height 112))
   (add-hook 'doom-modeline-mode-hook
@@ -304,7 +354,9 @@
                                       :weight 'normal :slant 'normal)))))
   (doom-modeline-mode 1))
 
-(use-package focus :ensure t :defer t)
+(use-package focus
+  :ensure t
+  :defer t)
 
 (use-package colorful-mode
   :ensure t
@@ -319,12 +371,13 @@
 
 (use-package ansi-color
   :ensure nil
-  :hook (compilation-filter . ansi-color-compilation-filter))
+  :hook
+  (compilation-filter . ansi-color-compilation-filter))
 
 ;;; ===============================================================
 ;;; Navigation
 
-;; gs / d/y/v + gs
+;; d/y/v + gs
 (use-package flash
   :ensure (:host github :repo "Prgebish/flash")
   :commands (flash-jump flash-jump-continue flash-treesitter)
@@ -355,19 +408,16 @@
 
 (use-package nerd-icons-dired
   :ensure t
-  :hook (dired-mode . nerd-icons-dired-mode))
+  :hook
+  (dired-mode . nerd-icons-dired-mode))
 
-(use-package buffer-move :ensure t :defer t)
+(use-package buffer-move
+  :ensure t
+  :defer t)
 
-(defun my/kill-buffer-and-window ()
-  (interactive)
-  (let ((buffer (current-buffer)))
-    (when (and (> (count-windows) 1)
-               (not (one-window-p)))
-      (delete-window))
-    (kill-buffer buffer)))
-
-(use-package restart-emacs :ensure t :defer t)
+(use-package restart-emacs
+  :ensure t
+  :defer t)
 
 ;;; ===============================================================
 ;;; LSP
@@ -389,6 +439,7 @@
 
 (use-package marginalia
   :ensure t
+  :defer
   :after vertico
   :init
   (marginalia-mode))
@@ -401,23 +452,34 @@
   (completion-category-defaults nil)
   (completion-pcm-leading-wildcard t))
 
-(use-package consult :ensure t :after vertico)
+(use-package consult
+  :ensure t
+  :after vertico
+  :defer t)
+
+(use-package consult-dir
+  :ensure t
+  :defer t)
 
 ;;; ===============================================================
 ;;; Editing
 
 (use-package move-text
   :ensure t
-  :bind (("M-<up>"   . move-text-up)
-         ("M-<down>" . move-text-down)))
+  :bind
+  (("M-<up>"   . move-text-up)
+   ("M-<down>" . move-text-down)))
 
-(use-package sudo-edit :ensure t :defer t)
+(use-package sudo-edit
+  :ensure t
+  :defer t)
 
 (use-package org
   :ensure nil
-  :hook ((org-mode . visual-line-mode)
-         (org-mode . org-indent-mode)
-         (org-mode . (lambda () (auto-fill-mode 0))))
+  :hook 
+  ((org-mode . visual-line-mode)
+   (org-mode . org-indent-mode)
+   (org-mode . (lambda () (auto-fill-mode 0))))
   :custom
   (org-hide-emphasis-markers t)
   (org-hide-leading-stars t)
@@ -430,17 +492,19 @@
   (org-cycle-hide-drawer-startup t)
   (org-return-follows-link t)
   :config
-  (setq evil-auto-indent nil)
+  (setopt evil-auto-indent nil)
   (set-face-attribute 'org-ellipsis nil :underline nil))
 
 (use-package olivetti
   :ensure t
-  :hook (org-mode . olivetti-mode))
+  :hook
+  (org-mode . olivetti-mode))
 
 (use-package org-modern
   :ensure t
   :after org
-  :hook (org-mode . org-modern-mode)
+  :hook
+  (org-mode . org-modern-mode)
   :custom
   (org-modern-star 'replace)
   (org-modern-replace-stars '("◉" "○" "◈" "◇" "•")) 
@@ -449,23 +513,31 @@
 
 (use-package org-tidy
   :ensure t
-  :hook (org-mode . org-tidy-mode))
+  :hook
+  (org-mode . org-tidy-mode))
 
 ;;; ===============================================================
 ;;; Misc
 
-(use-package helpful :ensure t :defer t) 
+(use-package helpful
+  :ensure t
+  :defer t) 
 
-(use-package devdocs :ensure t :defer t)
+(use-package devdocs
+  :ensure t
+  :defer t)
 
-(use-package vterm :ensure t)
+(use-package vterm
+  :ensure t
+  :commands vterm
+  :defer t)
 
 (use-package vterm-toggle
   :ensure t
   :after vterm
+  :commands vterm-toggle
   :config
-  (setq vterm-toggle-fullscreen-p nil)
-  ;; (setq vterm-toggle-scope 'project)
+  (setopt vterm-toggle-fullscreen-p nil)
   (add-to-list 'display-buffer-alist
              '((lambda (buffer-or-name _)
                    (let ((buffer (get-buffer buffer-or-name)))
@@ -475,13 +547,5 @@
                 (display-buffer-reuse-window display-buffer-at-bottom)
                 (reusable-frames . visible)
                 (window-height . 0.3))))
-
-(defun my/vterm-only ()
-  (interactive)
-  (let ((display-buffer-alist nil)) 
-    (vterm)
-    (delete-other-windows)
-    (set-process-query-on-exit-flag
-     (get-buffer-process (current-buffer)) nil)))
 
 ;;; init.el ends here

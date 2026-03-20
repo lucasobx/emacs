@@ -1,8 +1,8 @@
 ## Requirements
-- Emacs 29+
-- PragmataPro
-- Nerd Icons
-- libvterm
-- ripgrep
-- libtool
-- cmake
+* Emacs 29+
+* PragmataPro
+* Nerd Icons
+* libvterm
+* ripgrep
+* cmake
+* libtool

@@ -220,9 +220,6 @@
     "d"   '(:ignore t :wk "dired")
     "d d" '(dired :wk "open directory")
     "d j" '(dired-jump :wk "jump to directory")
-    "d p" '((lambda () (interactive)
-              (dired "~/documents/org"))
-            :wk "open projects folder")
     
     ;; --- emacs
     "e"   '(:ignore t :wk "emacs")
@@ -247,7 +244,10 @@
     "o"   '(:ignore t :wk "org")
     "o o" '(org-toggle-checkbox :wk "toggle checkbox")
     "o p" '(org-tidy-untidy-buffer :wk "edit property")
-
+    "o f" '((lambda () (interactive)
+              (dired "~/documents/org"))
+            :wk "open org folder")
+    
     ;; --- search
     "s"   '(:ignore t :wk "search")
     "s s" '(consult-line :wk "line")
@@ -309,9 +309,9 @@
   :config
   (global-evil-surround-mode 1))
 
-(use-package evil-tutor
-  :ensure t
-  :defer t)
+;; (use-package evil-tutor
+;;   :ensure t
+;;   :defer t)
 
 ;;; ===============================================================
 ;;; UI

@@ -30,9 +30,12 @@
 ;; miscellaneous performance
 (setq read-process-output-max (* 1024 1024 4))
 (setq process-adaptive-read-buffering nil)
-(setq auto-mode-case-fold nil) 
+(setq inhibit-compacting-font-caches t)
 (setq ffap-machine-p-known 'reject)
+(setq vc-handled-backends nil)
+(setq auto-mode-case-fold nil) 
 (setq inhibit-x-resources t)
+(setq site-run-file nil)
 
 ;; pgtk (wayland)
 (when (boundp 'pgtk-wait-for-event-timeout)
@@ -45,19 +48,19 @@
 ;; default frame appearance
 (setq default-frame-alist
       '((background-color . "#110d12")
-        (vertical-scroll-bars . nil)
         (horizontal-scroll-bars . nil)
+        (vertical-scroll-bars . nil)
         (menu-bar-lines . 0)
         (tool-bar-lines . 0)
-        (left-fringe . 8)
-        (right-fringe . 8)))
+        (right-fringe . 8)
+        (left-fringe . 8)))
 
 ;; disable UI elements early
 (setq package-enable-at-startup nil)
 (setq-default mode-line-format nil)
+(setq scroll-bar-mode nil)
 (setq menu-bar-mode nil)
 (setq tool-bar-mode nil)
-(setq scroll-bar-mode nil)
 (advice-add 'display-startup-screen :override #'ignore)
 
 ;; utf-8
@@ -69,12 +72,9 @@
 (setq bidi-inhibit-bpa t)
 
 ;; misc
-(setq frame-inhibit-implied-resize t
-      frame-resize-pixelwise t
-      inhibit-compacting-font-caches t)
-(setq ad-redefinition-action 'accept)
 (setq command-line-ns-option-alist nil)
 (setq command-line-x-option-alist nil)
+(setq ad-redefinition-action 'accept)
 (setenv "LSP_USE_PLISTS" "true")
 
 ;;; early-init.el ends here

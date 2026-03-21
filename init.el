@@ -127,12 +127,10 @@
   (load custom-file 'noerror 'nomessage)
   (put 'narrow-to-region 'disabled nil)
 
-  ;; startup message
   (add-hook 'emacs-startup-hook
             (lambda ()
               (message "Booted in %s." (emacs-init-time))))
 
-  ;; ignore system buffers during navigation
   (defun skip-these-buffers (_window buffer _bury-or-kill)
     "Function for `switch-to-prev-buffer-skip'."
     (string-match "\\*[^*]+\\*" (buffer-name buffer)))
@@ -190,7 +188,8 @@
   (setopt which-key-idle-delay 0.2
           which-key-add-column-padding 1
           which-key-min-display-lines 6
-          which-key-separator " → "))
+          which-key-separator " → ")
+  (set-face-attribute 'which-key-note-face nil :height 1.0))
 
 (use-package general
   :ensure (:wait t)

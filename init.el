@@ -72,13 +72,13 @@
   (display-line-numbers-type 'relative)
   (display-line-numbers-width 3)
   (history-length 25)
-  (indent-tabs-mode nil)
   (inhibit-startup-message t)
   (initial-scratch-message "")
   (make-backup-files nil)
   (ring-bell-function 'ignore)
   (switch-to-buffer-obey-display-actions t)
   (tab-always-indent 'complete)
+  (indent-tabs-mode nil)
   (tab-width 2)
   (scroll-margin 10)
   (scroll-conservatively 101)
@@ -93,7 +93,7 @@
   (split-width-threshold 100)
   (warning-minimum-level :emergency)
   (global-auto-revert-non-file-buffers t)
-  (global-auto-revert-mode 1)
+  (global-auto-revert-mode t)
   (uniquify-buffer-name-style 'forward)
   (echo-keystrokes 0.1)
   (sentence-end-double-space nil)
@@ -118,7 +118,7 @@
   (delete-selection-mode 1)
   (tooltip-mode -1)
   (electric-pair-mode 1)
-  (electric-indent-mode -1)
+  (electric-indent-mode 1)
   (defun display-startup-echo-area-message () (message ""))
   :config
   (setq custom-file (locate-user-emacs-file "custom-vars.el"))
@@ -187,9 +187,10 @@
   :config
   (setopt which-key-idle-delay 0.2
           which-key-add-column-padding 1
-          which-key-min-display-lines 6
+          which-key-min-display-lines 5
           which-key-separator " → ")
-  (set-face-attribute 'which-key-note-face nil :height 1.0))
+  (set-face-attribute 'which-key-note-face nil :height 1.0)
+  (setopt which-key-sort-order 'which-key-local-then-key-order))
 
 (use-package general
   :ensure (:wait t)
@@ -203,11 +204,11 @@
     :global-prefix "M-SPC")
   (my/keys
     ;; --- navigation
-    "/"       '(flash-jump :wk "flash")
-    "<right>" '(evil-end-of-line :wk "end of line")
-    "<left>"  '(evil-beginning-of-line :wk "beg of line")
-    "<tab>"   '(other-window :wk "other window")
-
+    "k"     '(my/kill-buffer-and-window :wk "kill buffer")
+    "["     '(evil-beginning-of-line :wk "beg-line")
+    "]"     '(evil-end-of-line :wk "end-line")
+    "/"     '(flash-jump :wk "flash")
+    
     ;; --- buffers
     "b"         '(:ignore t :wk "buffer")
     "b r"       '(revert-buffer :wk "reload buffer")
@@ -239,14 +240,6 @@
     "h v" '(helpful-variable :wk "variable")
     "h f" '(helpful-function :wk "function")
 
-    ;; --- org
-    "o"   '(:ignore t :wk "org")
-    "o o" '(org-toggle-checkbox :wk "toggle checkbox")
-    "o p" '(org-tidy-untidy-buffer :wk "edit property")
-    "o f" '((lambda () (interactive)
-              (dired "~/documents/org"))
-            :wk "open org folder")
-    
     ;; --- search
     "s"   '(:ignore t :wk "search")
     "s s" '(consult-line :wk "line")
@@ -265,7 +258,6 @@
 
     ;; --- windows
     "w"         '(:ignore t :wk "windows")
-    "w k"       '(my/kill-buffer-and-window :wk "kill buffer")
     "w w"       '(evil-window-split :wk "horizontal split")
     "w v"       '(evil-window-vsplit :wk "vertical split")
     "w c"       '(evil-window-delete :wk "close window")
@@ -273,7 +265,15 @@
     "w <right>" '(buf-move-right :wk "move right")
     "w <left>"  '(buf-move-left :wk "move left")
     "w <down>"  '(buf-move-down :wk "move down")
-    "w <up>"    '(buf-move-up :wk "move up")))
+    "w <up>"    '(buf-move-up :wk "move up"))
+  (my/keys
+    :keymaps 'org-mode-map
+    "o"   '(:ignore t :wk "org")
+    "o o" '(org-toggle-checkbox :wk "toggle checkbox")
+    "o p" '(org-tidy-untidy-buffer :wk "edit property")
+    "o f" '((lambda () (interactive)
+              (dired "~/documents/org"))
+            :wk "open org folder")))
 
 (use-package evil
   :ensure (:wait t)
@@ -287,6 +287,8 @@
           evil-split-window-below t
           evil-shift-width 2)
   :config
+  (define-key evil-insert-state-map (kbd "C-y") 'yank)
+  (define-key evil-normal-state-map (kbd "C-y") 'yank)
   (evil-set-initial-state 'vterm-mode 'emacs)
   (evil-mode 1))
 
@@ -343,6 +345,7 @@
   (nerd-icons-scale-factor 1.0)
   :config
   (setopt doom-modeline-always-show-macro-register t)
+  (setopt doom-modeline-buffer-modification-icon nil)
   (dolist (face '(mode-line mode-line-inactive))
     (set-face-attribute face nil :font my/font :height 112))
   (add-hook 'doom-modeline-mode-hook

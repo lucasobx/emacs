@@ -376,6 +376,18 @@
   :hook
   (compilation-filter . ansi-color-compilation-filter))
 
+(use-package line-reminder
+  :ensure t
+  :config
+  (add-hook 'minibuffer-setup-hook (lambda () (line-reminder-mode -1)))
+  (setopt line-reminder-show-option 'indicators)
+  (setopt line-reminder-bitmap 'vertical-bar)
+  (set-face-attribute 'line-reminder-modified-sign-face nil
+                      :foreground "#a67c6a")
+  (set-face-attribute 'line-reminder-saved-sign-face nil
+                      :foreground "#758672")
+  (global-line-reminder-mode 1))
+
 ;;; ===============================================================
 ;;; Navigation
 

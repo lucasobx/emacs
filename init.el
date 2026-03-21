@@ -532,8 +532,11 @@
 (use-package vterm
   :ensure t
   :commands vterm
-  :defer t)
-
+  :defer t
+  :config
+  (add-to-list 'vterm-keymap-exceptions "M-w")
+  (define-key vterm-mode-map (kbd "M-w") #'kill-ring-save))
+  
 (use-package vterm-toggle
   :ensure t
   :after vterm

@@ -14,4 +14,4 @@ Create a system shortcut to launch Emacs in terminal mode with:
 emacs --eval "(my/vterm-only)"
 ```
 ___
-<img width="2560" height="1548" alt="image" src="https://github.com/user-attachments/assets/06e854f5-ff0f-4643-9e5f-61a114b42df1" />
+<img width="2560" height="1548" alt="image" src="https://github.com/user-attachments/assets/6b4388c0-bca8-495a-a43f-8e4b2657c75a" />

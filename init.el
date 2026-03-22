@@ -73,6 +73,7 @@
   (display-line-numbers-width 3)
   (history-length 25)
   (inhibit-startup-message t)
+  (message-truncate-lines t)
   (initial-scratch-message "")
   (make-backup-files nil)
   (ring-bell-function 'ignore)
@@ -169,14 +170,6 @@
     (let ((proc (get-buffer-process (current-buffer))))
           (when proc (set-process-query-on-exit-flag proc nil)))))
 
-(defun my/kill-buffer-and-window ()
-  (interactive)
-  (let ((buffer (current-buffer)))
-    (when (and (> (count-windows) 1)
-               (not (one-window-p)))
-      (delete-window))
-    (kill-buffer buffer)))
-
 ;;; ===============================================================
 ;;; Keybindings
 
@@ -252,10 +245,10 @@
 
     ;; --- toggles
     "t"   '(:ignore t :wk "toggle")
+    "t t" '(vterm-toggle :wk "vterm")
     "t f" '(focus-mode :wk "focus mode")
-    "t t" '(vterm-toggle :wk "toggle vterm")
-    "t l" '(visual-line-mode :wk "toggle truncated lines")
-
+    "t l" '(visual-line-mode :wk "truncated lines")
+    
     ;; --- windows
     "w"         '(:ignore t :wk "windows")
     "w w"       '(evil-window-split :wk "horizontal split")
@@ -547,7 +540,10 @@
   :defer t
   :config
   (add-to-list 'vterm-keymap-exceptions "M-w")
-  (define-key vterm-mode-map (kbd "M-w") #'kill-ring-save))
+  (define-key vterm-mode-map (kbd "M-w") #'kill-ring-save)
+  (define-key vterm-mode-map (kbd "C-c")
+              (lambda () (interactive)
+                (vterm-send-key "c" nil nil t))))
   
 (use-package vterm-toggle
   :ensure t

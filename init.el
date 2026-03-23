@@ -76,14 +76,15 @@
   (savehist-mode 1)
   (recentf-mode 1)
   (winner-mode 1)
-  
+
   :custom
   ;; ui
   (redisplay-skip-fontification-on-input t)
   (uniquify-buffer-name-style 'forward)
   (display-line-numbers-type 'relative)
+  (display-line-numbers-width-start t)
   (warning-minimum-level :emergency)
-  (display-line-numbers-width 3)
+  ;; (display-line-numbers-width 3)
   (initial-scratch-message "")
   (ring-bell-function 'ignore)
   (split-width-threshold 100)
@@ -127,7 +128,7 @@
   (scroll-conservatively 101)
   (scroll-margin 10)
   (scroll-step 1)
-  
+
   :config
   ;; buffers
   (defun skip-these-buffers (_window buffer _bury-or-kill)
@@ -156,7 +157,7 @@
   (add-hook 'minibuffer-setup-hook
             (lambda () (setq-local face-remapping-alist
                                    '((default :height 0.95)))))
-  
+
   :bind
   ("C-="     . text-scale-increase)
   ("C--"     . text-scale-decrease)
@@ -173,7 +174,7 @@
 (defun my/vterm-only ()
   (interactive)
   (require 'vterm)
-  (let ((display-buffer-alist nil)) 
+  (let ((display-buffer-alist nil))
     (vterm)
     (delete-other-windows)
     (let ((proc (get-buffer-process (current-buffer))))
@@ -218,7 +219,7 @@
     "["     '(evil-beginning-of-line :wk "beg-line")
     "]"     '(evil-end-of-line :wk "end-line")
     "/"     '(flash-jump :wk "flash")
-    
+
     ;; --- buffers
     "b"         '(:ignore t :wk "buffer")
     "b r"       '(revert-buffer :wk "reload buffer")
@@ -230,7 +231,7 @@
     "d"   '(:ignore t :wk "dired")
     "d d" '(dired :wk "open directory")
     "d j" '(dired-jump :wk "jump to directory")
-    
+
     ;; --- emacs
     "e"   '(:ignore t :wk "emacs")
     "e s" '(sudo-edit :wk "sudo edit file")
@@ -242,7 +243,7 @@
     "e c" '((lambda () (interactive)
               (find-file (locate-user-emacs-file "init.el")))
             :wk "edit config")
-    
+
     ;; --- help
     "h"   '(:ignore t :wk "help")
     "h d" '(devdocs-lookup :wk "devdocs")
@@ -265,7 +266,8 @@
     "t t" '(vterm-toggle :wk "vterm")
     "t f" '(focus-mode :wk "focus mode")
     "t l" '(visual-line-mode :wk "truncated lines")
-    
+    "t w" '(my/toggle-whitespace-cleanup :wk "whitespace cleanup")
+
     ;; --- windows
     "w"         '(:ignore t :wk "windows")
     "w w"       '(evil-window-split :wk "horizontal split")
@@ -279,8 +281,9 @@
   (my/keys
     :keymaps 'org-mode-map
     "o"   '(:ignore t :wk "org")
-    "o o" '(org-toggle-checkbox :wk "toggle checkbox")
     "o p" '(org-tidy-untidy-buffer :wk "edit property")
+    "o o" '(org-toggle-checkbox :wk "toggle checkbox")
+    "o l" '(org-insert-link :wk "insert link")
     "o f" '((lambda () (interactive)
               (dired "~/documents/org"))
             :wk "open org folder")))
@@ -327,7 +330,7 @@
 ;;; ===============================================================
 ;;; UI
 
-(use-package nerd-icons 
+(use-package nerd-icons
   :ensure t)
 
 (use-package rg-themes
@@ -397,7 +400,7 @@
   (set-face-attribute 'line-reminder-modified-sign-face nil
                       :foreground "#a67c6a")
   (set-face-attribute 'line-reminder-saved-sign-face nil
-                      :foreground "#758672"))
+                      :foreground "#503f58"))
 
 ;;; ===============================================================
 ;;; Navigation
@@ -503,23 +506,39 @@
   :ensure t
   :defer t)
 
+(use-package whitespace
+  :ensure nil
+  :defer t
+  :hook
+  (before-save . whitespace-cleanup)
+  (prog-mode . whitespace-mode)
+  :init
+  (defun my/toggle-whitespace-cleanup ()
+    (interactive)
+    (if (memq #'whitespace-cleanup before-save-hook)
+        (progn
+          (remove-hook 'before-save-hook #'whitespace-cleanup)
+          (message "Whitespace cleanup on save: OFF"))
+      (add-hook 'before-save-hook #'whitespace-cleanup)
+      (message "Whitespace cleanup on save: ON"))))
+
 (use-package org
   :ensure nil
-  :hook 
+  :hook
   ((org-mode . visual-line-mode)
    (org-mode . org-indent-mode)
    (org-mode . (lambda () (auto-fill-mode 0))))
   :custom
-  (org-hide-emphasis-markers t)
-  (org-hide-leading-stars t)
-  (org-ellipsis " ∷")
-  (org-auto-align-tags nil)
-  (org-tags-column 0)
   (org-catch-invisible-edits 'show-and-error)
-  (org-special-ctrl-a/e t)
   (org-insert-heading-respect-content t)
   (org-cycle-hide-drawer-startup t)
+  (org-hide-emphasis-markers t)
   (org-return-follows-link t)
+  (org-hide-leading-stars t)
+  (org-auto-align-tags nil)
+  (org-special-ctrl-a/e t)
+  (org-tags-column 0)
+  (org-ellipsis " ∷")
   :config
   (setopt evil-auto-indent nil)
   (set-face-attribute 'org-ellipsis nil :underline nil))
@@ -536,9 +555,9 @@
   (org-mode . org-modern-mode)
   :custom
   (org-modern-star 'replace)
-  (org-modern-replace-stars '("◉" "○" "◈" "◇" "•")) 
+  (org-modern-replace-stars '("◉" "○" "◈" "◇" "•"))
   (org-modern-checkbox '((?X . "☑") (?\s . "☐")))
-  (org-modern-list '((?- . "›") (?+ . "»") (?* . "⋙")))) 
+  (org-modern-list '((?- . "›") (?+ . "»") (?* . "⋙"))))
 
 (use-package org-tidy
   :ensure t
@@ -550,7 +569,7 @@
 
 (use-package helpful
   :ensure t
-  :defer t) 
+  :defer t)
 
 (use-package devdocs
   :ensure t
@@ -564,7 +583,7 @@
   (add-to-list 'vterm-keymap-exceptions "M-w")
   (define-key vterm-mode-map (kbd "M-w") #'kill-ring-save)
   (evil-define-key 'emacs vterm-mode-map (kbd "C-c") #'vterm--self-insert))
-  
+
 (use-package vterm-toggle
   :ensure t
   :after vterm

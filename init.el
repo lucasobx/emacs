@@ -63,88 +63,105 @@
 (use-package emacs
   :ensure nil
   :custom
-  (auto-save-file-name-transforms
-   '((".*" "~/.config/emacs/auto-saves/" t)))
+  ;; ui
   (redisplay-skip-fontification-on-input t)
-  (auto-save-no-message t)
-  (delete-by-moving-to-trash t)
-  (create-lockfiles nil)
+  (uniquify-buffer-name-style 'forward)
   (display-line-numbers-type 'relative)
+  (warning-minimum-level :emergency)
   (display-line-numbers-width 3)
-  (history-length 25)
-  (inhibit-startup-message t)
-  (message-truncate-lines t)
   (initial-scratch-message "")
-  (make-backup-files nil)
   (ring-bell-function 'ignore)
+  (split-width-threshold 100)
+  (inhibit-startup-message t)
+  (treesit-font-lock-level 4)
+  (message-truncate-lines t)
+  (echo-keystrokes 0.1)
+  (use-short-answers t)
+  (use-dialog-box nil)
+  (truncate-lines t)
+  
+  ;; minibuffer
+  (minibuffer-prompt-properties
+    '(read-only t cursor-intangible t face minibuffer-prompt))
+  (read-extended-command-predicate
+   #'command-completion-default-include-p)
   (switch-to-buffer-obey-display-actions t)
+  (enable-recursive-minibuffers t)
+  (lazy-highlight-initial-delay 0)
+  (resize-mini-windows 'grow-only)
+  (history-length 25)
+
+  ;; editing
+  (kill-do-not-save-duplicates t)
+  (sentence-end-double-space nil)
   (tab-always-indent 'complete)
   (indent-tabs-mode nil)
   (tab-width 2)
-  (scroll-margin 10)
-  (scroll-conservatively 101)
-  (scroll-step 1)
-  (truncate-lines t)
+
+  ;; files
+  (auto-save-file-name-transforms
+   '((".*" "~/.config/emacs/auto-saves/" t)))
+  (find-file-suppress-same-file-warnings t)
+  (global-auto-revert-non-file-buffers t)
+  (kill-buffer-delete-auto-save-files t)
+  (auto-save-no-message t)
+  (make-backup-files nil)
+  (create-lockfiles nil)
+  
+  ;; scroll
+  (pixel-scroll-precision-use-momentum nil)
   (scroll-preserve-screen-position t)
   (mouse-wheel-progressive-speed nil)
-  (pixel-scroll-precision-use-momentum nil)
-  (treesit-font-lock-level 4)
-  (use-dialog-box nil)
-  (use-short-answers t)
-  (split-width-threshold 100)
-  (warning-minimum-level :emergency)
-  (global-auto-revert-non-file-buffers t)
-  (global-auto-revert-mode t)
-  (uniquify-buffer-name-style 'forward)
-  (echo-keystrokes 0.1)
-  (sentence-end-double-space nil)
-  (enable-recursive-minibuffers t)
-  (read-extended-command-predicate
-   #'command-completion-default-include-p)
-  (kill-do-not-save-duplicates t)
-  (kill-buffer-delete-auto-save-files t)
-  (minibuffer-prompt-properties
-    '(read-only t cursor-intangible t face minibuffer-prompt))
-  (find-file-suppress-same-file-warnings t)
-  (lazy-highlight-initial-delay 0)
-  (resize-mini-windows 'grow-only)
+  (delete-by-moving-to-trash t)
+  (scroll-conservatively 101)
+  (scroll-margin 10)
+  (scroll-step 1)
+  
   :init
-  (global-hl-line-mode -1)
-  (recentf-mode 1)
-  (savehist-mode 1)
-  (save-place-mode 1)
-  (winner-mode 1)
-  (file-name-shadow-mode 1)
-  (column-number-mode 1)
-  (delete-selection-mode 1)
-  (tooltip-mode -1)
-  (electric-pair-mode 1)
-  (electric-indent-mode 1)
   (defun display-startup-echo-area-message () (message ""))
+  (global-auto-revert-mode t)
+  (file-name-shadow-mode 1)
+  (delete-selection-mode 1)
+  (global-hl-line-mode -1)
+  (electric-indent-mode 1)
+  (electric-pair-mode 1)
+  (column-number-mode 1)
+  (save-place-mode 1)
+  (tooltip-mode -1)
+  (savehist-mode 1)
+  (recentf-mode 1)
+  (winner-mode 1)
+  
   :config
+  ;; buffers
+  (defun skip-these-buffers (_window buffer _bury-or-kill)
+    "Function for `switch-to-prev-buffer-skip'."
+    (string-match "\\*[^*]+\\*" (buffer-name buffer)))
+  (setq switch-to-prev-buffer-skip 'skip-these-buffers)
+
+  ;; benchmark
+  (add-hook 'emacs-startup-hook
+            (lambda ()
+              (message "Booted in %s." (emacs-init-time))))
+
+  ;; system
   (setq custom-file (locate-user-emacs-file "custom-vars.el"))
   (add-hook 'prog-mode-hook 'display-line-numbers-mode)
   (setopt native-comp-async-query-on-exit t)
   (load custom-file 'noerror 'nomessage)
   (put 'narrow-to-region 'disabled nil)
-
-  (add-hook 'emacs-startup-hook
-            (lambda ()
-              (message "Booted in %s." (emacs-init-time))))
-
-  (defun skip-these-buffers (_window buffer _bury-or-kill)
-    "Function for `switch-to-prev-buffer-skip'."
-    (string-match "\\*[^*]+\\*" (buffer-name buffer)))
-  (setq switch-to-prev-buffer-skip 'skip-these-buffers)
   
+  ;; bindings
   (define-key key-translation-map (kbd "ESC") (kbd "C-g"))
-  (global-unset-key (kbd "C-x C-z"))
-  (global-unset-key (kbd "C-<wheel-up>"))
   (global-unset-key (kbd "C-<wheel-down>"))
+  (global-unset-key (kbd "C-<wheel-up>"))
+  (global-unset-key (kbd "C-x C-z"))
   (global-unset-key (kbd "C-z"))
-  
-  (set-face-attribute 'help-key-binding nil :box nil :background nil
-                      :font my/font :height 0.95)
+
+  ;; ui
+  (set-face-attribute 'help-key-binding nil :box nil
+                      :background nil :font my/font
+                      :height 0.95)
   (add-hook 'minibuffer-setup-hook
             (lambda () (setq-local face-remapping-alist
                                    '((default :height 0.95)))))

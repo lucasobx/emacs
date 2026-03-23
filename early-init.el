@@ -32,7 +32,7 @@
 (setq process-adaptive-read-buffering nil)
 (setq inhibit-compacting-font-caches t)
 (setq ffap-machine-p-known 'reject)
-(setq vc-handled-backends nil)
+(setq vc-handled-backends '(Git))
 (setq auto-mode-case-fold nil) 
 (setq inhibit-x-resources t)
 (setq site-run-file nil)

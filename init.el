@@ -451,6 +451,10 @@
   :config
   (exec-path-from-shell-initialize))
 
+(use-package lua-ts-mode
+  :ensure nil
+  :mode "\\.lua\\'")
+
 ;;; ===============================================================
 ;;; Completion
 
@@ -558,9 +562,7 @@
   :config
   (add-to-list 'vterm-keymap-exceptions "M-w")
   (define-key vterm-mode-map (kbd "M-w") #'kill-ring-save)
-  (define-key vterm-mode-map (kbd "C-c")
-              (lambda () (interactive)
-                (vterm-send-key "c" nil nil t))))
+  (evil-define-key 'emacs vterm-mode-map (kbd "C-c") #'vterm--self-insert))
   
 (use-package vterm-toggle
   :ensure t

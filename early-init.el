@@ -51,9 +51,7 @@
         (horizontal-scroll-bars . nil)
         (vertical-scroll-bars . nil)
         (menu-bar-lines . 0)
-        (tool-bar-lines . 0)
-        (right-fringe . 8)
-        (left-fringe . 8)))
+        (tool-bar-lines . 0)))
 
 ;; disable UI elements early
 (setq package-enable-at-startup nil)

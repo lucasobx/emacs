@@ -62,6 +62,21 @@
 
 (use-package emacs
   :ensure nil
+  :init
+  (defun display-startup-echo-area-message () (message ""))
+  (global-auto-revert-mode t)
+  (file-name-shadow-mode 1)
+  (delete-selection-mode 1)
+  (global-hl-line-mode -1)
+  (electric-indent-mode 1)
+  (electric-pair-mode 1)
+  (column-number-mode 1)
+  (save-place-mode 1)
+  (tooltip-mode -1)
+  (savehist-mode 1)
+  (recentf-mode 1)
+  (winner-mode 1)
+  
   :custom
   ;; ui
   (redisplay-skip-fontification-on-input t)
@@ -79,7 +94,6 @@
   (use-short-answers t)
   (use-dialog-box nil)
   (truncate-lines t)
-  
   ;; minibuffer
   (minibuffer-prompt-properties
     '(read-only t cursor-intangible t face minibuffer-prompt))
@@ -90,14 +104,12 @@
   (lazy-highlight-initial-delay 0)
   (resize-mini-windows 'grow-only)
   (history-length 25)
-
   ;; editing
   (kill-do-not-save-duplicates t)
   (sentence-end-double-space nil)
   (tab-always-indent 'complete)
   (indent-tabs-mode nil)
   (tab-width 2)
-
   ;; files
   (auto-save-file-name-transforms
    '((".*" "~/.config/emacs/auto-saves/" t)))
@@ -107,7 +119,6 @@
   (auto-save-no-message t)
   (make-backup-files nil)
   (create-lockfiles nil)
-  
   ;; scroll
   (pixel-scroll-precision-use-momentum nil)
   (scroll-preserve-screen-position t)
@@ -117,47 +128,27 @@
   (scroll-margin 10)
   (scroll-step 1)
   
-  :init
-  (defun display-startup-echo-area-message () (message ""))
-  (global-auto-revert-mode t)
-  (file-name-shadow-mode 1)
-  (delete-selection-mode 1)
-  (global-hl-line-mode -1)
-  (electric-indent-mode 1)
-  (electric-pair-mode 1)
-  (column-number-mode 1)
-  (save-place-mode 1)
-  (tooltip-mode -1)
-  (savehist-mode 1)
-  (recentf-mode 1)
-  (winner-mode 1)
-  
   :config
   ;; buffers
   (defun skip-these-buffers (_window buffer _bury-or-kill)
     "Function for `switch-to-prev-buffer-skip'."
     (string-match "\\*[^*]+\\*" (buffer-name buffer)))
   (setq switch-to-prev-buffer-skip 'skip-these-buffers)
-
   ;; benchmark
   (add-hook 'emacs-startup-hook
-            (lambda ()
-              (message "Booted in %s." (emacs-init-time))))
-
+            (lambda () (message "Booted in %s." (emacs-init-time))))
   ;; system
   (setq custom-file (locate-user-emacs-file "custom-vars.el"))
   (add-hook 'prog-mode-hook 'display-line-numbers-mode)
   (setopt native-comp-async-query-on-exit t)
   (load custom-file 'noerror 'nomessage)
   (put 'narrow-to-region 'disabled nil)
-  
   ;; bindings
   (define-key key-translation-map (kbd "ESC") (kbd "C-g"))
   (global-unset-key (kbd "C-<wheel-down>"))
   (global-unset-key (kbd "C-<wheel-up>"))
   (global-unset-key (kbd "C-x C-z"))
   (global-unset-key (kbd "C-z"))
-
   ;; ui
   (set-face-attribute 'help-key-binding nil :box nil
                       :background nil :font my/font
@@ -165,6 +156,7 @@
   (add-hook 'minibuffer-setup-hook
             (lambda () (setq-local face-remapping-alist
                                    '((default :height 0.95)))))
+  
   :bind
   ("C-="     . text-scale-increase)
   ("C--"     . text-scale-decrease)

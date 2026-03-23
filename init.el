@@ -145,6 +145,14 @@
   (load custom-file 'noerror 'nomessage)
   (put 'narrow-to-region 'disabled nil)
   ;; bindings
+  ;; C-g closes minibuffer if active, otherwise quits normally
+  (define-advice keyboard-quit
+      (:around (quit) quit-current-context)
+    (if (active-minibuffer-window)
+        (if (minibufferp)
+            (minibuffer-keyboard-quit) (abort-recursive-edit))
+      (unless (or defining-kbd-macro executing-kbd-macro)
+        (funcall-interactively quit))))
   (define-key key-translation-map (kbd "ESC") (kbd "C-g"))
   (global-unset-key (kbd "C-<wheel-down>"))
   (global-unset-key (kbd "C-<wheel-up>"))
@@ -511,7 +519,6 @@
   :defer t
   :hook
   (before-save . whitespace-cleanup)
-  (prog-mode . whitespace-mode)
   :init
   (defun my/toggle-whitespace-cleanup ()
     (interactive)

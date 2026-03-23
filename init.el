@@ -170,6 +170,14 @@
     (let ((proc (get-buffer-process (current-buffer))))
           (when proc (set-process-query-on-exit-flag proc nil)))))
 
+(defun my/kill-buffer-and-window ()
+  (interactive)
+  (let ((buffer (current-buffer)))
+    (when (and (> (count-windows) 1)
+               (not (one-window-p)))
+      (delete-window))
+    (kill-buffer buffer)))
+
 ;;; ===============================================================
 ;;; Keybindings
 

@@ -525,10 +525,21 @@
 
 (use-package vertico
   :ensure t
-  :custom
-  (vertico-count 7)
   :init
-  (vertico-mode))
+  (vertico-mode)
+  :custom
+  (vertico-resize nil)
+  (vertico-cycle nil)
+  (vertico-count 7)
+  :config
+  (advice-add #'vertico--format-candidate :around
+            (lambda (orig cand prefix suffix index _start)
+              (setq cand (funcall orig cand prefix suffix index _start))
+              (concat
+               (if (= vertico--index index)
+                   (propertize "» " 'face '(:foreground "#768c9c" :weight bold))
+                 "  ")
+               cand))))
 
 (use-package marginalia
   :ensure t

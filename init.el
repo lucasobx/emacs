@@ -455,6 +455,16 @@
 ;;; ===============================================================
 ;;; LSP
 
+(use-package eldoc
+  :ensure nil
+  :custom
+  (eldoc-echo-area-use-multiline-p nil)
+  (eldoc-echo-area-prefer-doc-buffer t)
+  (eldoc-echo-area-display-truncation-message nil)
+  (eldoc-documentation-strategy 'eldoc-documentation-compose)
+  :init
+  (global-eldoc-mode))
+
 (use-package exec-path-from-shell
   :ensure t
   :config
@@ -462,7 +472,9 @@
 
 (use-package lua-ts-mode
   :ensure nil
-  :mode "\\.lua\\'")
+  :mode "\\.lua\\'"
+  :custom
+  (lua-ts-indent-offset 2))
 
 (use-package ruby-ts-mode
   :ensure nil

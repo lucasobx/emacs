@@ -205,7 +205,7 @@
   :config
   (setopt which-key-idle-delay 0.2
           which-key-add-column-padding 1
-          which-key-min-display-lines 5
+          which-key-min-display-lines 6
           which-key-separator " → ")
   (set-face-attribute 'which-key-note-face nil :height 1.0)
   (setopt which-key-sort-order 'which-key-local-then-key-order))
@@ -222,10 +222,11 @@
     :global-prefix "M-SPC")
   (my/keys
     ;; --- navigation
-    "k"     '(my/kill-buffer-and-window :wk "kill buffer")
-    "["     '(evil-beginning-of-line :wk "beg-line")
-    "]"     '(evil-end-of-line :wk "end-line")
-    "/"     '(flash-jump :wk "flash")
+    "k" '(my/kill-buffer-and-window :wk "kill buffer")
+    "[" '(evil-beginning-of-line :wk "beg-line")
+    "]" '(evil-end-of-line :wk "end-line")
+    "." '(embark-act :wk "embark")
+    "/" '(flash-jump :wk "flash")
 
     ;; --- buffers
     "b"         '(:ignore t :wk "buffer")
@@ -528,9 +529,8 @@
   :init
   (vertico-mode)
   :custom
-  (vertico-resize nil)
   (vertico-cycle nil)
-  (vertico-count 5)
+  (vertico-count 6)
   :config
   (advice-add #'vertico--format-candidate :around
             (lambda (orig cand prefix suffix index _start)
@@ -559,11 +559,21 @@
 (use-package consult
   :ensure t
   :after vertico
-  :defer t)
+  :defer t
+  :init
+  (advice-add #'register-preview :override #'consult-register-window)
+  (setopt xref-show-xrefs-function #'consult-xref
+          xref-show-definitions-function #'consult-xref))
 
 (use-package consult-dir
   :ensure t
   :defer t)
+
+(use-package embark
+  :ensure t
+  :defer t
+  :init
+  (setq prefix-help-command #'embark-prefix-help-command))
 
 ;; ===============================================================
 ;;; EDITING

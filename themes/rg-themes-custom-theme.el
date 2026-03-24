@@ -51,8 +51,8 @@
       (keyword-colour . "#a09b72")
       (invigorating   . "#758672")
       (some-red       . "#98585b")
-      (pinkish        . "#a67c6a"))   
-    
+      (pinkish        . "#a67c6a"))
+
     ;; The palette associations
     '((background . main-bg)
       (foreground . main-fg)
@@ -123,4 +123,4 @@
 
 (provide-theme 'rg-themes-custom)
 
-;;; rg-themes-bosque-theme.el ends here
+;;; rg-themes-custom-theme.el ends here

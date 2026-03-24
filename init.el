@@ -467,6 +467,29 @@
   :ensure nil
   :mode "\\.lua\\'")
 
+(use-package ruby-ts-mode
+  :ensure nil
+  :mode "\\.rb\\'")
+
+(use-package eglot
+  :ensure nil
+  :custom
+  (eglot-autoshutdown t)
+  (eglot-events-buffer-config '(:size 0 :format full))
+  (eglot-prefer-plaintext nil)
+  (jsonrpc-event-hook nil)
+  :init
+  (fset #'jsonrpc--log-event #'ignore)
+  (defun my/eglot-setup ()
+    (unless (memq major-mode '(emacs-lisp-mode lisp-mode))
+      (eglot-ensure)))
+  (add-hook 'prog-mode-hook #'my/eglot-setup)
+  (with-eval-after-load 'eglot
+    (add-to-list 'eglot-server-programs
+                 '((ruby-mode ruby-ts-mode) "ruby-lsp"))
+    (add-to-list 'eglot-server-programs
+                 '((lua-mode lua-ts-mode) "lua-language-server"))))
+
 ;;; ===============================================================
 ;;; Completion
 

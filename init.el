@@ -530,7 +530,7 @@
   :custom
   (vertico-resize nil)
   (vertico-cycle nil)
-  (vertico-count 7)
+  (vertico-count 5)
   :config
   (advice-add #'vertico--format-candidate :around
             (lambda (orig cand prefix suffix index _start)
@@ -543,7 +543,7 @@
 
 (use-package marginalia
   :ensure t
-  :defer
+  :defer t
   :after vertico
   :init
   (marginalia-mode))

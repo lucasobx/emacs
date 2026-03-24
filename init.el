@@ -1,9 +1,8 @@
 ;;; init.el --- Emacs --- -*- lexical-binding: t; no-byte-compile: t; -*-
-;;; ===============================================================
+;; ===============================================================
 ;;; Commentary:
 ;;; Code:
 
-;; elpaca package manager
 (defvar elpaca-installer-version 0.12)
 (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
 (defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
@@ -46,8 +45,8 @@
 (elpaca elpaca-use-package
   (elpaca-use-package-mode))
 
-;;; ===============================================================
-;;; Core settings
+;; ===============================================================
+;;; CORE SETTINGS
 
 (defvar my/font "PragmataPro Liga")
 (defvar my/size 132)
@@ -171,8 +170,8 @@
   ("C--"     . text-scale-decrease)
   ("C-<tab>" . other-window))
 
-;;; ===============================================================
-;;; Custom functions
+;; ===============================================================
+;;; CUSTOM FUNCTIONS
 
 (defun my/jump-to-end-of-block ()
   (interactive)
@@ -196,8 +195,8 @@
       (delete-window))
     (kill-buffer buffer)))
 
-;;; ===============================================================
-;;; Keybindings
+;; ===============================================================
+;;; KEYBINDINGS
 
 (use-package which-key
   :ensure nil
@@ -331,11 +330,11 @@
   :config
   (global-evil-surround-mode 1))
 
-;; (use-package evil-tutor
-;;   :ensure t
-;;   :defer t)
+(use-package evil-tutor
+  :ensure t
+  :defer t)
 
-;;; ===============================================================
+;; ===============================================================
 ;;; UI
 
 (use-package nerd-icons
@@ -410,8 +409,8 @@
   (set-face-attribute 'line-reminder-saved-sign-face nil
                       :foreground "#503f58"))
 
-;;; ===============================================================
-;;; Navigation
+;; ===============================================================
+;;; NAVIGATION
 
 ;; d/y/v + gs
 (use-package flash
@@ -452,29 +451,24 @@
   :ensure t
   :defer t)
 
-;;; ===============================================================
+;; ===============================================================
 ;;; LSP
-
-(use-package eldoc
-  :ensure nil
-  :custom
-  (eldoc-echo-area-use-multiline-p nil)
-  (eldoc-echo-area-prefer-doc-buffer t)
-  (eldoc-echo-area-display-truncation-message nil)
-  (eldoc-documentation-strategy 'eldoc-documentation-compose)
-  :init
-  (global-eldoc-mode))
 
 (use-package exec-path-from-shell
   :ensure t
   :config
   (exec-path-from-shell-initialize))
 
+(use-package markdown-mode
+  :ensure t
+  :defer t
+  :config
+  (set-face-attribute 'markdown-code-face nil :font my/font)
+  (set-face-attribute 'markdown-inline-code-face nil :font my/font))
+
 (use-package lua-ts-mode
   :ensure nil
-  :mode "\\.lua\\'"
-  :custom
-  (lua-ts-indent-offset 2))
+  :mode "\\.lua\\'")
 
 (use-package ruby-ts-mode
   :ensure nil
@@ -499,8 +493,35 @@
     (add-to-list 'eglot-server-programs
                  '((lua-mode lua-ts-mode) "lua-language-server"))))
 
-;;; ===============================================================
-;;; Completion
+(use-package eldoc
+  :ensure nil
+  :custom
+  (eldoc-echo-area-use-multiline-p nil)
+  (eldoc-echo-area-prefer-doc-buffer t)
+  (eldoc-echo-area-display-truncation-message nil)
+  (eldoc-documentation-strategy 'eldoc-documentation-compose)
+  :init
+  (global-eldoc-mode))
+
+(use-package eldoc-box
+  :ensure t
+  :defer t)
+
+(use-package flymake
+  :ensure nil
+  :defer t
+  :hook
+  (prog-mode . flymake-mode)
+  :custom
+  (flymake-show-diagnostics-at-end-of-line nil)
+  (flymake-indicator-type 'margins)
+  (flymake-margin-indicators-string
+   '((error "!" compilation-error)
+     (warning "?" compilation-warning)
+     (note "i" compilation-info))))
+
+;; ===============================================================
+;;; COMPLETION
 
 (use-package vertico
   :ensure t
@@ -533,8 +554,8 @@
   :ensure t
   :defer t)
 
-;;; ===============================================================
-;;; Editing
+;; ===============================================================
+;;; EDITING
 
 (use-package move-text
   :ensure t
@@ -603,8 +624,8 @@
   :hook
   (org-mode . org-tidy-mode))
 
-;;; ===============================================================
-;;; Misc
+;; ===============================================================
+;;; MISC
 
 (use-package helpful
   :ensure t

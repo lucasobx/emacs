@@ -425,10 +425,7 @@
   :init
   (with-eval-after-load 'evil
     (require 'flash-evil)
-    (flash-evil-setup t))
-  :config
-  (require 'flash-isearch)
-  (flash-isearch-mode 1))
+    (flash-evil-setup t)))
 
 (use-package dired
   :ensure nil

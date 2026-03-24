@@ -203,10 +203,12 @@
   :hook
   (after-init . which-key-mode)
   :config
-  (setopt which-key-idle-delay 0.2
+  (setopt which-key-max-description-length 28
           which-key-add-column-padding 1
           which-key-min-display-lines 6
-          which-key-separator " → ")
+          which-key-prefix-prefix ""
+          which-key-separator " → "
+          which-key-idle-delay 0.2)
   (set-face-attribute 'which-key-note-face nil :height 1.0)
   (setopt which-key-sort-order 'which-key-local-then-key-order))
 
@@ -223,10 +225,10 @@
   (my/keys
     ;; --- navigation
     "k" '(my/kill-buffer-and-window :wk "kill buffer")
-    "[" '(evil-beginning-of-line :wk "beg-line")
-    "]" '(evil-end-of-line :wk "end-line")
-    "." '(embark-act :wk "embark")
-    "/" '(flash-jump :wk "flash")
+    "[" '(evil-beginning-of-line :wk "beg of line")
+    "]" '(evil-end-of-line :wk "end of line")
+    "." '(embark-act :wk "context menu")
+    "/" '(flash-jump :wk "search jump")
 
     ;; --- buffers
     "b"         '(:ignore t :wk "buffer")
@@ -247,7 +249,7 @@
     "e r" '(restart-emacs :wk "restart emacs")
     "e f" '(eval-last-sexp :wk "eval expression")
     "e m" '(consult-mode-command :wk "mode commands")
-    "e e" '(my/jump-to-end-of-block :wk "jump to end of block")
+    "e e" '(my/jump-to-end-of-block :wk "end of block")
     "e c" '((lambda () (interactive)
               (find-file (locate-user-emacs-file "init.el")))
             :wk "edit config")
@@ -569,11 +571,46 @@
   :ensure t
   :defer t)
 
+;; embark + which-key
 (use-package embark
   :ensure t
   :defer t
   :init
-  (setq prefix-help-command #'embark-prefix-help-command))
+  (setopt prefix-help-command #'embark-prefix-help-command)
+  :config
+  (defun embark-which-key-indicator ()
+    (lambda (&optional keymap targets prefix)
+      (if (null keymap)
+          (which-key--hide-popup-ignore-command)
+        (which-key--show-keymap
+         (if (eq (plist-get (car targets) :type) 'embark-become)
+             "Become"
+           (format "Act on %s '%s'%s"
+                   (plist-get (car targets) :type)
+                   (embark--truncate-target (plist-get (car targets) :target))
+                   (if (cdr targets) "…" "")))
+         (if prefix
+             (pcase (lookup-key keymap prefix 'accept-default)
+               ((and (pred keymapp) km) km)
+               (_ (key-binding prefix 'accept-default)))
+           keymap)
+         nil nil t (lambda (binding)
+                     (not (string-suffix-p "-argument" (cdr binding))))))))
+
+  (defun embark-hide-which-key-indicator (fn &rest args)
+    "Hide the which-key indicator immediately when using the completing-read prompter."
+    (which-key--hide-popup-ignore-command)
+    (let ((embark-indicators
+           (remq #'embark-which-key-indicator embark-indicators)))
+      (apply fn args)))
+
+  (advice-add #'embark-completing-read-prompter
+              :around #'embark-hide-which-key-indicator)
+
+  (setq embark-indicators
+        '(embark-which-key-indicator
+          embark-highlight-indicator
+          embark-isearch-highlight-indicator)))
 
 ;; ===============================================================
 ;;; EDITING

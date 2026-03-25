@@ -354,6 +354,14 @@
 (use-package nerd-icons
   :ensure t)
 
+(use-package nerd-icons-completion
+  :ensure t
+  :after(:all nerd-icons marginalia)
+  :config
+  (nerd-icons-completion-mode)
+  (add-hook 'marginalia-mode-hook
+            #'nerd-icons-completion-marginalia-setup))
+
 (use-package rg-themes
   :ensure t
   :config

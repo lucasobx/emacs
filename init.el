@@ -183,7 +183,8 @@
   "Open vterm in full screen and disable exit query."
   (interactive)
   (require 'vterm)
-  (let ((display-buffer-alist nil))
+  (let ((popper-mode nil)
+        (display-buffer-alist nil))
     (vterm)
     (delete-other-windows)
     (let ((proc (get-buffer-process (current-buffer))))
@@ -234,10 +235,10 @@
     "/" '(flash-jump :wk "search jump")
 
     ;; --- buffers
-    "b"         '(:ignore t :wk "buffer")
-    "b r"       '(revert-buffer :wk "reload buffer")
-    "b b"       '(consult-buffer :wk "switch buffer")
-    "b h"  '(previous-buffer :wk "previous buffer")
+    "b"   '(:ignore t :wk "buffer")
+    "b r" '(revert-buffer :wk "reload buffer")
+    "b b" '(consult-buffer :wk "switch buffer")
+    "b h" '(previous-buffer :wk "previous buffer")
     "b l" '(next-buffer :wk "next buffer")
 
     ;; --- dired
@@ -264,6 +265,12 @@
     "h v" '(helpful-variable :wk "variable")
     "h f" '(helpful-function :wk "function")
 
+    ;; --- popper
+    "p"   '(:ignore t :wk "popper")
+    "p t" '(popper-toggle-type :wk "toggle type")
+    "p p" '(popper-toggle :wk "toggle popup")
+    "p l" '(popper-cycle :wk "next popup")
+
     ;; --- search
     "s"   '(:ignore t :wk "search")
     "s s" '(consult-line :wk "line")
@@ -276,10 +283,10 @@
 
     ;; --- toggles
     "t"   '(:ignore t :wk "toggle")
-    "t t" '(vterm-toggle :wk "vterm")
-    "t f" '(focus-mode :wk "focus mode")
-    "t l" '(visual-line-mode :wk "truncated lines")
     "t w" '(my/toggle-whitespace-cleanup :wk "whitespace cleanup")
+    "t l" '(visual-line-mode :wk "truncated lines")
+    "t f" '(focus-mode :wk "focus mode")
+    "t t" '(vterm :wk "vterm")
 
     ;; --- windows
     "w"   '(:ignore t :wk "windows")
@@ -417,6 +424,23 @@
                       :foreground "#a67c6a")
   (set-face-attribute 'line-reminder-saved-sign-face nil
                       :foreground "#503f58"))
+
+(use-package popper
+  :ensure t
+  :defer t
+  :init
+  (setopt popper-window-height 15)
+  (setopt popper-reference-buffers
+          '("\\*Async Shell Command\\*"
+            "^\\*vterm.*\\*$"
+            "\\*Messages\\*"
+            "Output\\*$"
+            compilation-mode
+            helpful-mode
+            vterm-mode
+            help-mode))
+  (setopt popper-mode-line "")
+  (popper-mode +1))
 
 ;; ===============================================================
 ;;; NAVIGATION
@@ -690,6 +714,14 @@
 ;; ===============================================================
 ;;; MISC
 
+(use-package vterm
+  :ensure t
+  :defer t
+  :config
+  (add-to-list 'vterm-keymap-exceptions "M-w")
+  (define-key vterm-mode-map (kbd "M-w") #'kill-ring-save)
+  (evil-define-key 'emacs vterm-mode-map (kbd "C-c") #'vterm--self-insert))
+
 (use-package helpful
   :ensure t
   :defer t)
@@ -697,30 +729,5 @@
 (use-package devdocs
   :ensure t
   :defer t)
-
-(use-package vterm
-  :ensure t
-  :commands vterm
-  :defer t
-  :config
-  (add-to-list 'vterm-keymap-exceptions "M-w")
-  (define-key vterm-mode-map (kbd "M-w") #'kill-ring-save)
-  (evil-define-key 'emacs vterm-mode-map (kbd "C-c") #'vterm--self-insert))
-
-(use-package vterm-toggle
-  :ensure t
-  :after vterm
-  :commands vterm-toggle
-  :config
-  (setopt vterm-toggle-fullscreen-p nil)
-  (add-to-list 'display-buffer-alist
-             '((lambda (buffer-or-name _)
-                   (let ((buffer (get-buffer buffer-or-name)))
-                     (with-current-buffer buffer
-                       (or (equal major-mode 'vterm-mode)
-                           (string-prefix-p vterm-buffer-name (buffer-name buffer))))))
-                (display-buffer-reuse-window display-buffer-at-bottom)
-                (reusable-frames . visible)
-                (window-height . 0.3))))
 
 ;;; init.el ends here

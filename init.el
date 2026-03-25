@@ -174,11 +174,13 @@
 ;;; CUSTOM FUNCTIONS
 
 (defun my/jump-to-end-of-block ()
+  "Jump to the end of the current block."
   (interactive)
   (beginning-of-defun)
   (forward-sexp))
 
 (defun my/vterm-only ()
+  "Open vterm in full screen and disable exit query."
   (interactive)
   (require 'vterm)
   (let ((display-buffer-alist nil))
@@ -188,6 +190,7 @@
           (when proc (set-process-query-on-exit-flag proc nil)))))
 
 (defun my/kill-buffer-and-window ()
+  "Kill the current buffer and close its window."
   (interactive)
   (let ((buffer (current-buffer)))
     (when (and (> (count-windows) 1)
@@ -358,15 +361,18 @@
 (use-package doom-modeline
   :ensure t
   :custom
+  (doom-modeline-window-width-limit 0)
+  (doom-modeline-total-line-number t)
+  (doom-modeline-buffer-encoding nil)
+  (doom-modeline-major-mode-icon t)
+  (doom-modeline-check-icon nil)
+  (nerd-icons-scale-factor 1.0)
+  (doom-modeline-modal-icon t)
   (doom-modeline-height 25)
   (doom-modeline-modal t)
-  (doom-modeline-modal-icon t)
   (doom-modeline-icon t)
-  (doom-modeline-major-mode-icon t)
-  (doom-modeline-buffer-encoding nil)
-  (doom-modeline-total-line-number t)
-  (nerd-icons-scale-factor 1.0)
   :config
+  (defun doom-modeline-check-icon (_icon _unicode _text &optional _face) "")
   (setopt doom-modeline-always-show-macro-register t)
   (setopt doom-modeline-buffer-modification-icon nil)
   (dolist (face '(mode-line mode-line-inactive))
@@ -571,7 +577,6 @@
   :ensure t
   :defer t)
 
-;; embark + which-key
 (use-package embark
   :ensure t
   :defer t

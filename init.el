@@ -237,8 +237,8 @@
     "b"         '(:ignore t :wk "buffer")
     "b r"       '(revert-buffer :wk "reload buffer")
     "b b"       '(consult-buffer :wk "switch buffer")
-    "b <left>"  '(previous-buffer :wk "previous buffer")
-    "b <right>" '(next-buffer :wk "next buffer")
+    "b h"  '(previous-buffer :wk "previous buffer")
+    "b l" '(next-buffer :wk "next buffer")
 
     ;; --- dired
     "d"   '(:ignore t :wk "dired")
@@ -282,15 +282,15 @@
     "t w" '(my/toggle-whitespace-cleanup :wk "whitespace cleanup")
 
     ;; --- windows
-    "w"         '(:ignore t :wk "windows")
-    "w w"       '(evil-window-split :wk "horizontal split")
-    "w v"       '(evil-window-vsplit :wk "vertical split")
-    "w c"       '(evil-window-delete :wk "close window")
-    "w n"       '(evil-window-new :wk "new window")
-    "w <right>" '(buf-move-right :wk "move right")
-    "w <left>"  '(buf-move-left :wk "move left")
-    "w <down>"  '(buf-move-down :wk "move down")
-    "w <up>"    '(buf-move-up :wk "move up"))
+    "w"   '(:ignore t :wk "windows")
+    "w w" '(evil-window-split :wk "horizontal split")
+    "w v" '(evil-window-vsplit :wk "vertical split")
+    "w c" '(evil-window-delete :wk "close window")
+    "w n" '(evil-window-new :wk "new window")
+    "w l" '(buf-move-right :wk "move right")
+    "w h" '(buf-move-left :wk "move left")
+    "w j" '(buf-move-down :wk "move down")
+    "w k" '(buf-move-up :wk "move up"))
   (my/keys
     :keymaps 'org-mode-map
     "o"   '(:ignore t :wk "org")

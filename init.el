@@ -260,10 +260,11 @@
 
     ;; --- help
     "h"   '(:ignore t :wk "help")
-    "h d" '(devdocs-lookup :wk "devdocs")
     "h h" '(helpful-at-point :wk "at point")
     "h v" '(helpful-variable :wk "variable")
     "h f" '(helpful-function :wk "function")
+    "h d" '(devdocs-lookup :wk "devdocs")
+    "h e" '(eldoc :wk "eldoc")
 
     ;; --- popper
     "p"   '(:ignore t :wk "popper")
@@ -434,6 +435,7 @@
           '("\\*Async Shell Command\\*"
             "^\\*vterm.*\\*$"
             "\\*Messages\\*"
+            "\\*eldoc\\*"
             "Output\\*$"
             compilation-mode
             helpful-mode

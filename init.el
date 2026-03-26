@@ -474,7 +474,6 @@
   (setopt popper-reference-buffers
           '("\\*Async Shell Command\\*"
             "^\\*vterm.*\\*$"
-            "\\*Messages\\*"
             "\\*eldoc\\*"
             "Output\\*$"
             compilation-mode

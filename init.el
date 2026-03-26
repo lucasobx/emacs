@@ -274,13 +274,13 @@
 
     ;; --- search
     "s"   '(:ignore t :wk "search")
-    "s s" '(consult-line :wk "line")
-    "s i" '(consult-imenu :wk "imenu")
-    "s f" '(consult-find :wk "find file")
-    "s g" '(consult-ripgrep :wk "ripgrep")
-    "s l" '(consult-line-multi :wk "line-multi")
-    "s d" '(consult-dir :wk "recent directories")
     "s r" '(consult-recent-file :wk "recent files")
+    "s l" '(consult-line-multi :wk "line in files")
+    "s d" '(consult-dir :wk "recent directories")
+    "s g" '(consult-ripgrep :wk "ripgrep")
+    "s i" '(consult-imenu :wk "imenu")
+    "s s" '(consult-line :wk "line")
+    "s f" '(consult-find :wk "file")
 
     ;; --- toggles
     "t"   '(:ignore t :wk "toggle")
@@ -333,6 +333,12 @@
   (setopt evil-collection-mode-list '(dashboard dired ibuffer magit))
   (evil-collection-init))
 
+(use-package evil-matchit
+  :ensure t
+  :after evil-collection
+  :config
+  (global-evil-matchit-mode 1))
+
 (use-package evil-commentary
   :ensure t
   :after evil
@@ -354,13 +360,17 @@
 (use-package nerd-icons
   :ensure t)
 
+(use-package nerd-icons-dired
+  :ensure t
+  :hook
+  (dired-mode . nerd-icons-dired-mode))
+
 (use-package nerd-icons-completion
   :ensure t
   :after(:all nerd-icons marginalia)
   :config
   (nerd-icons-completion-mode)
-  (add-hook 'marginalia-mode-hook
-            #'nerd-icons-completion-marginalia-setup))
+  (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
 
 (use-package rg-themes
   :ensure t
@@ -434,24 +444,6 @@
   (set-face-attribute 'line-reminder-saved-sign-face nil
                       :foreground "#503f58"))
 
-(use-package popper
-  :ensure t
-  :defer t
-  :init
-  (setopt popper-window-height 15)
-  (setopt popper-reference-buffers
-          '("\\*Async Shell Command\\*"
-            "^\\*vterm.*\\*$"
-            "\\*Messages\\*"
-            "\\*eldoc\\*"
-            "Output\\*$"
-            compilation-mode
-            helpful-mode
-            vterm-mode
-            help-mode))
-  (setopt popper-mode-line "")
-  (popper-mode +1))
-
 ;; ===============================================================
 ;;; NAVIGATION
 
@@ -479,12 +471,38 @@
   (dired-dwim-target t)
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-recursive-deletes 'top)
-  (dired-recursive-copies 'always))
+  (dired-recursive-copies 'alwaysa)
+  (dired-free-space nil)
+  :config
+  (defun my/abbrev-header ()
+    "Abbreviate the path."
+    (save-excursion
+      (goto-char (point-min))
+      (let ((inhibit-read-only t)
+            (home (expand-file-name "~")))
+        (save-excursion
+          (when (search-forward home nil t)
+            (replace-match "~"))))))
+  (add-hook 'dired-after-readin-hook #'my/abbrev-header))
 
-(use-package nerd-icons-dired
+(use-package popper
   :ensure t
-  :hook
-  (dired-mode . nerd-icons-dired-mode))
+  :defer t
+  :init
+  (setopt popper-window-height 15)
+  (setopt popper-reference-buffers
+          '("\\*Async Shell Command\\*"
+            "^\\*vterm.*\\*$"
+            "\\*Messages\\*"
+            "\\*eldoc\\*"
+            "Output\\*$"
+            compilation-mode
+            helpful-mode
+            vterm-mode
+            dired-mode
+            help-mode))
+  (setopt popper-mode-line "")
+  (popper-mode +1))
 
 (use-package buffer-move
   :ensure t
@@ -588,7 +606,10 @@
   :defer t
   :after vertico
   :init
-  (marginalia-mode))
+  (marginalia-mode)
+  :config
+  (setopt marginalia-annotators
+          (assq-delete-all 'file marginalia-annotators)))
 
 (use-package orderless
   :ensure t

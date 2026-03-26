@@ -230,9 +230,9 @@
     ;; --- navigation
     "k" '(my/kill-buffer-and-window :wk "kill buffer")
     "[" '(evil-beginning-of-line :wk "beg of line")
-    "<" '(previous-buffer :wk "previous buffer")
     "]" '(evil-end-of-line :wk "end of line")
-    "b" '(consult-buffer :wk "switch buffer")
+    "<" '(previous-buffer :wk "previ buffer")
+    "b" '(consult-buffer :wk "search buffer")
     ">" '(next-buffer :wk "next buffer")
     "d" '(dired-jump :wk "file manager")
     "." '(embark-act :wk "context menu")

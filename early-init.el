@@ -47,8 +47,7 @@
 
 ;; default frame appearance
 (setq default-frame-alist
-      '((background-color . "#110d12")
-        (horizontal-scroll-bars . nil)
+      '((horizontal-scroll-bars . nil)
         (vertical-scroll-bars . nil)
         (menu-bar-lines . 0)
         (tool-bar-lines . 0)))

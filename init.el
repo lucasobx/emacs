@@ -230,21 +230,13 @@
     ;; --- navigation
     "k" '(my/kill-buffer-and-window :wk "kill buffer")
     "[" '(evil-beginning-of-line :wk "beg of line")
+    "<" '(previous-buffer :wk "previous buffer")
     "]" '(evil-end-of-line :wk "end of line")
+    "b" '(consult-buffer :wk "switch buffer")
+    ">" '(next-buffer :wk "next buffer")
+    "d" '(dired-jump :wk "file manager")
     "." '(embark-act :wk "context menu")
     "/" '(flash-jump :wk "search jump")
-
-    ;; --- buffers
-    "b"   '(:ignore t :wk "buffer")
-    "b r" '(revert-buffer :wk "reload buffer")
-    "b b" '(consult-buffer :wk "switch buffer")
-    "b h" '(previous-buffer :wk "previous buffer")
-    "b l" '(next-buffer :wk "next buffer")
-
-    ;; --- dired
-    "d"   '(:ignore t :wk "dired")
-    "d d" '(dired :wk "open directory")
-    "d j" '(dired-jump :wk "jump to directory")
 
     ;; --- emacs
     "e"   '(:ignore t :wk "emacs")
@@ -471,19 +463,8 @@
   (dired-dwim-target t)
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-recursive-deletes 'top)
-  (dired-recursive-copies 'alwaysa)
-  (dired-free-space nil)
-  :config
-  (defun my/abbrev-header ()
-    "Abbreviate the path."
-    (save-excursion
-      (goto-char (point-min))
-      (let ((inhibit-read-only t)
-            (home (expand-file-name "~")))
-        (save-excursion
-          (when (search-forward home nil t)
-            (replace-match "~"))))))
-  (add-hook 'dired-after-readin-hook #'my/abbrev-header))
+  (dired-recursive-copies 'always)
+  (dired-free-space nil))
 
 (use-package popper
   :ensure t

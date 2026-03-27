@@ -342,7 +342,20 @@
   :config
   (global-evil-surround-mode 1))
 
+(use-package evil-goggles
+  :ensure t
+  :custom
+  (evil-goggles-duration 0.100)
+  (evil-goggles-enable-paste nil)
+  :config
+  (evil-goggles-mode)
+  (evil-goggles-use-diff-faces))
+
 (use-package evil-tutor
+  :ensure t
+  :defer t)
+
+(use-package transient
   :ensure t
   :defer t)
 
@@ -435,6 +448,7 @@
                       :foreground "#a67c6a")
   (set-face-attribute 'line-reminder-saved-sign-face nil
                       :foreground "#503f58"))
+
 
 ;; ===============================================================
 ;;; NAVIGATION
@@ -680,6 +694,9 @@
       (add-hook 'before-save-hook #'whitespace-cleanup)
       (message "Whitespace cleanup on save: ON"))))
 
+;; ===============================================================
+;;; WRITING & READING
+
 (use-package org
   :ensure nil
   :hook
@@ -723,7 +740,7 @@
   (org-mode . org-tidy-mode))
 
 ;; ===============================================================
-;;; MISC
+;;; TERMINAL
 
 (use-package vterm
   :ensure t
@@ -733,11 +750,21 @@
   (define-key vterm-mode-map (kbd "M-w") #'kill-ring-save)
   (evil-define-key 'emacs vterm-mode-map (kbd "C-c") #'vterm--self-insert))
 
+;; ===============================================================
+;;; DOCS
+
 (use-package helpful
   :ensure t
   :defer t)
 
 (use-package devdocs
+  :ensure t
+  :defer t)
+
+;; ===============================================================
+;;; VERSION CONTROL
+
+(use-package magit
   :ensure t
   :defer t)
 

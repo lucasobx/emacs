@@ -603,7 +603,11 @@
   (corfu-max-width 40)
   (corfu-bar-width 0)
   (corfu-auto nil)
-  (corfu-count 5))
+  (corfu-count 5)
+  :config
+  (corfu-popupinfo-mode)
+  (setopt corfu-popupinfo-delay nil)
+  (define-key corfu-map (kbd "M-d") #'corfu-popupinfo-toggle))
 
 (use-package nerd-icons-corfu
   :ensure t

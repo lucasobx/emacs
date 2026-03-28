@@ -258,6 +258,15 @@
     "h d" '(devdocs-lookup :wk "devdocs")
     "h e" '(eldoc :wk "eldoc")
 
+    "l"   '(:ignore t :wk "lsp")
+    "l e" '(flymake-goto-next-error :wk "next error")
+    "l w" '(flymake-goto-prev-error :wk "prev error")
+    "l d" '(xref-find-definitions :wk "definition")
+    "l c" '(eglot-code-actions :wk "code actions")
+    "l r" '(xref-find-references :wk "references")
+    "l a" '(xref-find-apropos :wk "apropos")
+    "l n" '(eglot-rename :wk "rename")
+
     ;; --- popper
     "p"   '(:ignore t :wk "popper")
     "p t" '(popper-toggle-type :wk "toggle type")
@@ -580,6 +589,27 @@
    '((error "!" compilation-error)
      (warning "?" compilation-warning)
      (note "i" compilation-info))))
+
+(use-package corfu
+  :ensure t
+  :defer t
+  :hook
+  (prog-mode .corfu-mode)
+  :custom
+  (corfu-right-margin-width 0)
+  (corfu-quit-no-match t)
+  (corfu-auto-prefix 1)
+  (corfu-min-width 40)
+  (corfu-max-width 40)
+  (corfu-bar-width 0)
+  (corfu-auto nil)
+  (corfu-count 5))
+
+(use-package nerd-icons-corfu
+  :ensure t
+  :after corfu
+  :config
+  (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 
 ;; ===============================================================
 ;;; COMPLETION

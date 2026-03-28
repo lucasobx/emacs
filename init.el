@@ -84,6 +84,7 @@
   (display-line-numbers-width-start t)
   (warning-minimum-level :emergency)
   ;; (display-line-numbers-width 3)
+  (initial-major-mode 'org-mode)
   (initial-scratch-message "")
   (ring-bell-function 'ignore)
   (split-width-threshold 100)
@@ -144,7 +145,6 @@
   (load custom-file 'noerror 'nomessage)
   (put 'narrow-to-region 'disabled nil)
   ;; bindings
-  ;; C-g closes minibuffer if active, otherwise quits normally
   (define-advice keyboard-quit
       (:around (quit) quit-current-context)
     (if (active-minibuffer-window)
@@ -313,6 +313,7 @@
           evil-split-window-below t
           evil-shift-width 2)
   :config
+  (define-key evil-normal-state-map (kbd "<escape>") #'keyboard-quit)
   (define-key evil-insert-state-map (kbd "C-y") 'yank)
   (define-key evil-normal-state-map (kbd "C-y") 'yank)
   (evil-set-initial-state 'vterm-mode 'emacs)
@@ -382,7 +383,10 @@
   :config
   (add-to-list 'custom-theme-load-path "~/.config/emacs/themes")
   (rg-themes-set 'rg-themes-custom)
-  (window-divider-mode -1))
+  (window-divider-mode -1)
+  (custom-set-faces
+   '(font-lock-comment-face ((t (:slant normal))))
+   '(font-lock-comment-delimiter-face ((t (:slant normal))))))
 
 (use-package rainbow-delimiters
   :ensure t
@@ -399,7 +403,7 @@
   (doom-modeline-check-icon nil)
   (nerd-icons-scale-factor 1.0)
   (doom-modeline-modal-icon t)
-  (doom-modeline-height 25)
+  (doom-modeline-height 16)
   (doom-modeline-modal t)
   (doom-modeline-icon t)
   :config
@@ -471,10 +475,12 @@
   :ensure nil
   :hook
   (dired-mode . dired-hide-details-mode)
+  (dired-mode . dired-omit-mode)
   (dired-mode . hl-line-mode)
   :custom
-  (dired-listing-switches "-lah --group-directories-first")
+  (dired-listing-switches "-lah --group-directories-first --sort=extension")
   (dired-dwim-target t)
+  (dired-omit-files "^\\.\\.?$")
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-recursive-deletes 'top)
   (dired-recursive-copies 'always)
@@ -584,7 +590,7 @@
   (vertico-mode)
   :custom
   (vertico-cycle nil)
-  (vertico-count 6)
+  (vertico-count 5)
   :config
   (advice-add #'vertico--format-candidate :around
             (lambda (orig cand prefix suffix index _start)
@@ -603,7 +609,7 @@
   (marginalia-mode)
   :config
   (setopt marginalia-annotators
-          (assq-delete-all 'file marginalia-annotators)))
+        (assq-delete-all 'file marginalia-annotators)))
 
 (use-package orderless
   :ensure t
@@ -624,7 +630,16 @@
 
 (use-package consult-dir
   :ensure t
-  :defer t)
+  :defer t
+  :config
+  (defun my/consult-dir--strip-annotations (orig-fn &rest args)
+    (let ((consult-dir-sources
+           (mapcar (lambda (src)
+                     (let ((val (if (symbolp src) (symbol-value src) src)))
+                       (plist-put (copy-sequence val) :name nil)))
+                   consult-dir-sources)))
+      (apply orig-fn args)))
+  (advice-add #'consult-dir :around #'my/consult-dir--strip-annotations))
 
 (use-package embark
   :ensure t

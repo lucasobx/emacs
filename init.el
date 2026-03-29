@@ -630,7 +630,7 @@
   (vertico-mode)
   :custom
   (vertico-cycle nil)
-  (vertico-count 5)
+  (vertico-count 6)
   :config
   (advice-add #'vertico--format-candidate :around
             (lambda (orig cand prefix suffix index _start)
@@ -641,12 +641,32 @@
                  "  ")
                cand))))
 
-;; (use-package vertico-posframe
-;;   :ensure t
-;;   :defer t
-;;   :after vertico
-;;   :init
-;;   (vertico-posframe-mode 1))
+(use-package vertico-posframe
+  :ensure t
+  :defer t
+  :after vertico
+  :init
+  (vertico-posframe-mode 1)
+  :config
+  (custom-set-faces
+   '(vertico-posframe-border-2 ((t (:background "#768c9c"))))
+   '(vertico-posframe-border-3 ((t (:background "#758672"))))
+   '(vertico-posframe-border-4 ((t (:background "#98585b")))))
+  (defun my/vertico-posframe-handler (info)
+    (let ((pos (posframe-poshandler-frame-bottom-right-corner info)))
+      (cons (- (car pos) 15)
+            (- (cdr pos) 20))))
+  (setopt vertico-posframe-width 60
+          vertico-posframe-height 8
+          vertico-posframe-poshandler #'my/vertico-posframe-handler)
+  (setopt vertico-posframe-parameters
+          '((left-fringe  . 3)
+            (right-fringe . 20)))
+  (setopt vertico-multiform-commands
+          '((consult-find (:not posframe))
+            (consult-ripgrep (:not posframe))
+            (t posframe)))
+  (vertico-multiform-mode 1))
 
 (use-package marginalia
   :ensure t

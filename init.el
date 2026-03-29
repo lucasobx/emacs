@@ -426,8 +426,7 @@
             (lambda ()
               (dolist (face (face-list))
                 (when (string-prefix-p "doom-modeline" (symbol-name face))
-                  (set-face-attribute face nil
-                                      :weight 'normal :slant 'normal)))))
+                  (set-face-attribute face nil :weight 'normal :slant 'normal)))))
   (doom-modeline-mode 1))
 
 (use-package focus
@@ -529,8 +528,12 @@
 
 (use-package exec-path-from-shell
   :ensure t
-  :config
-  (exec-path-from-shell-initialize))
+  :defer t
+  :init
+  (defun my/exec-path-once ()
+    (exec-path-from-shell-initialize)
+    (remove-hook 'prog-mode-hook #'my/exec-path-once))
+  (add-hook 'prog-mode-hook #'my/exec-path-once))
 
 (use-package markdown-mode
   :ensure t
@@ -595,7 +598,6 @@
 
 (use-package corfu
   :ensure t
-  :defer t
   :hook
   (prog-mode .corfu-mode)
   :custom

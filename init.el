@@ -641,6 +641,13 @@
                  "  ")
                cand))))
 
+;; (use-package vertico-posframe
+;;   :ensure t
+;;   :defer t
+;;   :after vertico
+;;   :init
+;;   (vertico-posframe-mode 1))
+
 (use-package marginalia
   :ensure t
   :defer t
@@ -649,7 +656,11 @@
   (marginalia-mode)
   :config
   (setopt marginalia-annotators
-        (assq-delete-all 'file marginalia-annotators)))
+          (mapcar (lambda (pair)
+                    (if (eq (car pair) 'face)
+                        pair
+                      (cons (car pair) '(none))))
+                  marginalia-annotators)))
 
 (use-package orderless
   :ensure t
@@ -685,16 +696,7 @@
 
 (use-package consult-dir
   :ensure t
-  :defer t
-  :config
-  (defun my/consult-dir--strip-annotations (orig-fn &rest args)
-    (let ((consult-dir-sources
-           (mapcar (lambda (src)
-                     (let ((val (if (symbolp src) (symbol-value src) src)))
-                       (plist-put (copy-sequence val) :name nil)))
-                   consult-dir-sources)))
-      (apply orig-fn args)))
-  (advice-add #'consult-dir :around #'my/consult-dir--strip-annotations))
+  :defer t)
 
 (use-package embark
   :ensure t

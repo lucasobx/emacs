@@ -233,10 +233,12 @@
     "]" '(evil-end-of-line :wk "end of line")
     "<" '(previous-buffer :wk "previ buffer")
     "b" '(consult-buffer :wk "search buffer")
+    "," '(popper-toggle :wk "toggle popup")
     ">" '(next-buffer :wk "next buffer")
     "d" '(dired-jump :wk "file manager")
     "." '(embark-act :wk "context menu")
     "/" '(flash-jump :wk "search jump")
+    "f" '(find-file :wk "find-file")
 
     ;; --- emacs
     "e"   '(:ignore t :wk "emacs")
@@ -270,7 +272,6 @@
     ;; --- popper
     "p"   '(:ignore t :wk "popper")
     "p t" '(popper-toggle-type :wk "toggle type")
-    "p p" '(popper-toggle :wk "toggle popup")
     "p l" '(popper-cycle :wk "next popup")
 
     ;; --- search
@@ -487,13 +488,15 @@
   (dired-mode . dired-omit-mode)
   (dired-mode . hl-line-mode)
   :custom
-  (dired-listing-switches "-lah --group-directories-first --sort=extension")
+  (dired-listing-switches "-lah --almost-all --group-directories-first --sort=extension")
   (dired-dwim-target t)
-  (dired-omit-files "^\\.\\.?$")
+  (dired-omit-files "^\\.")
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-recursive-deletes 'top)
   (dired-recursive-copies 'always)
-  (dired-free-space nil))
+  (dired-free-space nil)
+  :bind
+  (:map dired-mode-map ("C-," . dired-omit-mode)))
 
 (use-package popper
   :ensure t
@@ -605,6 +608,7 @@
   (corfu-auto nil)
   (corfu-count 5)
   :config
+  (corfu-echo-mode)
   (corfu-popupinfo-mode)
   (setopt corfu-popupinfo-delay nil)
   (define-key corfu-map (kbd "M-d") #'corfu-popupinfo-toggle))
@@ -660,7 +664,22 @@
   :init
   (advice-add #'register-preview :override #'consult-register-window)
   (setopt xref-show-xrefs-function #'consult-xref
-          xref-show-definitions-function #'consult-xref))
+          xref-show-definitions-function #'consult-xref)
+  :config
+  (setopt consult-buffer-filter
+          (append consult-buffer-filter
+                  '("\\*Async Shell Command\\*"
+                    "\\*eldoc\\*"
+                    "Output\\*$")))
+  (defun my/consult-buffer-filter-modes (buffers)
+    (cl-remove-if
+     (lambda (buf)
+       (let ((buffer (if (stringp buf) (get-buffer buf) (cdr buf))))
+         (when buffer
+           (memq (buffer-local-value 'major-mode buffer)
+                 '(dired-mode helpful-mode vterm-mode help-mode compilation-mode)))))
+     buffers))
+  (advice-add #'consult--buffer-query :filter-return #'my/consult-buffer-filter-modes))
 
 (use-package consult-dir
   :ensure t

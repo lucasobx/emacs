@@ -561,12 +561,18 @@
 
 (use-package ruby-ts-mode
   :ensure nil
-  :mode "\\.rb\\'")
+  :mode "\\.rb\\'"
+  :mode "Gemfile\\'"
+  :mode "Rakefile\\'")
 
 (use-package inf-ruby
   :ensure t
   :hook
-  (ruby-ts-mode . inf-ruby-minor-mode))
+  (ruby-ts-mode . inf-ruby-minor-mode)
+  :config
+  (when (executable-find "pry")
+    (add-to-list 'inf-ruby-implementations '("pry" . "pry"))
+    (setq inf-ruby-default-implementation "pry")))
 
 (use-package eglot
   :ensure nil

@@ -362,10 +362,6 @@
   (evil-goggles-mode)
   (evil-goggles-use-diff-faces))
 
-(use-package evil-tutor
-  :ensure t
-  :defer t)
-
 (use-package transient
   :ensure t
   :defer t)

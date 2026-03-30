@@ -274,6 +274,15 @@
     "p t" '(popper-toggle-type :wk "toggle type")
     "p l" '(popper-cycle :wk "next popup")
 
+    ;; --- ruby
+    "r"   '(:ignore t :wk "ruby")
+    "r g" '(ruby-send-buffer-and-go :wk "send buffer go")
+    "r c" '(inf-ruby-console-auto :wk "rails console")
+    "r s" '(ruby-send-region :wk "send region")
+    "r b" '(ruby-send-buffer :wk "send buffer")
+    "r l" '(ruby-send-line :wk "send line")
+    "r r" '(inf-ruby :wk "open repl")
+
     ;; --- search
     "s"   '(:ignore t :wk "search")
     "s r" '(consult-recent-file :wk "recent files")
@@ -340,6 +349,14 @@
   :ensure t
   :after evil-collection
   :config
+  (require 'evil-matchit-ruby)
+  (evilmi-load-plugin-rules '(ruby-base-mode ruby-ts-mode) '(simple ruby))
+  (setq evilmi-ruby-match-tags
+        '((("unless" "if") ("elsif" "else") "end")
+          ("begin" ("rescue" "ensure") "end")
+          ("case" ("when" "else") "end")
+          (("class" "def" "while" "do" "module" "for" "until") () "end")
+          (("describe" "context" "subject" "specify" "it" "let") () "end")))
   (global-evil-matchit-mode 1))
 
 (use-package evil-commentary
@@ -545,6 +562,11 @@
 (use-package ruby-ts-mode
   :ensure nil
   :mode "\\.rb\\'")
+
+(use-package inf-ruby
+  :ensure t
+  :hook
+  (ruby-ts-mode . inf-ruby-minor-mode))
 
 (use-package eglot
   :ensure nil

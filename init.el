@@ -661,12 +661,7 @@
           vertico-posframe-poshandler #'my/vertico-posframe-handler)
   (setopt vertico-posframe-parameters
           '((left-fringe  . 3)
-            (right-fringe . 20)))
-  (setopt vertico-multiform-commands
-          '((consult-find (:not posframe))
-            (consult-ripgrep (:not posframe))
-            (t posframe)))
-  (vertico-multiform-mode 1))
+            (right-fringe . 20))))
 
 (use-package marginalia
   :ensure t

@@ -1,5 +1,6 @@
 auto-save-list/
 custom-vars.el
+.lsp-session
 auto-saves/
 eln-cache/
 transient/

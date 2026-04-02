@@ -242,15 +242,15 @@
 
     ;; --- emacs
     "e"   '(:ignore t :wk "emacs")
-    "e s" '(sudo-edit :wk "sudo edit file")
-    "e p" '(check-parens :wk "check parens")
-    "e r" '(restart-emacs :wk "restart emacs")
-    "e f" '(eval-last-sexp :wk "eval expression")
-    "e m" '(consult-mode-command :wk "mode commands")
-    "e e" '(my/jump-to-end-of-block :wk "end of block")
     "e c" '((lambda () (interactive)
               (find-file (locate-user-emacs-file "init.el")))
             :wk "edit config")
+    "e e" '(my/jump-to-end-of-block :wk "end of block")
+    "e m" '(consult-mode-command :wk "mode commands")
+    "e f" '(eval-last-sexp :wk "eval expression")
+    "e r" '(restart-emacs :wk "restart emacs")
+    "e p" '(check-parens :wk "check parens")
+    "e s" '(sudo-edit :wk "sudo edit file")
 
     ;; --- help
     "h"   '(:ignore t :wk "help")

@@ -97,7 +97,7 @@
   (truncate-lines t)
   ;; minibuffer
   (minibuffer-prompt-properties
-    '(read-only t cursor-intangible t face minibuffer-prompt))
+   '(read-only t cursor-intangible t face minibuffer-prompt))
   (read-extended-command-predicate
    #'command-completion-default-include-p)
   (switch-to-buffer-obey-display-actions t)
@@ -188,7 +188,7 @@
     (vterm)
     (delete-other-windows)
     (let ((proc (get-buffer-process (current-buffer))))
-          (when proc (set-process-query-on-exit-flag proc nil)))))
+      (when proc (set-process-query-on-exit-flag proc nil)))))
 
 (defun my/kill-buffer-and-window ()
   "Kill the current buffer and close its window."
@@ -255,19 +255,17 @@
     ;; --- help
     "h"   '(:ignore t :wk "help")
     "h h" '(helpful-at-point :wk "at point")
-    "h v" '(helpful-variable :wk "variable")
-    "h f" '(helpful-function :wk "function")
     "h d" '(devdocs-lookup :wk "devdocs")
     "h e" '(eldoc :wk "eldoc")
 
     "l"   '(:ignore t :wk "lsp")
-    "l e" '(flymake-goto-next-error :wk "next error")
-    "l w" '(flymake-goto-prev-error :wk "prev error")
-    "l d" '(xref-find-definitions :wk "definition")
-    "l c" '(eglot-code-actions :wk "code actions")
-    "l r" '(xref-find-references :wk "references")
-    "l a" '(xref-find-apropos :wk "apropos")
-    "l n" '(eglot-rename :wk "rename")
+    "l c" '(lsp-execute-code-action :wk "code actions")
+    "l w" '(flycheck-previous-error :wk "prev error")
+    "l l" '(flycheck-list-errors :wk "list errors")
+    "l d" '(lsp-find-definition :wk "definition")
+    "l r" '(lsp-find-references :wk "references")
+    "l e" '(flycheck-next-error :wk "next error")
+    "l n" '(lsp-rename :wk "rename")
 
     ;; --- popper
     "p"   '(:ignore t :wk "popper")
@@ -315,10 +313,7 @@
     "o"   '(:ignore t :wk "org")
     "o p" '(org-tidy-untidy-buffer :wk "edit property")
     "o o" '(org-toggle-checkbox :wk "toggle checkbox")
-    "o l" '(org-insert-link :wk "insert link")
-    "o f" '((lambda () (interactive)
-              (dired "~/documents/org"))
-            :wk "open org folder")))
+    "o l" '(org-insert-link :wk "insert link")))
 
 (use-package evil
   :ensure (:wait t)
@@ -521,6 +516,7 @@
             "\\*eldoc\\*"
             "Output\\*$"
             compilation-mode
+            devdocs-mode
             helpful-mode
             vterm-mode
             dired-mode
@@ -541,12 +537,9 @@
 
 (use-package exec-path-from-shell
   :ensure t
-  :defer t
-  :init
-  (defun my/exec-path-once ()
-    (exec-path-from-shell-initialize)
-    (remove-hook 'prog-mode-hook #'my/exec-path-once))
-  (add-hook 'prog-mode-hook #'my/exec-path-once))
+  :demand t
+  :config
+  (exec-path-from-shell-initialize))
 
 (use-package markdown-mode
   :ensure t
@@ -554,6 +547,12 @@
   :config
   (set-face-attribute 'markdown-code-face nil :font my/font)
   (set-face-attribute 'markdown-inline-code-face nil :font my/font))
+
+(with-eval-after-load 'shr
+  (set-face-attribute 'shr-text nil
+                      :family my/font :height my/size :weight 'normal)
+  (set-face-attribute 'shr-code nil
+                      :family my/font :height my/size :weight 'normal))
 
 (use-package lua-ts-mode
   :ensure nil
@@ -563,7 +562,11 @@
   :ensure nil
   :mode "\\.rb\\'"
   :mode "Gemfile\\'"
-  :mode "Rakefile\\'")
+  :mode "Rakefile\\'"
+  :config
+  (add-to-list 'treesit-language-source-alist '(ruby "https://github.com/tree-sitter/tree-sitter-ruby"))
+  (setopt ruby-indent-level 2)
+  (setopt ruby-indent-tabs-mode nil))
 
 (use-package inf-ruby
   :ensure t
@@ -574,76 +577,63 @@
     (add-to-list 'inf-ruby-implementations '("pry" . "pry"))
     (setq inf-ruby-default-implementation "pry")))
 
-(use-package eglot
-  :ensure nil
+(use-package lsp-mode
+  :ensure t
+  :defer t
+  :hook
+  ((ruby-ts-mode
+    lua-ts-mode) . lsp-deferred)
+  :commands lsp
   :custom
-  (eglot-autoshutdown t)
-  (eglot-events-buffer-config '(:size 0 :format full))
-  (eglot-prefer-plaintext nil)
-  (jsonrpc-event-hook nil)
-  :init
-  (fset #'jsonrpc--log-event #'ignore)
-  (defun my/eglot-setup ()
-    (unless (memq major-mode '(emacs-lisp-mode lisp-mode))
-      (eglot-ensure)))
-  (add-hook 'prog-mode-hook #'my/eglot-setup)
-  (with-eval-after-load 'eglot
-    (add-to-list 'eglot-server-programs
-                 '((ruby-mode ruby-ts-mode) "ruby-lsp"))
-    (add-to-list 'eglot-server-programs
-                 '((lua-mode lua-ts-mode) "lua-language-server"))))
+  (lsp-session-file (locate-user-emacs-file ".lsp-session"))
+  (lsp-completion-provider :none)
+  (lsp-keep-workspace-alive nil)
+  (lsp-inlay-hint-enable nil)
+  (lsp-idle-delay 0.5)
+  (lsp-log-io nil)
+  ;; core settings
+  (lsp-enable-suggest-server-download t)
+  (lsp-enable-on-type-formatting nil)
+  (lsp-enable-symbol-highlighting t)
+  (lsp-enable-text-document-color t)
+  (lsp-enable-file-watchers nil)
+  (lsp-enable-indentation nil)
+  (lsp-eldoc-enable-hover t)
+  (lsp-enable-folding nil)
+  (lsp-auto-configure t)
+  (lsp-enable-links nil)
+  (lsp-enable-imenu t)
+  (lsp-enable-xref t)
+  ;; modeline settings
+  (lsp-modeline-workspace-status-enable t)
+  (lsp-modeline-code-actions-enable nil)
+  (lsp-modeline-diagnostics-enable nil)
+  (lsp-signature-doc-lines 1)
+  (lsp-eldoc-render-all t)
+  ;; completion settings
+  (lsp-completion-enable-additional-text-edit t)
+  (lsp-completion-show-kind t)
+  (lsp-completion-enable t)
+  (lsp-enable-snippet nil)
+  ;; headerline settings
+  (lsp-headerline-breadcrumb-enable nil)
+  ;; semantic settings
+  (lsp-semantic-tokens-enable nil))
+
+(use-package flycheck
+  :ensure t
+  :hook
+  (prog-mode . flycheck-mode))
 
 (use-package eldoc
   :ensure nil
   :custom
-  (eldoc-echo-area-use-multiline-p nil)
-  (eldoc-echo-area-prefer-doc-buffer t)
-  (eldoc-echo-area-display-truncation-message nil)
   (eldoc-documentation-strategy 'eldoc-documentation-compose)
+  (eldoc-echo-area-display-truncation-message nil)
+  (eldoc-echo-area-prefer-doc-buffer t)
+  (eldoc-echo-area-use-multiline-p nil)
   :init
   (global-eldoc-mode))
-
-(use-package eldoc-box
-  :ensure t
-  :defer t)
-
-(use-package flymake
-  :ensure nil
-  :defer t
-  :hook
-  (prog-mode . flymake-mode)
-  :custom
-  (flymake-show-diagnostics-at-end-of-line nil)
-  (flymake-indicator-type 'margins)
-  (flymake-margin-indicators-string
-   '((error "!" compilation-error)
-     (warning "?" compilation-warning)
-     (note "i" compilation-info))))
-
-(use-package corfu
-  :ensure t
-  :hook
-  (prog-mode .corfu-mode)
-  :custom
-  (corfu-right-margin-width 0)
-  (corfu-quit-no-match t)
-  (corfu-auto-prefix 1)
-  (corfu-min-width 40)
-  (corfu-max-width 40)
-  (corfu-bar-width 0)
-  (corfu-auto nil)
-  (corfu-count 5)
-  :config
-  (corfu-echo-mode)
-  (corfu-popupinfo-mode)
-  (setopt corfu-popupinfo-delay nil)
-  (define-key corfu-map (kbd "M-d") #'corfu-popupinfo-toggle))
-
-(use-package nerd-icons-corfu
-  :ensure t
-  :after corfu
-  :config
-  (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 
 ;; ===============================================================
 ;;; COMPLETION
@@ -657,13 +647,13 @@
   (vertico-count 6)
   :config
   (advice-add #'vertico--format-candidate :around
-            (lambda (orig cand prefix suffix index _start)
-              (setq cand (funcall orig cand prefix suffix index _start))
-              (concat
-               (if (= vertico--index index)
-                   (propertize "» " 'face '(:foreground "#768c9c" :weight bold))
-                 "  ")
-               cand))))
+              (lambda (orig cand prefix suffix index _start)
+                (setq cand (funcall orig cand prefix suffix index _start))
+                (concat
+                 (if (= vertico--index index)
+                     (propertize "» " 'face '(:foreground "#768c9c" :weight bold))
+                   "  ")
+                 cand))))
 
 (use-package vertico-posframe
   :ensure t
@@ -717,6 +707,7 @@
   (advice-add #'register-preview :override #'consult-register-window)
   (setopt xref-show-xrefs-function #'consult-xref
           xref-show-definitions-function #'consult-xref)
+  (setopt completion-in-region-function #'consult-completion-in-region)
   :config
   (setopt consult-buffer-filter
           (append consult-buffer-filter
@@ -870,7 +861,9 @@
 
 (use-package devdocs
   :ensure t
-  :defer t)
+  :defer t
+  :config
+  (setopt devdocs-header-line nil))
 
 ;; ===============================================================
 ;;; VERSION CONTROL

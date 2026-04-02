@@ -272,15 +272,6 @@
     "p t" '(popper-toggle-type :wk "toggle type")
     "p l" '(popper-cycle :wk "next popup")
 
-    ;; --- ruby
-    "r"   '(:ignore t :wk "ruby")
-    "r g" '(ruby-send-buffer-and-go :wk "send buffer go")
-    "r c" '(inf-ruby-console-auto :wk "rails console")
-    "r s" '(ruby-send-region :wk "send region")
-    "r b" '(ruby-send-buffer :wk "send buffer")
-    "r l" '(ruby-send-line :wk "send line")
-    "r r" '(inf-ruby :wk "open repl")
-
     ;; --- search
     "s"   '(:ignore t :wk "search")
     "s r" '(consult-recent-file :wk "recent files")
@@ -308,12 +299,23 @@
     "w h" '(buf-move-left :wk "move left")
     "w j" '(buf-move-down :wk "move down")
     "w k" '(buf-move-up :wk "move up"))
+
   (my/keys
     :keymaps 'org-mode-map
     "o"   '(:ignore t :wk "org")
     "o p" '(org-tidy-untidy-buffer :wk "edit property")
     "o o" '(org-toggle-checkbox :wk "toggle checkbox")
-    "o l" '(org-insert-link :wk "insert link")))
+    "o l" '(org-insert-link :wk "insert link"))
+
+  (my/keys
+    :keymaps '(ruby-mode-map ruby-ts-mode-map)
+    "r"   '(:ignore t :wk "ruby")
+    "r g" '(ruby-send-buffer-and-go :wk "send buffer go")
+    "r c" '(inf-ruby-console-auto :wk "rails console")
+    "r s" '(ruby-send-region :wk "send region")
+    "r b" '(ruby-send-buffer :wk "send buffer")
+    "r l" '(ruby-send-line :wk "send line")
+    "r r" '(inf-ruby :wk "open repl")))
 
 (use-package evil
   :ensure (:wait t)

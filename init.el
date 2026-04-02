@@ -541,6 +541,15 @@
   :config
   (exec-path-from-shell-initialize))
 
+(use-package treesit-auto
+  :ensure t
+  :after emacs
+  :custom
+  (treesit-auto-install 'prompt)
+  :config
+  (treesit-auto-add-to-auto-mode-alist 'all)
+  (global-treesit-auto-mode t))
+
 (use-package markdown-mode
   :ensure t
   :defer t
@@ -548,25 +557,9 @@
   (set-face-attribute 'markdown-code-face nil :font my/font)
   (set-face-attribute 'markdown-inline-code-face nil :font my/font))
 
-(with-eval-after-load 'shr
-  (set-face-attribute 'shr-text nil
-                      :family my/font :height my/size :weight 'normal)
-  (set-face-attribute 'shr-code nil
-                      :family my/font :height my/size :weight 'normal))
-
-(use-package lua-ts-mode
-  :ensure nil
-  :mode "\\.lua\\'")
-
-(use-package ruby-ts-mode
-  :ensure nil
-  :mode "\\.rb\\'"
-  :mode "Gemfile\\'"
-  :mode "Rakefile\\'"
-  :config
-  (add-to-list 'treesit-language-source-alist '(ruby "https://github.com/tree-sitter/tree-sitter-ruby"))
-  (setopt ruby-indent-level 2)
-  (setopt ruby-indent-tabs-mode nil))
+(use-package dotenv-mode
+  :ensure t
+  :defer t)
 
 (use-package inf-ruby
   :ensure t
@@ -864,6 +857,12 @@
   :defer t
   :config
   (setopt devdocs-header-line nil))
+
+(with-eval-after-load 'shr
+  (set-face-attribute 'shr-text nil
+                      :family my/font :height my/size :weight 'normal)
+  (set-face-attribute 'shr-code nil
+                      :family my/font :height my/size :weight 'normal))
 
 ;; ===============================================================
 ;;; VERSION CONTROL

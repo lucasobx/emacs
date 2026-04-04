@@ -159,8 +159,8 @@
   (global-unset-key (kbd "C-z"))
   ;; ui
   (set-face-attribute 'help-key-binding nil :box nil
-                      :background nil :font my/font
-                      :height 0.95)
+                      :background nil :foreground "#65738c"
+                      :font my/font :height 0.95)
   (add-hook 'minibuffer-setup-hook
             (lambda () (setq-local face-remapping-alist
                                    '((default :height 0.95)))))

@@ -207,7 +207,7 @@
           which-key-min-display-lines 6
           which-key-prefix-prefix ""
           which-key-separator " → "
-          which-key-idle-delay 1.0)
+          which-key-idle-delay 0.3)
   (set-face-attribute 'which-key-note-face nil :height 1.0)
   (setopt which-key-sort-order 'which-key-local-then-key-order))
 

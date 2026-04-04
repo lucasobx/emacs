@@ -83,7 +83,7 @@
   (display-line-numbers-type 'relative)
   (display-line-numbers-width-start t)
   (warning-minimum-level :emergency)
-  ;; (display-line-numbers-width 3)
+  ;; (display-line-numbers-width 4)
   (initial-major-mode 'org-mode)
   (initial-scratch-message "")
   (ring-bell-function 'ignore)
@@ -158,12 +158,7 @@
   (global-unset-key (kbd "C-x C-z"))
   (global-unset-key (kbd "C-z"))
   ;; ui
-  (set-face-attribute 'help-key-binding nil :box nil
-                      :background nil :foreground "#65738c"
-                      :font my/font :height 0.95)
-  (add-hook 'minibuffer-setup-hook
-            (lambda () (setq-local face-remapping-alist
-                                   '((default :height 0.95)))))
+  (set-face-attribute 'tooltip nil :font my/font)
 
   :bind
   ("C-="     . text-scale-increase)
@@ -212,7 +207,7 @@
           which-key-min-display-lines 6
           which-key-prefix-prefix ""
           which-key-separator " → "
-          which-key-idle-delay 0.2)
+          which-key-idle-delay 1.0)
   (set-face-attribute 'which-key-note-face nil :height 1.0)
   (setopt which-key-sort-order 'which-key-local-then-key-order))
 
@@ -277,6 +272,7 @@
     "s r" '(consult-recent-file :wk "recent files")
     "s l" '(consult-line-multi :wk "line in files")
     "s d" '(consult-dir :wk "recent directories")
+    "s c" '(consult-theme :wk "change theme")
     "s g" '(consult-ripgrep :wk "ripgrep")
     "s i" '(consult-imenu :wk "imenu")
     "s s" '(consult-line :wk "line")
@@ -399,14 +395,11 @@
   (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
 
 (use-package rg-themes
-  :ensure t
+  :ensure nil
+  :load-path "~/.config/emacs/themes"
   :config
   (add-to-list 'custom-theme-load-path "~/.config/emacs/themes")
-  (rg-themes-set 'rg-themes-custom)
-  (window-divider-mode -1)
-  (custom-set-faces
-   '(font-lock-comment-face ((t (:slant normal))))
-   '(font-lock-comment-delimiter-face ((t (:slant normal))))))
+  (rg-themes-set 'rg-themes-custom))
 
 (use-package rainbow-delimiters
   :ensure t
@@ -423,15 +416,15 @@
   (doom-modeline-check-icon nil)
   (nerd-icons-scale-factor 1.0)
   (doom-modeline-modal-icon t)
-  (doom-modeline-height 16)
   (doom-modeline-modal t)
   (doom-modeline-icon t)
   :config
   (defun doom-modeline-check-icon (_icon _unicode _text &optional _face) "")
   (setopt doom-modeline-always-show-macro-register t)
   (setopt doom-modeline-buffer-modification-icon nil)
-  (dolist (face '(mode-line mode-line-inactive))
-    (set-face-attribute face nil :font my/font :height 112))
+  (custom-set-faces
+   '(mode-line ((t (:inherit default :height 112 :weight normal))))
+   '(mode-line-inactive ((t (:inherit default :height 112 :weight normal)))))
   (add-hook 'doom-modeline-mode-hook
             (lambda ()
               (dolist (face (face-list))
@@ -471,7 +464,6 @@
                       :foreground "#a67c6a")
   (set-face-attribute 'line-reminder-saved-sign-face nil
                       :foreground "#503f58"))
-
 
 ;; ===============================================================
 ;;; NAVIGATION
@@ -656,6 +648,11 @@
   :after vertico
   :init
   (vertico-posframe-mode 1)
+  (vertico-multiform-mode 1)
+  :custom
+  (vertico-multiform-commands
+   '((consult-theme (:not posframe))
+     (t posframe)))
   :config
   (custom-set-faces
    '(vertico-posframe-border-2 ((t (:background "#768c9c"))))

@@ -81,9 +81,9 @@
   (redisplay-skip-fontification-on-input t)
   (uniquify-buffer-name-style 'forward)
   (display-line-numbers-type 'relative)
-  (display-line-numbers-width-start t)
+  ;; (display-line-numbers-width-start t)
   (warning-minimum-level :emergency)
-  ;; (display-line-numbers-width 4)
+  (display-line-numbers-width 4)
   (initial-major-mode 'org-mode)
   (initial-scratch-message "")
   (ring-bell-function 'ignore)
@@ -610,7 +610,9 @@
 (use-package flycheck
   :ensure t
   :hook
-  (prog-mode . flycheck-mode))
+  (prog-mode . flycheck-mode)
+  :config
+  (setq flycheck-indication-mode nil))
 
 (use-package eldoc
   :ensure nil

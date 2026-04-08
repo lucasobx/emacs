@@ -618,13 +618,15 @@
 (use-package flycheck-posframe
   :ensure t
   :after flycheck
+  :hook
+  (flycheck-mode . flycheck-posframe-mode)
+  :custom
+  (flycheck-posframe-position 'window-bottom-right-corner)
+  (flycheck-posframe-warning-prefix "")
+  (flycheck-posframe-error-prefix   "")
+  (flycheck-posframe-info-prefix    "")
+  (flycheck-posframe-border-width 1)
   :config
-  (add-hook 'flycheck-mode-hook #'flycheck-posframe-mode)
-  (setq flycheck-posframe-border-width 1)
-  (setq flycheck-posframe-position 'window-bottom-right-corner)
-  (setq flycheck-posframe-info-prefix    "")
-  (setq flycheck-posframe-warning-prefix "")
-  (setq flycheck-posframe-error-prefix   "")
   (set-face-attribute 'flycheck-posframe-border-face nil
                       :foreground (face-attribute 'font-lock-comment-face :foreground)))
 

@@ -607,8 +607,26 @@
   :ensure t
   :hook
   (prog-mode . flycheck-mode)
+  :custom
+  (flycheck-buffer-switch-check-intermediate-buffers t)
+  (flycheck-display-errors-delay 0.25)
+  (flycheck-idle-change-delay 1.0)
+  (flycheck-indication-mode nil)
   :config
-  (setq flycheck-indication-mode nil))
+  (delq 'new-line flycheck-check-syntax-automatically))
+
+(use-package flycheck-posframe
+  :ensure t
+  :after flycheck
+  :config
+  (add-hook 'flycheck-mode-hook #'flycheck-posframe-mode)
+  (setq flycheck-posframe-border-width 1)
+  (setq flycheck-posframe-position 'window-bottom-right-corner)
+  (setq flycheck-posframe-info-prefix    "")
+  (setq flycheck-posframe-warning-prefix "")
+  (setq flycheck-posframe-error-prefix   "")
+  (set-face-attribute 'flycheck-posframe-border-face nil
+                      :foreground (face-attribute 'font-lock-comment-face :foreground)))
 
 (use-package eldoc
   :ensure nil

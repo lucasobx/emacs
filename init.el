@@ -551,10 +551,6 @@
   (set-face-attribute 'markdown-code-face nil :font my/font)
   (set-face-attribute 'markdown-inline-code-face nil :font my/font))
 
-(use-package dotenv-mode
-  :ensure t
-  :defer t)
-
 (use-package inf-ruby
   :ensure t
   :hook
@@ -774,21 +770,6 @@
 (use-package sudo-edit
   :ensure t
   :defer t)
-
-(use-package whitespace
-  :ensure nil
-  :defer t
-  :hook
-  (before-save . whitespace-cleanup)
-  :init
-  (defun my/toggle-whitespace-cleanup ()
-    (interactive)
-    (if (memq #'whitespace-cleanup before-save-hook)
-        (progn
-          (remove-hook 'before-save-hook #'whitespace-cleanup)
-          (message "Whitespace cleanup on save: OFF"))
-      (add-hook 'before-save-hook #'whitespace-cleanup)
-      (message "Whitespace cleanup on save: ON"))))
 
 ;; ===============================================================
 ;;; WRITING & READING

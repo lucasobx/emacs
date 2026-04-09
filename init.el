@@ -282,7 +282,6 @@
     "t"   '(:ignore t :wk "toggle")
     "t w" '(my/toggle-whitespace-cleanup :wk "whitespace cleanup")
     "t l" '(visual-line-mode :wk "truncated lines")
-    "t f" '(focus-mode :wk "focus mode")
     "t t" '(vterm :wk "vterm")
 
     ;; --- windows
@@ -399,7 +398,7 @@
   :load-path "~/.config/emacs/themes"
   :config
   (add-to-list 'custom-theme-load-path "~/.config/emacs/themes")
-  (rg-themes-set 'rg-themes-custom))
+  (rg-themes-set 'rg-themes-custom7))
 
 (use-package rainbow-delimiters
   :ensure t
@@ -431,10 +430,6 @@
                 (when (string-prefix-p "doom-modeline" (symbol-name face))
                   (set-face-attribute face nil :weight 'normal :slant 'normal)))))
   (doom-modeline-mode 1))
-
-(use-package focus
-  :ensure t
-  :defer t)
 
 (use-package colorful-mode
   :ensure t

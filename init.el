@@ -223,17 +223,17 @@
     :global-prefix "M-SPC")
   (my/keys
     ;; --- navigation
-    "k" '(my/kill-buffer-and-window :wk "kill buffer")
-    "[" '(evil-beginning-of-line :wk "beg of line")
-    "]" '(evil-end-of-line :wk "end of line")
-    "<" '(previous-buffer :wk "previ buffer")
-    "b" '(consult-buffer :wk "search buffer")
-    "," '(popper-toggle :wk "toggle popup")
-    ">" '(next-buffer :wk "next buffer")
-    "d" '(dired-jump :wk "file manager")
-    "." '(embark-act :wk "context menu")
-    "/" '(flash-jump :wk "search jump")
-    "f" '(find-file :wk "find-file")
+    "k"       '(my/kill-buffer-and-window :wk "kill buffer")
+    "<left>"  '(evil-beginning-of-line :wk "beg of line")
+    "<right>" '(evil-end-of-line :wk "end of line")
+    "<"       '(previous-buffer :wk "previ buffer")
+    "b"       '(consult-buffer :wk "search buffer")
+    ","       '(popper-toggle :wk "toggle popup")
+    ">"       '(next-buffer :wk "next buffer")
+    "d"       '(dired-jump :wk "file manager")
+    "."       '(embark-act :wk "context menu")
+    "/"       '(flash-jump :wk "search jump")
+    "f"       '(find-file :wk "find-file")
 
     ;; --- emacs
     "e"   '(:ignore t :wk "emacs")
@@ -280,7 +280,6 @@
 
     ;; --- toggles
     "t"   '(:ignore t :wk "toggle")
-    "t w" '(my/toggle-whitespace-cleanup :wk "whitespace cleanup")
     "t l" '(visual-line-mode :wk "truncated lines")
     "t t" '(vterm :wk "vterm")
 
@@ -393,12 +392,12 @@
   (nerd-icons-completion-mode)
   (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
 
-(use-package rg-themes
+(use-package pixel-themes
   :ensure nil
   :load-path "~/.config/emacs/themes"
   :config
   (add-to-list 'custom-theme-load-path "~/.config/emacs/themes")
-  (rg-themes-set 'rg-themes-custom7))
+  (pixel-themes-set 'pixel-themes-grayweather))
 
 (use-package rainbow-delimiters
   :ensure t
@@ -680,7 +679,11 @@
           vertico-posframe-poshandler #'my/vertico-posframe-handler)
   (setopt vertico-posframe-parameters
           '((left-fringe  . 3)
-            (right-fringe . 20))))
+            (right-fringe . 20)))
+  (defun my/vertico-posframe-refresh ()
+    (vertico-posframe-mode -1)
+    (vertico-posframe-mode 1))
+  (add-hook 'pixel-themes-after-theme-load-hook #'my/vertico-posframe-refresh))
 
 (use-package marginalia
   :ensure t

@@ -2,6 +2,7 @@ auto-save-list/
 custom-vars.el
 .lsp-session
 auto-saves/
+nov-places
 eln-cache/
 transient/
 devdocs/
@@ -9,6 +10,6 @@ history
 recentf
 .cache/
 .tutor/
-elpaca/
+elpaca
 places
 tramp

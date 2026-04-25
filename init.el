@@ -397,7 +397,7 @@
   :load-path "~/.config/emacs/themes"
   :config
   (add-to-list 'custom-theme-load-path "~/.config/emacs/themes")
-  (pixel-themes-set 'pixel-themes-grayweather))
+  (pixel-themes-set 'pixel-themes-steamlords))
 
 (use-package rainbow-delimiters
   :ensure t

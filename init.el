@@ -1,4 +1,4 @@
-;; init.el --- Emacs --- -*- lexical-binding: t; no-byte-compile: t; -*-
+;;; init.el --- Emacs --- -*- lexical-binding: t; no-byte-compile: t; -*-
 ;; ===============================================================
 ;;; Commentary:
 ;;; Code:
@@ -570,36 +570,32 @@
                    "  ")
                  cand))))
 
-;; (use-package vertico-posframe
-;;   :ensure t
-;;   :defer t
-;;   :after vertico
-;;   :init
-;;   (vertico-posframe-mode 1)
-;;   (vertico-multiform-mode 1)
-;;   :custom
-;;   (vertico-multiform-commands
-;;    '((consult-theme (:not posframe))
-;;      (t posframe)))
-;;   :config
-;;   (custom-set-faces
-;;    '(vertico-posframe-border-2 ((t (:background "#768c9c"))))
-;;    '(vertico-posframe-border-3 ((t (:background "#758672"))))
-;;    '(vertico-posframe-border-4 ((t (:background "#98585b")))))
-;;   (defun my/vertico-posframe-handler (info)
-;;     (let ((pos (posframe-poshandler-frame-bottom-right-corner info)))
-;;       (cons (- (car pos) 15)
-;;             (- (cdr pos) 20))))
-;;   (setopt vertico-posframe-width 60
-;;           vertico-posframe-height 8
-;;           vertico-posframe-poshandler #'my/vertico-posframe-handler)
-;;   (setopt vertico-posframe-parameters
-;;           '((left-fringe  . 3)
-;;             (right-fringe . 20)))
-;;   (defun my/vertico-posframe-refresh ()
-;;     (vertico-posframe-mode -1)
-;;     (vertico-posframe-mode 1))
-;;   (add-hook 'pixel-themes-after-theme-load-hook #'my/vertico-posframe-refresh))
+(use-package vertico-posframe
+  :ensure t
+  :defer t
+  :after vertico
+  :init
+  (vertico-posframe-mode 1)
+  (vertico-multiform-mode 1)
+  :custom
+  (vertico-multiform-commands
+   '((consult-theme (:not posframe))
+     (t posframe)))
+  :config
+  (defun my/vertico-posframe-handler (info)
+    (let ((pos (posframe-poshandler-frame-bottom-right-corner info)))
+      (cons (- (car pos) 15)
+            (- (cdr pos) 20))))
+  (setopt vertico-posframe-width 60
+          vertico-posframe-height 8
+          vertico-posframe-poshandler #'my/vertico-posframe-handler)
+  (setopt vertico-posframe-parameters
+          '((left-fringe  . 3)
+            (right-fringe . 20)))
+  (defun my/vertico-posframe-refresh ()
+    (vertico-posframe-mode -1)
+    (vertico-posframe-mode 1))
+  (add-hook 'pixel-themes-after-theme-load-hook #'my/vertico-posframe-refresh))
 
 (use-package marginalia
   :ensure t

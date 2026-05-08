@@ -216,16 +216,18 @@
     "k"       '(my/kill-buffer-window :wk "kill buffer")
     "b"       '(consult-buffer :wk "search buffer")
     ","       '(popper-toggle :wk "toggle popup")
+    "n"       '(popper-cycle :wk "next popup")
     "d"       '(dired-jump :wk "file manager")
     "."       '(embark-act :wk "context menu")
     "/"       '(flash-jump :wk "search jump")
 
-    ;; --- emacs
-    "e"   '(:ignore t :wk "emacs")
+    ;; --- config
+    "e"   '(:ignore t :wk "emacs config")
     "e c" '((lambda () (interactive)
               (find-file (locate-user-emacs-file "init.el")))
             :wk "edit config")
     "e e" '(my/jump-to-end-of-block :wk "end of block")
+    "e t" '(visual-line-mode :wk "truncated lines")
     "e f" '(eval-last-sexp :wk "eval expression")
     "e r" '(restart-emacs :wk "restart emacs")
     "e s" '(sudo-edit :wk "sudo edit file")
@@ -234,21 +236,13 @@
     "h"   '(:ignore t :wk "help")
     "h h" '(helpful-at-point :wk "at point")
     "h d" '(devdocs-lookup :wk "devdocs")
-    "h e" '(eldoc :wk "eldoc")
 
     "l"   '(:ignore t :wk "lsp")
-    "l e" '(lsp-bridge-diagnostic-jump-next :wk "next error")
-    "l w" '(lsp-bridge-diagnostic-jump-prev :wk "prev error")
     "l l" '(lsp-bridge-diagnostic-list :wk "list errors")
     "l r" '(lsp-bridge-find-references :wk "references")
     "l c" '(lsp-bridge-code-action :wk "code actions")
     "l d" '(lsp-bridge-find-def :wk "definition")
     "l n" '(lsp-bridge-rename :wk "rename")
-
-    ;; --- popper
-    "p"   '(:ignore t :wk "popper")
-    "p t" '(popper-toggle-type :wk "toggle type")
-    "p l" '(popper-cycle :wk "next popup")
 
     ;; --- search
     "s"   '(:ignore t :wk "search")
@@ -261,10 +255,6 @@
     "s i" '(consult-imenu :wk "imenu")
     "s s" '(consult-line :wk "line")
     "s f" '(consult-fd :wk "file")
-
-    ;; --- toggles
-    "t"   '(:ignore t :wk "toggle")
-    "t l" '(visual-line-mode :wk "truncated lines")
 
     ;; --- windows
     "w"         '(:ignore t :wk "windows")

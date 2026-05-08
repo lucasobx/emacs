@@ -264,7 +264,7 @@
     "s g" '(consult-ripgrep :wk "ripgrep")
     "s i" '(consult-imenu :wk "imenu")
     "s s" '(consult-line :wk "line")
-    "s f" '(consult-find :wk "file")
+    "s f" '(consult-fd :wk "file")
 
     ;; --- toggles
     "t"   '(:ignore t :wk "toggle")
@@ -630,6 +630,8 @@
           xref-show-definitions-function #'consult-xref)
   (setopt completion-in-region-function #'consult-completion-in-region)
   :config
+  (setopt consult-fd-args
+          '("fd" "--color=auto" "--full-path" "--hidden"))
   (setopt consult-buffer-filter
           (append consult-buffer-filter
                   '("\\*Async Shell Command\\*"

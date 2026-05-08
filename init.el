@@ -1,4 +1,4 @@
-;;; init.el --- Emacs --- -*- lexical-binding: t; no-byte-compile: t; -*-
+;; init.el --- Emacs --- -*- lexical-binding: t; no-byte-compile: t; -*-
 ;; ===============================================================
 ;;; Commentary:
 ;;; Code:
@@ -173,7 +173,7 @@
   (beginning-of-defun)
   (forward-sexp))
 
-(defun my/kill-buffer-and-window ()
+(defun my/kill-buffer-window ()
   "Kill the current buffer and close its window."
   (interactive)
   (let ((buffer (current-buffer)))
@@ -211,17 +211,14 @@
     :global-prefix "M-SPC")
   (my/keys
     ;; --- navigation
-    "k"       '(my/kill-buffer-and-window :wk "kill buffer")
-    "<left>"  '(evil-beginning-of-line :wk "beg of line")
-    "<right>" '(evil-end-of-line :wk "end of line")
-    "<"       '(previous-buffer :wk "previ buffer")
+    "<right>" '(evil-end-of-line :wk ("→" . "end of line"))
+    "<left>"  '(evil-beginning-of-line :wk ("←" . "beg of line"))
+    "k"       '(my/kill-buffer-window :wk "kill buffer")
     "b"       '(consult-buffer :wk "search buffer")
     ","       '(popper-toggle :wk "toggle popup")
-    ">"       '(next-buffer :wk "next buffer")
     "d"       '(dired-jump :wk "file manager")
     "."       '(embark-act :wk "context menu")
     "/"       '(flash-jump :wk "search jump")
-    "f"       '(find-file :wk "find-file")
 
     ;; --- emacs
     "e"   '(:ignore t :wk "emacs")
@@ -229,10 +226,8 @@
               (find-file (locate-user-emacs-file "init.el")))
             :wk "edit config")
     "e e" '(my/jump-to-end-of-block :wk "end of block")
-    "e m" '(consult-mode-command :wk "mode commands")
     "e f" '(eval-last-sexp :wk "eval expression")
     "e r" '(restart-emacs :wk "restart emacs")
-    "e p" '(check-parens :wk "check parens")
     "e s" '(sudo-edit :wk "sudo edit file")
 
     ;; --- help
@@ -270,18 +265,17 @@
     ;; --- toggles
     "t"   '(:ignore t :wk "toggle")
     "t l" '(visual-line-mode :wk "truncated lines")
-    "t t" '(ghostel :wk "terminal")
 
     ;; --- windows
-    "w"   '(:ignore t :wk "windows")
-    "w w" '(evil-window-split :wk "horizontal split")
-    "w v" '(evil-window-vsplit :wk "vertical split")
-    "w c" '(evil-window-delete :wk "close window")
-    "w n" '(evil-window-new :wk "new window")
-    "w l" '(buf-move-right :wk "move right")
-    "w h" '(buf-move-left :wk "move left")
-    "w j" '(buf-move-down :wk "move down")
-    "w k" '(buf-move-up :wk "move up"))
+    "w"         '(:ignore t :wk "windows")
+    "w <up>"    '(buf-move-up :wk ("↑" . "move up"))
+    "w <down>"  '(buf-move-down :wk ("↓" . "move down"))
+    "w <left>"  '(buf-move-left :wk ("←" . "move left"))
+    "w <right>" '(buf-move-right :wk ("→" . "move right"))
+    "w w"       '(evil-window-split :wk "horizontal split")
+    "w v"       '(evil-window-vsplit :wk "vertical split")
+    "w c"       '(evil-window-delete :wk "close window")
+    "w n"       '(evil-window-new :wk "new window"))
 
   ;; --- org-mode
   (my/keys
@@ -305,7 +299,8 @@
   ;; --- consult-yank 
   (general-def
     :states '(normal insert)
-    "M-y" 'consult-yank-pop))
+    "M-y"   'consult-yank-pop
+    "<f12>" 'ghostel))
 
 (use-package evil
   :ensure (:wait t)

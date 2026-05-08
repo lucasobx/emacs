@@ -260,8 +260,9 @@
     "s r" '(consult-recent-file :wk "recent files")
     "s l" '(consult-line-multi :wk "line in files")
     "s d" '(consult-dir :wk "recent directories")
-    "s c" '(consult-theme :wk "change theme")
     "s g" '(consult-ripgrep :wk "ripgrep")
+    "s o" '(consult-outline :wk "outline")
+    "s t" '(consult-theme :wk "themes")
     "s i" '(consult-imenu :wk "imenu")
     "s s" '(consult-line :wk "line")
     "s f" '(consult-fd :wk "file")
@@ -282,6 +283,7 @@
     "w j" '(buf-move-down :wk "move down")
     "w k" '(buf-move-up :wk "move up"))
 
+  ;; --- org-mode
   (my/keys
     :keymaps 'org-mode-map
     "o"   '(:ignore t :wk "org")
@@ -289,6 +291,7 @@
     "o o" '(org-toggle-checkbox :wk "toggle checkbox")
     "o l" '(org-insert-link :wk "insert link"))
 
+  ;; --- ruby-mode
   (my/keys
     :keymaps '(ruby-mode-map ruby-ts-mode-map)
     "r"   '(:ignore t :wk "ruby")
@@ -297,7 +300,12 @@
     "r s" '(ruby-send-region :wk "send region")
     "r b" '(ruby-send-buffer :wk "send buffer")
     "r l" '(ruby-send-line :wk "send line")
-    "r r" '(inf-ruby :wk "open repl")))
+    "r r" '(inf-ruby :wk "open repl"))
+
+  ;; --- consult-yank 
+  (general-def
+    :states '(normal insert)
+    "M-y" 'consult-yank-pop))
 
 (use-package evil
   :ensure (:wait t)

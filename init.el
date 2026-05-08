@@ -45,16 +45,15 @@
 (elpaca elpaca-use-package
   (elpaca-use-package-mode))
 
+(elpaca compat)
+(elpaca-wait)
+
 ;; ===============================================================
 ;;; CORE SETTINGS
 
-(defvar my/font "PragmataPro Liga")
-(defvar my/size 132)
-(defvar my/line-spacing 0.15)
-
-;; (defvar my/font "Berkeley Mono ExtraCondensed Retina")
-;; (defvar my/line-spacing 1)
-;; (defvar my/size 140)
+(defvar my/font "Berkeley Mono ExtraCondensed Regular")
+(defvar my/line-spacing 0)
+(defvar my/size 130)
 
 (set-face-attribute 'default nil :font my/font :height my/size)
 (setq-default line-spacing my/line-spacing)
@@ -174,17 +173,6 @@
   (beginning-of-defun)
   (forward-sexp))
 
-(defun my/vterm-only ()
-  "Open vterm in full screen and disable exit query."
-  (interactive)
-  (require 'vterm)
-  (let ((popper-mode nil)
-        (display-buffer-alist nil))
-    (vterm)
-    (delete-other-windows)
-    (let ((proc (get-buffer-process (current-buffer))))
-      (when proc (set-process-query-on-exit-flag proc nil)))))
-
 (defun my/kill-buffer-and-window ()
   "Kill the current buffer and close its window."
   (interactive)
@@ -254,13 +242,13 @@
     "h e" '(eldoc :wk "eldoc")
 
     "l"   '(:ignore t :wk "lsp")
-    "l c" '(lsp-execute-code-action :wk "code actions")
-    "l w" '(flycheck-previous-error :wk "prev error")
-    "l l" '(flycheck-list-errors :wk "list errors")
-    "l d" '(lsp-find-definition :wk "definition")
-    "l r" '(lsp-find-references :wk "references")
-    "l e" '(flycheck-next-error :wk "next error")
-    "l n" '(lsp-rename :wk "rename")
+    "l e" '(lsp-bridge-diagnostic-jump-next :wk "next error")
+    "l w" '(lsp-bridge-diagnostic-jump-prev :wk "prev error")
+    "l l" '(lsp-bridge-diagnostic-list :wk "list errors")
+    "l r" '(lsp-bridge-find-references :wk "references")
+    "l c" '(lsp-bridge-code-action :wk "code actions")
+    "l d" '(lsp-bridge-find-def :wk "definition")
+    "l n" '(lsp-bridge-rename :wk "rename")
 
     ;; --- popper
     "p"   '(:ignore t :wk "popper")
@@ -281,7 +269,7 @@
     ;; --- toggles
     "t"   '(:ignore t :wk "toggle")
     "t l" '(visual-line-mode :wk "truncated lines")
-    "t t" '(vterm :wk "vterm")
+    "t t" '(ghostel :wk "terminal")
 
     ;; --- windows
     "w"   '(:ignore t :wk "windows")
@@ -326,7 +314,6 @@
   (define-key evil-normal-state-map (kbd "<escape>") #'keyboard-quit)
   (define-key evil-insert-state-map (kbd "C-y") 'yank)
   (define-key evil-normal-state-map (kbd "C-y") 'yank)
-  (evil-set-initial-state 'vterm-mode 'emacs)
   (evil-mode 1))
 
 (use-package evil-collection
@@ -336,30 +323,11 @@
   (setopt evil-collection-mode-list '(dashboard dired ibuffer magit))
   (evil-collection-init))
 
-(use-package evil-matchit
-  :ensure t
-  :after evil-collection
-  :config
-  (require 'evil-matchit-ruby)
-  (evilmi-load-plugin-rules '(ruby-base-mode ruby-ts-mode) '(simple ruby))
-  (setq evilmi-ruby-match-tags
-        '((("unless" "if") ("elsif" "else") "end")
-          ("begin" ("rescue" "ensure") "end")
-          ("case" ("when" "else") "end")
-          (("class" "def" "while" "do" "module" "for" "until") () "end")
-          (("describe" "context" "subject" "specify" "it" "let") () "end")))
-  (global-evil-matchit-mode 1))
-
 (use-package evil-commentary
   :ensure t
   :after evil
   :config
   (evil-commentary-mode))
-
-(use-package evil-surround
-  :ensure t
-  :config
-  (global-evil-surround-mode 1))
 
 (use-package evil-goggles
   :ensure t
@@ -397,7 +365,7 @@
   :load-path "~/.config/emacs/themes"
   :config
   (add-to-list 'custom-theme-load-path "~/.config/emacs/themes")
-  (pixel-themes-set 'pixel-themes-steamlords))
+  (pixel-themes-set 'pixel-themes-miri16))
 
 (use-package rainbow-delimiters
   :ensure t
@@ -414,6 +382,7 @@
   (doom-modeline-check-icon nil)
   (nerd-icons-scale-factor 1.0)
   (doom-modeline-modal-icon t)
+  (doom-modeline-height 30)
   (doom-modeline-modal t)
   (doom-modeline-icon t)
   :config
@@ -421,8 +390,8 @@
   (setopt doom-modeline-always-show-macro-register t)
   (setopt doom-modeline-buffer-modification-icon nil)
   (custom-set-faces
-   '(mode-line ((t (:inherit default :height 112 :weight normal))))
-   '(mode-line-inactive ((t (:inherit default :height 112 :weight normal)))))
+   '(mode-line ((t (:inherit default :height 118 :weight normal))))
+   '(mode-line-inactive ((t (:inherit default :height 118 :weight normal)))))
   (add-hook 'doom-modeline-mode-hook
             (lambda ()
               (dolist (face (face-list))
@@ -455,9 +424,9 @@
   (setopt line-reminder-show-option 'indicators)
   (setopt line-reminder-bitmap 'vertical-bar)
   (set-face-attribute 'line-reminder-modified-sign-face nil
-                      :foreground "#a67c6a")
+                      :foreground (face-attribute 'line-number-current-line :foreground))
   (set-face-attribute 'line-reminder-saved-sign-face nil
-                      :foreground "#503f58"))
+                      :foreground (face-attribute 'default :background)))
 
 ;; ===============================================================
 ;;; NAVIGATION
@@ -500,13 +469,13 @@
   (setopt popper-window-height 15)
   (setopt popper-reference-buffers
           '("\\*Async Shell Command\\*"
-            "^\\*vterm.*\\*$"
+            "^\\*ghostel.*\\*$"
             "\\*eldoc\\*"
             "Output\\*$"
             compilation-mode
             devdocs-mode
             helpful-mode
-            vterm-mode
+            ghostel-mode
             dired-mode
             help-mode))
   (setopt popper-mode-line "")
@@ -545,6 +514,10 @@
   (set-face-attribute 'markdown-code-face nil :font my/font)
   (set-face-attribute 'markdown-inline-code-face nil :font my/font))
 
+(use-package yasnippet
+  :ensure t
+  :defer t)
+
 (use-package inf-ruby
   :ensure t
   :hook
@@ -554,75 +527,15 @@
     (add-to-list 'inf-ruby-implementations '("pry" . "pry"))
     (setq inf-ruby-default-implementation "pry")))
 
-(use-package lsp-mode
-  :ensure t
-  :defer t
+(use-package lsp-bridge
+  :ensure '(lsp-bridge :type git :host github :repo "manateelazycat/lsp-bridge"
+            :files (:defaults "*.el" "*.py" "acm" "core" "langserver" "multiserver" "resources")
+            :build (:not compile))
   :hook
-  ((ruby-ts-mode
-    lua-ts-mode) . lsp-deferred)
-  :commands lsp
+  (prog-mode . lsp-bridge-mode)
   :custom
-  (lsp-session-file (locate-user-emacs-file ".lsp-session"))
-  (lsp-completion-provider :none)
-  (lsp-keep-workspace-alive nil)
-  (lsp-inlay-hint-enable nil)
-  (lsp-idle-delay 0.5)
-  (lsp-log-io nil)
-  ;; core settings
-  (lsp-enable-suggest-server-download t)
-  (lsp-enable-on-type-formatting nil)
-  (lsp-enable-symbol-highlighting t)
-  (lsp-enable-text-document-color t)
-  (lsp-enable-file-watchers nil)
-  (lsp-enable-indentation nil)
-  (lsp-eldoc-enable-hover t)
-  (lsp-enable-folding nil)
-  (lsp-auto-configure t)
-  (lsp-enable-links nil)
-  (lsp-enable-imenu t)
-  (lsp-enable-xref t)
-  ;; modeline settings
-  (lsp-modeline-workspace-status-enable t)
-  (lsp-modeline-code-actions-enable nil)
-  (lsp-modeline-diagnostics-enable nil)
-  (lsp-signature-doc-lines 1)
-  (lsp-eldoc-render-all t)
-  ;; completion settings
-  (lsp-completion-enable-additional-text-edit t)
-  (lsp-completion-show-kind t)
-  (lsp-completion-enable t)
-  (lsp-enable-snippet nil)
-  ;; headerline settings
-  (lsp-headerline-breadcrumb-enable nil)
-  ;; semantic settings
-  (lsp-semantic-tokens-enable nil))
-
-(use-package flycheck
-  :ensure t
-  :hook
-  (prog-mode . flycheck-mode)
-  :custom
-  (flycheck-buffer-switch-check-intermediate-buffers t)
-  (flycheck-display-errors-delay 0.25)
-  (flycheck-idle-change-delay 1.0)
-  (flycheck-indication-mode nil)
-  :config
-  (delq 'new-line flycheck-check-syntax-automatically))
-
-(use-package flycheck-posframe
-  :ensure t
-  :after flycheck
-  :hook
-  (flycheck-mode . flycheck-posframe-mode)
-  :custom
-  (flycheck-posframe-position 'window-bottom-right-corner)
-  (flycheck-posframe-warning-prefix "")
-  (flycheck-posframe-error-prefix   "")
-  (flycheck-posframe-info-prefix    "")
-  (flycheck-posframe-border-width 1)
-  :config
-  (set-face-attribute 'flycheck-posframe-border-face nil
-                      :foreground (face-attribute 'font-lock-comment-face :foreground)))
+  (lsp-bridge-enable-diagnostics t)
+  (lsp-bridge-enable-hover-diagnostic t))
 
 (use-package eldoc
   :ensure nil
@@ -654,36 +567,36 @@
                    "  ")
                  cand))))
 
-(use-package vertico-posframe
-  :ensure t
-  :defer t
-  :after vertico
-  :init
-  (vertico-posframe-mode 1)
-  (vertico-multiform-mode 1)
-  :custom
-  (vertico-multiform-commands
-   '((consult-theme (:not posframe))
-     (t posframe)))
-  :config
-  (custom-set-faces
-   '(vertico-posframe-border-2 ((t (:background "#768c9c"))))
-   '(vertico-posframe-border-3 ((t (:background "#758672"))))
-   '(vertico-posframe-border-4 ((t (:background "#98585b")))))
-  (defun my/vertico-posframe-handler (info)
-    (let ((pos (posframe-poshandler-frame-bottom-right-corner info)))
-      (cons (- (car pos) 15)
-            (- (cdr pos) 20))))
-  (setopt vertico-posframe-width 60
-          vertico-posframe-height 8
-          vertico-posframe-poshandler #'my/vertico-posframe-handler)
-  (setopt vertico-posframe-parameters
-          '((left-fringe  . 3)
-            (right-fringe . 20)))
-  (defun my/vertico-posframe-refresh ()
-    (vertico-posframe-mode -1)
-    (vertico-posframe-mode 1))
-  (add-hook 'pixel-themes-after-theme-load-hook #'my/vertico-posframe-refresh))
+;; (use-package vertico-posframe
+;;   :ensure t
+;;   :defer t
+;;   :after vertico
+;;   :init
+;;   (vertico-posframe-mode 1)
+;;   (vertico-multiform-mode 1)
+;;   :custom
+;;   (vertico-multiform-commands
+;;    '((consult-theme (:not posframe))
+;;      (t posframe)))
+;;   :config
+;;   (custom-set-faces
+;;    '(vertico-posframe-border-2 ((t (:background "#768c9c"))))
+;;    '(vertico-posframe-border-3 ((t (:background "#758672"))))
+;;    '(vertico-posframe-border-4 ((t (:background "#98585b")))))
+;;   (defun my/vertico-posframe-handler (info)
+;;     (let ((pos (posframe-poshandler-frame-bottom-right-corner info)))
+;;       (cons (- (car pos) 15)
+;;             (- (cdr pos) 20))))
+;;   (setopt vertico-posframe-width 60
+;;           vertico-posframe-height 8
+;;           vertico-posframe-poshandler #'my/vertico-posframe-handler)
+;;   (setopt vertico-posframe-parameters
+;;           '((left-fringe  . 3)
+;;             (right-fringe . 20)))
+;;   (defun my/vertico-posframe-refresh ()
+;;     (vertico-posframe-mode -1)
+;;     (vertico-posframe-mode 1))
+;;   (add-hook 'pixel-themes-after-theme-load-hook #'my/vertico-posframe-refresh))
 
 (use-package marginalia
   :ensure t
@@ -728,17 +641,19 @@
        (let ((buffer (if (stringp buf) (get-buffer buf) (cdr buf))))
          (when buffer
            (memq (buffer-local-value 'major-mode buffer)
-                 '(dired-mode helpful-mode vterm-mode help-mode compilation-mode)))))
+                 '(dired-mode helpful-mode ghostel-mode help-mode compilation-mode)))))
      buffers))
   (advice-add #'consult--buffer-query :filter-return #'my/consult-buffer-filter-modes))
 
 (use-package consult-dir
   :ensure t
-  :defer t)
+  :after consult)
 
 (use-package embark
   :ensure t
   :defer t
+  :bind
+  (("C-." . embark-act))
   :init
   (setopt prefix-help-command #'embark-prefix-help-command)
   :config
@@ -837,13 +752,13 @@
 ;; ===============================================================
 ;;; TERMINAL
 
-(use-package vterm
+(use-package ghostel
+  :ensure t)
+
+(use-package evil-ghostel
   :ensure t
-  :defer t
-  :config
-  (add-to-list 'vterm-keymap-exceptions "M-w")
-  (define-key vterm-mode-map (kbd "M-w") #'kill-ring-save)
-  (evil-define-key 'emacs vterm-mode-map (kbd "C-c") #'vterm--self-insert))
+  :after (ghostel evil)
+  :hook (ghostel-mode . evil-ghostel-mode))
 
 ;; ===============================================================
 ;;; DOCS

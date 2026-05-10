@@ -52,11 +52,9 @@
 ;;; CORE SETTINGS
 
 (defvar my/font "Berkeley Mono ExtraCondensed Regular")
-(defvar my/line-spacing 0)
 (defvar my/size 130)
 
 (set-face-attribute 'default nil :font my/font :height my/size)
-(setq-default line-spacing my/line-spacing)
 
 (use-package emacs
   :ensure nil
@@ -76,6 +74,16 @@
   (winner-mode 1)
 
   :custom
+  ;; EMACS-31
+  (display-fill-column-indicator-warning nil)
+  (ibuffer-human-readable-size t)
+  (delete-pair-push-mark t)
+  (treesit-auto-install-grammar t)
+  (treesit-enabled-modes t)
+  (zone-all-frames t)
+  (zone-all-windows-in-frame t)
+  (completion-eager-update t)
+  (completion-eager-display 'auto)
   ;; ui
   (redisplay-skip-fontification-on-input t)
   (uniquify-buffer-name-style 'forward)
@@ -129,6 +137,11 @@
   (scroll-step 1)
 
   :config
+  ;; minibuffer
+  (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
+  (add-hook 'minibuffer-setup-hook (lambda () (setq truncate-lines t)))
+  (minibuffer-depth-indicate-mode 1)
+  (minibuffer-electric-default-mode 1)
   ;; buffers
   (defun skip-these-buffers (_window buffer _bury-or-kill)
     "Function for `switch-to-prev-buffer-skip'."
@@ -216,6 +229,7 @@
     "k"       '(my/kill-buffer-window :wk "kill buffer")
     "b"       '(consult-buffer :wk "search buffer")
     ","       '(popper-toggle :wk "toggle popup")
+    "y"       '(consult-yank-pop :wk "yank-pop")
     "n"       '(popper-cycle :wk "next popup")
     "d"       '(dired-jump :wk "file manager")
     "."       '(embark-act :wk "context menu")
@@ -314,7 +328,7 @@
   :ensure t
   :after evil
   :config
-  (setopt evil-collection-mode-list '(dashboard dired ibuffer magit))
+  (setopt evil-collection-mode-list '(dired ibuffer magit))
   (evil-collection-init))
 
 (use-package evil-commentary
@@ -335,6 +349,49 @@
 (use-package transient
   :ensure t
   :defer t)
+
+(use-package speedbar
+  :ensure nil
+  :bind
+  (("M-i" . (lambda ()
+              (interactive)
+              (speedbar-window) ; EMACS-31
+              (let ((win (get-buffer-window speedbar-buffer)))
+                (when win
+                  (select-window win))))))
+  :custom
+  (speedbar-window-default-width 25) ; EMACS-31
+  (speedbar-window-max-width 25) ; EMACS-31
+  (speedbar-show-unknown-files t)
+  (speedbar-directory-unshown-regexp "^$")
+  (speedbar-indentation-width 2)
+  (speedbar-use-images t)
+  (speedbar-update-flag nil)
+  :config
+  (setq speedbar-expand-image-button-alist
+        '(("<+>" . ezimage-directory)
+          ("<->" . ezimage-directory-minus)
+          ("< >" . ezimage-directory)
+          ("[+]" . ezimage-page-plus)
+          ("[-]" . ezimage-page-minus)
+          ("[?]" . ezimage-page)
+          ("[ ]" . ezimage-page)
+          ("{+}" . ezimage-directory-plus)
+          ("{-}" . ezimage-directory-minus)
+          ("<M>" . ezimage-mail)
+          ("<d>" . ezimage-document-tag)
+          ("<i>" . ezimage-info-tag)
+          (" =>" . ezimage-tag)
+          (" +>" . ezimage-tag-gt)
+          (" ->" . ezimage-tag-v)
+          (">"   . ezimage-tag)
+          ("@"   . ezimage-tag-type)
+          ("  @" . ezimage-tag-type)
+          ("*"   . ezimage-checkout)
+          ("#"   . ezimage-object)
+          ("!"   . ezimage-object-out-of-date)
+          ("//"  . ezimage-label)
+          ("%"   . ezimage-lock))))
 
 ;; ===============================================================
 ;;; UI
@@ -358,7 +415,6 @@
   :ensure nil
   :load-path "~/.config/emacs/themes"
   :config
-  (add-to-list 'custom-theme-load-path "~/.config/emacs/themes")
   (pixel-themes-set 'pixel-themes-miri16))
 
 (use-package rainbow-delimiters
@@ -447,6 +503,7 @@
   (dired-mode . hl-line-mode)
   :custom
   (dired-listing-switches "-lah --almost-all --group-directories-first --sort=extension")
+  (dired-hide-details-hide-absolute-location t) ; EMACS-31
   (dired-dwim-target t)
   (dired-omit-files "^\\.")
   (dired-kill-when-opening-new-dired-buffer t)
@@ -501,12 +558,9 @@
   (treesit-auto-add-to-auto-mode-alist 'all)
   (global-treesit-auto-mode t))
 
-(use-package markdown-mode
-  :ensure t
-  :defer t
-  :config
-  (set-face-attribute 'markdown-code-face nil :font my/font)
-  (set-face-attribute 'markdown-inline-code-face nil :font my/font))
+(use-package markdown-ts-mode
+  :ensure nil
+  :defer t)
 
 (use-package yasnippet
   :ensure t
@@ -534,6 +588,7 @@
 (use-package eldoc
   :ensure nil
   :custom
+  (eldoc-help-at-pt t) ; EMACS-31
   (eldoc-documentation-strategy 'eldoc-documentation-compose)
   (eldoc-echo-area-display-truncation-message nil)
   (eldoc-echo-area-prefer-doc-buffer t)

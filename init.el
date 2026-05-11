@@ -277,10 +277,9 @@
     "w <down>"  '(buf-move-down :wk ("↓" . "move down"))
     "w <left>"  '(buf-move-left :wk ("←" . "move left"))
     "w <right>" '(buf-move-right :wk ("→" . "move right"))
-    "w w"       '(evil-window-split :wk "horizontal split")
     "w v"       '(evil-window-vsplit :wk "vertical split")
     "w c"       '(evil-window-delete :wk "close window")
-    "w n"       '(evil-window-new :wk "new window"))
+    "w w"       '(evil-window-new :wk "new window"))
 
   ;; --- org-mode
   (my/keys

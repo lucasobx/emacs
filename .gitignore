@@ -1,13 +1,16 @@
 auto-save-list/
 custom-vars.el
 .lsp-session
+recentf.eld
 auto-saves/
+places.eld
 nov-places
 eln-cache/
 transient/
 devdocs/
 history
 recentf
+themes/
 .cache/
 .tutor/
 elpaca

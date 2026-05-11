@@ -1,9 +1,8 @@
 ### Requirements
-* emacs 29+
+* emacs 31+
 * nerd icons
 * ripgrep
 * fd
 
 ___
-<img width="1281" height="1537" alt="image" src="https://github.com/user-attachments/assets/da0a9464-e802-48c9-8565-158376172d62" />
-
+<img width="1254" height="1521" alt="image" src="https://github.com/user-attachments/assets/83f4868e-7375-466c-a624-8497988e947b" />

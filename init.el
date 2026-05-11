@@ -45,8 +45,8 @@
 (elpaca elpaca-use-package
   (elpaca-use-package-mode))
 
-(elpaca compat)
-(elpaca-wait)
+(use-package compat
+  :ensure (:wait t))
 
 ;; ===============================================================
 ;;; CORE SETTINGS

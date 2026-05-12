@@ -165,17 +165,17 @@
       (unless (or defining-kbd-macro executing-kbd-macro)
         (funcall-interactively quit))))
   (define-key key-translation-map (kbd "ESC") (kbd "C-g"))
-  (global-unset-key (kbd "C-<wheel-down>"))
-  (global-unset-key (kbd "C-<wheel-up>"))
-  (global-unset-key (kbd "C-x C-z"))
-  (global-unset-key (kbd "C-z"))
   ;; ui
   (set-face-attribute 'tooltip nil :font my/font)
 
   :bind
-  ("C-="     . text-scale-increase)
-  ("C--"     . text-scale-decrease)
-  ("C-<tab>" . other-window))
+  ("C-=" . text-scale-increase)
+  ("C--" . text-scale-decrease)
+  ("C-<tab>" . other-window)
+  ("C-<wheel-down>" . nil)
+  ("C-<wheel-up>" . nil)
+  ("C-x C-z" . nil)
+  ("C-z" . nil))
 
 ;; ===============================================================
 ;;; CUSTOM FUNCTIONS

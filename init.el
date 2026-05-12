@@ -273,10 +273,9 @@
 
     ;; --- windows
     "w"         '(:ignore t :wk "windows")
-    "w <up>"    '(buf-move-up :wk ("↑" . "move up"))
-    "w <down>"  '(buf-move-down :wk ("↓" . "move down"))
-    "w <left>"  '(buf-move-left :wk ("←" . "move left"))
-    "w <right>" '(buf-move-right :wk ("→" . "move right"))
+    "w <right>" '(window-layout-rotate-clockwise :wk ("→" . "rotate clockwise"))
+    "w <left>"  '(window-layout-flip-leftright :wk ("←" . "flip left-right"))
+    "w <up>"    '(window-layout-flip-topdown :wk ("↑" . "flip top-down"))
     "w v"       '(evil-window-vsplit :wk "vertical split")
     "w c"       '(evil-window-delete :wk "close window")
     "w w"       '(evil-window-new :wk "new window"))
@@ -362,35 +361,8 @@
   (speedbar-window-default-width 25) ; EMACS-31
   (speedbar-window-max-width 25) ; EMACS-31
   (speedbar-show-unknown-files t)
-  (speedbar-directory-unshown-regexp "^$")
   (speedbar-indentation-width 2)
-  (speedbar-use-images t)
-  (speedbar-update-flag nil)
-  :config
-  (setq speedbar-expand-image-button-alist
-        '(("<+>" . ezimage-directory)
-          ("<->" . ezimage-directory-minus)
-          ("< >" . ezimage-directory)
-          ("[+]" . ezimage-page-plus)
-          ("[-]" . ezimage-page-minus)
-          ("[?]" . ezimage-page)
-          ("[ ]" . ezimage-page)
-          ("{+}" . ezimage-directory-plus)
-          ("{-}" . ezimage-directory-minus)
-          ("<M>" . ezimage-mail)
-          ("<d>" . ezimage-document-tag)
-          ("<i>" . ezimage-info-tag)
-          (" =>" . ezimage-tag)
-          (" +>" . ezimage-tag-gt)
-          (" ->" . ezimage-tag-v)
-          (">"   . ezimage-tag)
-          ("@"   . ezimage-tag-type)
-          ("  @" . ezimage-tag-type)
-          ("*"   . ezimage-checkout)
-          ("#"   . ezimage-object)
-          ("!"   . ezimage-object-out-of-date)
-          ("//"  . ezimage-label)
-          ("%"   . ezimage-lock))))
+  (speedbar-use-images t))
 
 ;; ===============================================================
 ;;; UI
@@ -414,7 +386,7 @@
   :ensure nil
   :load-path "~/.config/emacs/themes"
   :config
-  (pixel-themes-set 'pixel-themes-miri16))
+  (pixel-themes-set 'pixel-themes-grayweather))
 
 (use-package rainbow-delimiters
   :ensure t
@@ -530,10 +502,6 @@
             help-mode))
   (setopt popper-mode-line "")
   (popper-mode +1))
-
-(use-package buffer-move
-  :ensure t
-  :defer t)
 
 (use-package restart-emacs
   :ensure t

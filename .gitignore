@@ -1,6 +1,7 @@
 auto-save-list/
 custom-vars.el
 .lsp-session
+tree-sitter/
 recentf.eld
 auto-saves/
 places.eld

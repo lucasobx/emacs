@@ -228,9 +228,7 @@
     "<left>"  '(evil-beginning-of-line :wk ("←" . "beg of line"))
     "k"       '(my/kill-buffer-window :wk "kill buffer")
     "b"       '(consult-buffer :wk "search buffer")
-    ","       '(popper-toggle :wk "toggle popup")
     "y"       '(consult-yank-pop :wk "yank-pop")
-    "n"       '(popper-cycle :wk "next popup")
     "d"       '(dired-jump :wk "file manager")
     "."       '(embark-act :wk "context menu")
     "/"       '(flash-jump :wk "search jump")
@@ -263,7 +261,6 @@
     "s"   '(:ignore t :wk "search")
     "s r" '(consult-recent-file :wk "recent files")
     "s l" '(consult-line-multi :wk "line in files")
-    "s d" '(consult-dir :wk "recent directories")
     "s g" '(consult-ripgrep :wk "ripgrep")
     "s o" '(consult-outline :wk "outline")
     "s t" '(consult-theme :wk "themes")
@@ -301,8 +298,9 @@
 
   ;; --- consult-yank 
   (general-def
-    :states '(normal insert)
+    :states '(normal insert visual)
     "M-y"   'consult-yank-pop
+    "C-,"   'popper-toggle
     "<f12>" 'ghostel))
 
 (use-package evil
@@ -370,7 +368,7 @@
   :ensure nil
   :load-path "~/.config/emacs/themes"
   :config
-  (pixel-themes-set 'pixel-themes-grayweather))
+  (pixel-themes-set 'pixel-themes-miri16))
 
 (use-package rainbow-delimiters
   :ensure t
@@ -574,9 +572,10 @@
   :init
   (marginalia-mode)
   :config
+  ;; restrict annotations to 'face' and 'command' categories
   (setopt marginalia-annotators
           (mapcar (lambda (pair)
-                    (if (eq (car pair) 'face)
+                    (if (memq (car pair) '(face command))
                         pair
                       (cons (car pair) '(none))))
                   marginalia-annotators)))
@@ -618,7 +617,9 @@
 
 (use-package consult-dir
   :ensure t
-  :after consult)
+  :defer t
+  :bind
+  ("C-c c" . consult-dir))
 
 (use-package embark
   :ensure t
@@ -703,6 +704,13 @@
   :ensure t
   :hook
   (org-mode . olivetti-mode))
+
+(use-package org-appear
+  :ensure (:host github :repo "awth13/org-appear")
+  :hook
+  (org-mode . org-appear-mode)
+  :custom
+  (org-appear-autoemphasis t))
 
 (use-package org-modern
   :ensure t

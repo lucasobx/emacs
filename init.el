@@ -45,9 +45,6 @@
 (elpaca elpaca-use-package
   (elpaca-use-package-mode))
 
-(use-package compat
-  :ensure (:wait t))
-
 ;; ===============================================================
 ;;; CORE SETTINGS
 
@@ -554,6 +551,7 @@
   (vertico-cycle nil)
   (vertico-count 6)
   :config
+  ;; add a visual indicator to the currently selected candidate
   (advice-add #'vertico--format-candidate :around
               (lambda (orig cand prefix suffix index _start)
                 (setq cand (funcall orig cand prefix suffix index _start))
@@ -600,9 +598,7 @@
           '("fd" "--color=auto" "--full-path" "--hidden"))
   (setopt consult-buffer-filter
           (append consult-buffer-filter
-                  '("\\*Async Shell Command\\*"
-                    "\\*eldoc\\*"
-                    "Output\\*$")))
+                  '("\\*Async Shell Command\\*" "\\*eldoc\\*" "Output\\*$")))
   (defun my/consult-buffer-filter-modes (buffers)
     (cl-remove-if
      (lambda (buf)
@@ -712,7 +708,6 @@
 
 (use-package org-modern
   :ensure t
-  :after org
   :hook
   (org-mode . org-modern-mode)
   :custom
@@ -720,6 +715,11 @@
   (org-modern-replace-stars '("◉" "○" "◈" "◇" "•"))
   (org-modern-checkbox '((?X . "☑") (?\s . "☐")))
   (org-modern-list '((?- . "›") (?+ . "»") (?* . "⋙"))))
+
+(use-package org-remark
+  :ensure t
+  :hook
+  (org-mode . org-remark-global-tracking-mode))
 
 (use-package org-tidy
   :ensure t

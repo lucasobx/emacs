@@ -348,22 +348,6 @@
   :ensure t
   :defer t)
 
-(use-package speedbar
-  :ensure nil
-  :bind
-  (("M-i" . (lambda ()
-              (interactive)
-              (speedbar-window) ; EMACS-31
-              (let ((win (get-buffer-window speedbar-buffer)))
-                (when win
-                  (select-window win))))))
-  :custom
-  (speedbar-window-default-width 25) ; EMACS-31
-  (speedbar-window-max-width 25) ; EMACS-31
-  (speedbar-show-unknown-files t)
-  (speedbar-indentation-width 2)
-  (speedbar-use-images t))
-
 ;; ===============================================================
 ;;; UI
 

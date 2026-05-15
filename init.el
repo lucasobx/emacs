@@ -54,8 +54,6 @@
 (defvar my/font "Berkeley Mono ExtraCondensed Regular")
 (defvar my/size 130)
 
-(set-face-attribute 'default nil :font my/font :height my/size)
-
 (use-package emacs
   :ensure nil
   :init
@@ -74,24 +72,16 @@
   (winner-mode 1)
 
   :custom
-  ;; EMACS-31
-  (display-fill-column-indicator-warning nil)
-  (ibuffer-human-readable-size t)
-  (delete-pair-push-mark t)
-  (treesit-auto-install-grammar t)
-  (treesit-enabled-modes t)
-  (zone-all-frames t)
-  (zone-all-windows-in-frame t)
-  (completion-eager-update t)
-  (completion-eager-display 'auto)
   ;; ui
+  (display-fill-column-indicator-warning nil)
   (redisplay-skip-fontification-on-input t)
   (uniquify-buffer-name-style 'forward)
   (display-line-numbers-type 'relative)
-  ;; (display-line-numbers-width-start t)
   (warning-minimum-level :emergency)
+  (ibuffer-human-readable-size t)
   (display-line-numbers-width 4)
   (initial-major-mode 'org-mode)
+  (zone-all-windows-in-frame t)
   (initial-scratch-message "")
   (ring-bell-function 'ignore)
   (split-width-threshold 100)
@@ -101,6 +91,7 @@
   (echo-keystrokes 0.1)
   (use-short-answers t)
   (use-dialog-box nil)
+  (zone-all-frames t)
   (truncate-lines t)
   ;; minibuffer
   (minibuffer-prompt-properties
@@ -111,11 +102,16 @@
   (enable-recursive-minibuffers t)
   (lazy-highlight-initial-delay 0)
   (resize-mini-windows 'grow-only)
+  (completion-eager-display 'auto)
+  (completion-eager-update t)
   (history-length 25)
   ;; editing
+  (treesit-auto-install-grammar t)
   (kill-do-not-save-duplicates t)
   (sentence-end-double-space nil)
   (tab-always-indent 'complete)
+  (delete-pair-push-mark t)
+  (treesit-enabled-modes t)
   (indent-tabs-mode nil)
   (tab-width 2)
   ;; files
@@ -135,8 +131,12 @@
   (scroll-conservatively 101)
   (scroll-margin 10)
   (scroll-step 1)
-
+  
   :config
+  ;; ui
+  (set-face-attribute 'default nil :family my/font :height my/size)
+  (set-face-attribute 'minibuffer-nonselected nil :background)
+  (set-face-attribute 'tooltip nil :family my/font)
   ;; minibuffer
   (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
   (add-hook 'minibuffer-setup-hook (lambda () (setq truncate-lines t)))
@@ -165,8 +165,6 @@
       (unless (or defining-kbd-macro executing-kbd-macro)
         (funcall-interactively quit))))
   (define-key key-translation-map (kbd "ESC") (kbd "C-g"))
-  ;; ui
-  (set-face-attribute 'tooltip nil :font my/font)
 
   :bind
   ("C-=" . text-scale-increase)
@@ -283,7 +281,7 @@
     "o"   '(:ignore t :wk "org")
     "o p" '(org-tidy-untidy-buffer :wk "edit property")
     "o o" '(org-toggle-checkbox :wk "toggle checkbox")
-    "o l" '(org-insert-link :wk "insert link"))
+    "o t" '(org-insert-todo-heading :wk "insert todo"))
 
   ;; --- ruby-mode
   (my/keys
@@ -343,7 +341,7 @@
   (evil-goggles-use-diff-faces))
 
 (use-package transient
-  :ensure t
+  :ensure nil
   :defer t)
 
 ;; ===============================================================

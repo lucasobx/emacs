@@ -540,16 +540,23 @@
   :ensure '(lsp-bridge :type git :host github :repo "manateelazycat/lsp-bridge"
             :files (:defaults "*.el" "*.py" "acm" "core" "langserver" "multiserver" "resources")
             :build (:not compile))
-  :hook
-  (prog-mode . lsp-bridge-mode)
   :custom
   (lsp-bridge-enable-diagnostics t)
-  (lsp-bridge-enable-hover-diagnostic t))
+  (lsp-bridge-enable-hover-diagnostic t)
+  (lsp-bridge-ruby-lsp-server "ruby-lsp")
+  (acm-idle-delay 0.5)
+  :config
+  (setopt lsp-bridge-default-mode-hooks
+        '(ruby-mode-hook
+          ruby-ts-mode-hook
+          python-mode-hook
+          python-ts-mode-hook))
+  (global-lsp-bridge-mode))
 
 (use-package eldoc
   :ensure nil
   :custom
-  (eldoc-help-at-pt t) ; EMACS-31
+  (eldoc-help-at-pt t)
   (eldoc-documentation-strategy 'eldoc-documentation-compose)
   (eldoc-echo-area-display-truncation-message nil)
   (eldoc-echo-area-prefer-doc-buffer t)

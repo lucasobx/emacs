@@ -247,12 +247,27 @@
     "h h" '(helpful-at-point :wk "at point")
     "h d" '(devdocs-lookup :wk "devdocs")
 
+    ;; --- lsp
     "l"   '(:ignore t :wk "lsp")
     "l l" '(lsp-bridge-diagnostic-list :wk "list errors")
     "l r" '(lsp-bridge-find-references :wk "references")
     "l c" '(lsp-bridge-code-action :wk "code actions")
     "l d" '(lsp-bridge-find-def :wk "definition")
     "l n" '(lsp-bridge-rename :wk "rename")
+
+    ;; --- remark
+    "n"  '(:ignore t :wk "remark")
+    "nm" '(org-remark-mark      :wk "marcar região")
+    "nl" '(org-remark-mark-line :wk "marcar linha")
+    "no" '(org-remark-open      :wk "abrir nota")
+    "nv" '(org-remark-view      :wk "ver nota")
+    "nn" '(org-remark-next      :wk "próximo highlight")
+    "np" '(org-remark-prev      :wk "anterior highlight")
+    "nd" '(org-remark-delete    :wk "deletar highlight")
+    "nc" '(org-remark-change    :wk "mudar caneta")
+    ;; custom
+    "nb" '(org-remark-mark-blue :wk "marcador azul")
+    "nr" '(org-remark-mark-text-red :wk "texto vermelho")
 
     ;; --- search
     "s"   '(:ignore t :wk "search")
@@ -699,7 +714,9 @@
 (use-package olivetti
   :ensure t
   :hook
-  (org-mode . olivetti-mode))
+  (org-mode . olivetti-mode)
+  :config
+  (olivetti-body-width 80))
 
 (use-package org-appear
   :ensure (:host github :repo "awth13/org-appear")
@@ -720,8 +737,17 @@
 
 (use-package org-remark
   :ensure t
-  :hook
-  (org-mode . org-remark-global-tracking-mode))
+  :init
+  (org-remark-global-tracking-mode +1)
+  :custom
+  (org-remark-notes-file-name "~/.config/emacs/org/annotations.org")
+  :config
+  (org-remark-create "blue"
+    '(:background "#1f3a5f" :foreground "#a0b9ba")
+    '(CATEGORY "important"))
+  (org-remark-create "text-red"
+    '(:foreground "#aa0033")
+    '(CATEGORY "important")))
 
 (use-package org-tidy
   :ensure t
@@ -732,12 +758,10 @@
 ;;; TERMINAL
 
 (use-package ghostel
-  :ensure t)
-
-(use-package evil-ghostel
   :ensure t
-  :after (ghostel evil)
-  :hook (ghostel-mode . evil-ghostel-mode))
+  :defer t
+  :hook
+  (ghostel-mode . evil-emacs-state))
 
 ;; ===============================================================
 ;;; DOCS

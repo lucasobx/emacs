@@ -49,7 +49,9 @@
 ;;; CORE SETTINGS
 
 (defvar my/font "Berkeley Mono ExtraCondensed Regular")
-(defvar my/size 130)
+(defvar my/size 125)
+(defvar my/line-spacing 1)
+(setq-default line-spacing my/line-spacing)
 
 (use-package emacs
   :ensure nil
@@ -363,7 +365,7 @@
   :ensure nil
   :load-path "~/.config/emacs/themes"
   :config
-  (pixel-themes-set 'pixel-themes-miri16))
+  (pixel-themes-set 'pixel-themes-alia16))
 
 (use-package rainbow-delimiters
   :ensure t
@@ -380,7 +382,7 @@
   (doom-modeline-check-icon nil)
   (nerd-icons-scale-factor 1.0)
   (doom-modeline-modal-icon t)
-  (doom-modeline-height 28)
+  (doom-modeline-height 25)
   (doom-modeline-modal t)
   (doom-modeline-icon t)
   :config
@@ -725,11 +727,6 @@
   :ensure t
   :hook
   (org-mode . org-tidy-mode))
-
-(use-package org-autolist
-  :ensure t
-  :hook
-  (org-mode . org-autolist-mode))
 
 ;; ===============================================================
 ;;; TERMINAL

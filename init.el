@@ -292,9 +292,7 @@
   (my/keys
     :keymaps 'org-mode-map
     "o"   '(:ignore t :wk "org")
-    "o p" '(org-tidy-untidy-buffer :wk "edit property")
-    "o o" '(org-toggle-checkbox :wk "toggle checkbox")
-    "o t" '(org-insert-todo-heading :wk "insert todo"))
+    "o p" '(org-tidy-untidy-buffer :wk "edit property"))
 
   ;; --- ruby-mode
   (my/keys
@@ -535,6 +533,11 @@
     (add-to-list 'inf-ruby-implementations '("pry" . "pry"))
     (setq inf-ruby-default-implementation "pry")))
 
+(use-package mason
+  :ensure t
+  :config
+  (mason-setup))
+
 (use-package lsp-bridge
   :ensure '(lsp-bridge :type git :host github :repo "manateelazycat/lsp-bridge"
             :files (:defaults "*.el" "*.py" "acm" "core" "langserver" "multiserver" "resources")
@@ -550,6 +553,7 @@
   (setopt lsp-bridge-default-mode-hooks
           '(emacs-lisp-mode-hook
             ruby-ts-mode-hook
+            bash-ts-mode-hook
             ruby-mode-hook
             org-mode-hook))
   (global-lsp-bridge-mode))
@@ -666,6 +670,7 @@
   (org-catch-invisible-edits 'show-and-error)
   (org-insert-heading-respect-content t)
   (org-cycle-hide-drawer-startup t)
+  (org-agenda-files '("~/Documents/org"))
   (org-hide-emphasis-markers t)
   (org-return-follows-link t)
   (org-hide-leading-stars t)
@@ -698,8 +703,8 @@
   :custom
   (org-modern-star 'replace)
   (org-modern-replace-stars '("◉" "○" "◈" "◇" "•"))
-  (org-modern-checkbox '((?X . "☑") (?\s . "☐")))
-  (org-modern-list '((?- . "›") (?+ . "»") (?* . "⋙"))))
+  (org-modern-checkbox nil)
+  (org-modern-list '((?- . "›") (?+ . "»") (?* . "»»"))))
 
 (use-package org-remark
   :ensure t

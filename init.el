@@ -540,16 +540,18 @@
             :files (:defaults "*.el" "*.py" "acm" "core" "langserver" "multiserver" "resources")
             :build (:not compile))
   :custom
-  (lsp-bridge-enable-diagnostics t)
-  (lsp-bridge-enable-hover-diagnostic t)
   (lsp-bridge-ruby-lsp-server "ruby-lsp")
-  (acm-idle-delay 0.5)
+  (lsp-bridge-enable-document-highlight t)
+  (lsp-bridge-enable-auto-format-code t)
+  (lsp-bridge-enable-hover-diagnostic t)
+  (lsp-bridge-enable-diagnostics t)
+  (lsp-bridge-enable-org-babel t)
   :config
   (setopt lsp-bridge-default-mode-hooks
-        '(ruby-mode-hook
-          ruby-ts-mode-hook
-          python-mode-hook
-          python-ts-mode-hook))
+          '(emacs-lisp-mode-hook
+            ruby-ts-mode-hook
+            ruby-mode-hook
+            org-mode-hook))
   (global-lsp-bridge-mode))
 
 (use-package eldoc

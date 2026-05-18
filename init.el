@@ -50,8 +50,6 @@
 
 (defvar my/font "Berkeley Mono ExtraCondensed Regular")
 (defvar my/size 125)
-(defvar my/line-spacing 1)
-(setq-default line-spacing my/line-spacing)
 
 (use-package emacs
   :ensure nil
@@ -92,6 +90,7 @@
   (use-dialog-box nil)
   (zone-all-frames t)
   (truncate-lines t)
+  (line-spacing 1)
   ;; minibuffer
   (minibuffer-prompt-properties
    '(read-only t cursor-intangible t face minibuffer-prompt))
@@ -257,17 +256,17 @@
 
     ;; --- remark
     "n"  '(:ignore t :wk "remark")
-    "nm" '(org-remark-mark      :wk "marcar região")
-    "nl" '(org-remark-mark-line :wk "marcar linha")
-    "no" '(org-remark-open      :wk "abrir nota")
-    "nv" '(org-remark-view      :wk "ver nota")
-    "nn" '(org-remark-next      :wk "próximo highlight")
-    "np" '(org-remark-prev      :wk "anterior highlight")
-    "nd" '(org-remark-delete    :wk "deletar highlight")
-    "nc" '(org-remark-change    :wk "mudar caneta")
+    "nm" '(org-remark-mark :wk "mark region")
+    "nl" '(org-remark-mark-line :wk "mark line")
+    "no" '(org-remark-open :wk "open note")
+    "nv" '(org-remark-view :wk "view note")
+    "nn" '(org-remark-next :wk "mark next")
+    "np" '(org-remark-prev :wk "mark prev")
+    "nd" '(org-remark-delete :wk "mark delete")
+    "nc" '(org-remark-change :wk "mark chage")
     ;; custom
-    "nb" '(org-remark-mark-blue :wk "marcador azul")
-    "nr" '(org-remark-mark-text-red :wk "texto vermelho")
+    "nb" '(org-remark-mark-blue :wk "mark blue")
+    "nr" '(org-remark-mark-text-red :wk "text red")
 
     ;; --- search
     "s"   '(:ignore t :wk "search")
@@ -302,7 +301,7 @@
     :keymaps '(ruby-mode-map ruby-ts-mode-map)
     "r"   '(:ignore t :wk "ruby")
     "r g" '(ruby-send-buffer-and-go :wk "send buffer go")
-    "r c" '(inf-ruby-console-auto :wk "rails console")
+    "r c" '(inf-ruby-console-auto :wk "ruby console")
     "r s" '(ruby-send-region :wk "send region")
     "r b" '(ruby-send-buffer :wk "send buffer")
     "r l" '(ruby-send-line :wk "send line")

@@ -726,12 +726,16 @@
   (setopt evil-auto-indent nil)
   (set-face-attribute 'org-ellipsis nil :underline nil))
 
+(use-package evil-org
+  :ensure t
+  :after org
+  :hook
+  (org-mode . evil-org-mode))
+
 (use-package olivetti
   :ensure t
   :hook
-  (org-mode . olivetti-mode)
-  :config
-  (olivetti-body-width 80))
+  (org-mode . olivetti-mode))
 
 (use-package org-appear
   :ensure (:host github :repo "awth13/org-appear")

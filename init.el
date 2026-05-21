@@ -472,7 +472,7 @@
   (dired-mode . hl-line-mode)
   :custom
   (dired-listing-switches "-lah --almost-all --group-directories-first --sort=extension")
-  (dired-hide-details-hide-absolute-location t) ; EMACS-31
+  (dired-hide-details-hide-absolute-location t)
   (dired-dwim-target t)
   (dired-omit-files "^\\.")
   (dired-kill-when-opening-new-dired-buffer t)
@@ -480,7 +480,11 @@
   (dired-recursive-copies 'always)
   (dired-free-space nil)
   :bind
-  (:map dired-mode-map ("C-," . dired-omit-mode)))
+  (:map dired-mode-map ("C-c o" . dired-omit-mode)))
+
+(use-package wdired
+  :ensure nil
+  :commands (wdired-change-to-wdired-mode))
 
 (use-package popper
   :ensure t

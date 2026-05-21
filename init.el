@@ -193,6 +193,25 @@
       (delete-window))
     (kill-buffer buffer)))
 
+(defun my/delete-dont-kill (arg)
+  "Delete characters backward until encountering the beginning of a word.
+   With argument ARG, do this that many times. Don't add to kill ring."
+  (interactive "p")
+  (delete-region (point) (progn (backward-word arg) (point))))
+
+(defun my/backward-delete ()
+  "Delete a word, a character, or whitespace."
+  (interactive)
+  (cond
+   ((looking-back (rx (char word)) 1)
+    (my/delete-dont-kill 1))
+   ((looking-back (rx (seq (char word) (= 1 blank))) 1)
+	(my/delete-dont-kill 1))
+   ((looking-back (rx (char blank)) 1)
+    (delete-horizontal-space t))
+   (t
+    (backward-delete-char-untabify 1))))
+
 ;; ===============================================================
 ;;; KEYBINDINGS
 
@@ -222,41 +241,27 @@
     :global-prefix "M-SPC")
   (my/keys
     ;; --- navigation
-    "<right>" '(evil-end-of-line :wk ("→" . "end of line"))
     "<left>"  '(evil-beginning-of-line :wk ("←" . "beg of line"))
-    "k"       '(my/kill-buffer-window :wk "kill buffer")
-    "b"       '(consult-buffer :wk "search buffer")
-    "y"       '(consult-yank-pop :wk "yank-pop")
-    "d"       '(dired-jump :wk "file manager")
-    "."       '(embark-act :wk "context menu")
-    "/"       '(flash-jump :wk "search jump")
-    "f"       '(find-file :wk "find file")
+    "<right>" '(evil-end-of-line :wk ("→" . "end of line"))
+    "k" '(my/kill-buffer-window :wk "kill buffer")
+    "b" '(consult-buffer :wk "search buffer")
+    "y" '(consult-yank-pop :wk "yank-pop")
+    "d" '(dired-jump :wk "file manager")
+    "/" '(flash-jump :wk "search jump")
+    "f" '(find-file :wk "find file")
 
-    ;; --- config
     "e"   '(:ignore t :wk "emacs config")
     "e c" '((lambda () (interactive)
               (find-file (locate-user-emacs-file "init.el")))
             :wk "edit config")
-    "e e" '(my/jump-to-end-of-block :wk "end of block")
     "e t" '(visual-line-mode :wk "truncated lines")
-    "e f" '(eval-last-sexp :wk "eval expression")
     "e r" '(restart-emacs :wk "restart emacs")
     "e s" '(sudo-edit :wk "sudo edit file")
 
-    ;; --- help
     "h"   '(:ignore t :wk "help")
-    "h h" '(helpful-at-point :wk "at point")
+    "h h" '(helpful-at-point :wk "helpful")
     "h d" '(devdocs-lookup :wk "devdocs")
 
-    ;; --- lsp
-    "l"   '(:ignore t :wk "lsp")
-    "l l" '(lsp-bridge-diagnostic-list :wk "list errors")
-    "l r" '(lsp-bridge-find-references :wk "references")
-    "l c" '(lsp-bridge-code-action :wk "code actions")
-    "l d" '(lsp-bridge-find-def :wk "definition")
-    "l n" '(lsp-bridge-rename :wk "rename")
-
-    ;; --- remark
     "n"  '(:ignore t :wk "remark")
     "nm" '(org-remark-mark :wk "mark region")
     "nl" '(org-remark-mark-line :wk "mark line")
@@ -270,7 +275,6 @@
     "nb" '(org-remark-mark-blue :wk "mark blue")
     "nr" '(org-remark-mark-text-red :wk "text red")
 
-    ;; --- search
     "s"   '(:ignore t :wk "search")
     "s r" '(consult-recent-file :wk "recent files")
     "s l" '(consult-line-multi :wk "line in files")
@@ -279,39 +283,40 @@
     "s t" '(consult-theme :wk "themes")
     "s i" '(consult-imenu :wk "imenu")
     "s s" '(consult-line :wk "line")
-    "s f" '(consult-fd :wk "file")
+    "s f" '(consult-fd :wk "file"))
 
-    ;; --- windows
-    "w"         '(:ignore t :wk "windows")
-    "w <right>" '(window-layout-rotate-clockwise :wk ("→" . "rotate clockwise"))
-    "w <left>"  '(window-layout-flip-leftright :wk ("←" . "flip left-right"))
-    "w <up>"    '(window-layout-flip-topdown :wk ("↑" . "flip top-down"))
-    "w v"       '(evil-window-vsplit :wk "vertical split")
-    "w c"       '(evil-window-delete :wk "close window")
-    "w w"       '(evil-window-new :wk "new window"))
-
-  ;; --- org-mode
   (my/keys
-    :keymaps 'org-mode-map
-    "o"   '(:ignore t :wk "org")
-    "o p" '(org-tidy-untidy-buffer :wk "edit property"))
+    :keymaps '(emacs-lisp-mode-map)
+    "e"   '(:ignore t :wk "emacs")
+    "e e" '(my/jump-to-end-of-block :wk "end of block")
+    "e f" '(eval-last-sexp :wk "eval expression"))
 
-  ;; --- ruby-mode
+  (my/keys
+    :keymaps '(prog-mode-map)
+    "l"   '(:ignore t :wk "lsp")
+    "l l" '(lsp-bridge-diagnostic-list :wk "list errors")
+    "l r" '(lsp-bridge-find-references :wk "references")
+    "l c" '(lsp-bridge-code-action :wk "code actions")
+    "l d" '(lsp-bridge-find-def :wk "definition")
+    "l n" '(lsp-bridge-rename :wk "rename"))
+  
   (my/keys
     :keymaps '(ruby-mode-map ruby-ts-mode-map)
     "r"   '(:ignore t :wk "ruby")
     "r g" '(ruby-send-buffer-and-go :wk "send buffer go")
-    "r c" '(inf-ruby-console-auto :wk "ruby console")
+    "r r" '(ruby-send-buffer :wk "send buffer")
     "r s" '(ruby-send-region :wk "send region")
-    "r b" '(ruby-send-buffer :wk "send buffer")
     "r l" '(ruby-send-line :wk "send line")
-    "r r" '(inf-ruby :wk "open repl"))
+    "r i" '(inf-ruby :wk "open repl"))
 
-  ;; --- consult-yank 
   (general-def
-    :states '(normal insert visual)
+    :states '(normal insert visual emacs)
+    "C-<backspace>" 'my/backward-delete
+    "<f2>"  'wdired-change-to-wdired-mode   
     "M-y"   'consult-yank-pop
+    "C-o"   'other-window
     "C-,"   'popper-toggle
+    "C-."   'popper-cycle
     "<f12>" 'ghostel))
 
 (use-package evil

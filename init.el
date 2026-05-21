@@ -49,7 +49,7 @@
 ;;; CORE SETTINGS
 
 (defvar my/font "Berkeley Mono ExtraCondensed Regular")
-(defvar my/size 125)
+(defvar my/font-size 120)
 
 (use-package emacs
   :ensure nil
@@ -76,8 +76,8 @@
   (display-line-numbers-type 'relative)
   (warning-minimum-level :emergency)
   (ibuffer-human-readable-size t)
+  (initial-major-mode 'text-mode)
   (display-line-numbers-width 4)
-  (initial-major-mode 'org-mode)
   (zone-all-windows-in-frame t)
   (initial-scratch-message "")
   (ring-bell-function 'ignore)
@@ -132,9 +132,10 @@
   
   :config
   ;; ui
-  (set-face-attribute 'default nil :family my/font :height my/size)
+  (set-face-attribute 'default nil :family my/font :height my/font-size)
   (set-face-attribute 'minibuffer-nonselected nil :background)
   (set-face-attribute 'tooltip nil :family my/font)
+  (setq-default line-spacing 0)
   ;; minibuffer
   (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
   (add-hook 'minibuffer-setup-hook (lambda () (setq truncate-lines t)))
@@ -165,13 +166,14 @@
   (define-key key-translation-map (kbd "ESC") (kbd "C-g"))
 
   :bind
-  ("C-=" . text-scale-increase)
-  ("C--" . text-scale-decrease)
-  ("C-<tab>" . other-window)
   ("C-<wheel-down>" . nil)
   ("C-<wheel-up>" . nil)
   ("C-x C-z" . nil)
-  ("C-z" . nil))
+  ("C-z" . nil)
+  ("C-=" . text-scale-increase)
+  ("C--" . text-scale-decrease)
+  ("RET" . newline-and-indent)
+  ("C-o" . other-window))
 
 ;; ===============================================================
 ;;; CUSTOM FUNCTIONS

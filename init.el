@@ -505,9 +505,27 @@
   (setopt popper-mode-line "")
   (popper-mode +1))
 
-(use-package restart-emacs
-  :ensure t
+;; ===============================================================
+;;; TREESITTER
+
+(use-package markdown-ts-mode
+  :ensure nil
   :defer t)
+
+(use-package lua-ts-mode
+  :ensure nil
+  :mode "\\.lua\\'"
+  :custom
+  (lua-ts-indent-offset 2))
+
+(use-package ruby-ts-mode
+  :ensure nil
+  :mode ("\\.rb\\'" "Rakefile\\'" "Gemfile\\'")
+  :custom
+  (ruby-indent-level 2)
+  :config
+  (add-to-list 'treesit-language-source-alist
+               '(ruby "https://github.com/tree-sitter/tree-sitter-ruby" "master" "src")))
 
 ;; ===============================================================
 ;;; LSP
@@ -542,7 +560,11 @@
   :config
   (when (executable-find "pry")
     (add-to-list 'inf-ruby-implementations '("pry" . "pry"))
-    (setq inf-ruby-default-implementation "pry")))
+    (setq inf-ruby-default-implementation "pry"))
+  (add-hook 'inf-ruby-mode-hook
+            (lambda ()
+              (set-process-query-on-exit-flag
+               (get-buffer-process (current-buffer)) nil))))
 
 (use-package mason
   :ensure t
@@ -554,18 +576,22 @@
             :files (:defaults "*.el" "*.py" "acm" "core" "langserver" "multiserver" "resources")
             :build (:not compile))
   :custom
+  (lsp-bridge-lua-lsp-server "sumneko")
   (lsp-bridge-ruby-lsp-server "ruby-lsp")
+  (lsp-bridge-python-lsp-server "pyright")
   (lsp-bridge-enable-document-highlight t)
   (lsp-bridge-enable-auto-format-code t)
   (lsp-bridge-enable-hover-diagnostic t)
   (lsp-bridge-enable-diagnostics t)
   (lsp-bridge-enable-org-babel t)
+  (acm-enable-doc nil)
+  (acm-menu-length 5)
   :config
   (setopt lsp-bridge-default-mode-hooks
           '(emacs-lisp-mode-hook
-            ruby-ts-mode-hook
-            bash-ts-mode-hook
             ruby-mode-hook
+            ruby-ts-mode-hook
+            lua-ts-mode-hook
             org-mode-hook))
   (global-lsp-bridge-mode))
 
@@ -636,16 +662,19 @@
   :config
   (setopt consult-fd-args
           '("fd" "--color=auto" "--full-path" "--hidden"))
+  (setopt consult-buffer-sources '(consult-source-buffer))
   (setopt consult-buffer-filter
           (append consult-buffer-filter
-                  '("\\*Async Shell Command\\*" "\\*eldoc\\*" "Output\\*$")))
+                  '("\\*Async Shell Command\\*" "\\*eldoc\\*" "Output\\*$"
+                    "annotations.org" "\\*Messages\\*" "\\*lsp-bridge.*\\*"
+                    "\\*helpful.*\\*" "\\*ghostel.*\\*")))
+  ;; prevent dired buffer from surfacing in consult-buffer when hidden by popper.
   (defun my/consult-buffer-filter-modes (buffers)
     (cl-remove-if
      (lambda (buf)
        (let ((buffer (if (stringp buf) (get-buffer buf) (cdr buf))))
          (when buffer
-           (memq (buffer-local-value 'major-mode buffer)
-                 '(dired-mode helpful-mode ghostel-mode help-mode compilation-mode)))))
+           (memq (buffer-local-value 'major-mode buffer) '(dired-mode)))))
      buffers))
   (advice-add #'consult--buffer-query :filter-return #'my/consult-buffer-filter-modes))
 
@@ -655,7 +684,11 @@
   :bind
   ("C-c c" . consult-dir))
 
-;; ===============================================================
+(use-package yasnippet
+  :ensure t
+  :defer t)
+
+;; ==============================================================
 ;;; EDITING
 
 (use-package move-text
@@ -724,12 +757,9 @@
   :custom
   (org-remark-notes-file-name "~/.config/emacs/org/annotations.org")
   :config
-  (org-remark-create "blue"
-    '(:background "#1f3a5f" :foreground "#a0b9ba")
-    '(CATEGORY "important"))
-  (org-remark-create "text-red"
-    '(:foreground "#aa0033")
-    '(CATEGORY "important")))
+  (org-remark-create "custom1"
+    'mode-line-active
+    '(CATEGORY "custom")))
 
 (use-package org-tidy
   :ensure t

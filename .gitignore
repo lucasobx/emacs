@@ -11,9 +11,10 @@ transient/
 devdocs/
 history
 recentf
-themes/
 .cache/
 .tutor/
 elpaca
 places
+mason/
 tramp
+lisp/

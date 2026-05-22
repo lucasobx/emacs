@@ -155,34 +155,30 @@
   (setopt native-comp-async-query-on-exit t)
   (load custom-file 'noerror 'nomessage)
   (put 'narrow-to-region 'disabled nil)
-  ;; bindings
-  (define-advice keyboard-quit
-      (:around (quit) quit-current-context)
-    (if (active-minibuffer-window)
-        (if (minibufferp)
-            (minibuffer-keyboard-quit) (abort-recursive-edit))
-      (unless (or defining-kbd-macro executing-kbd-macro)
-        (funcall-interactively quit))))
+  ;; smart context clearing and quit handler
   (define-key key-translation-map (kbd "ESC") (kbd "C-g"))
+  (define-advice keyboard-quit (:around (quit) quit-context-dwim)
+    (cond
+    ((and (region-active-p)
+          (not (active-minibuffer-window)))
+      (keyboard-quit))
+    ((derived-mode-p 'completion-list-mode)
+      (delete-completion-window))
+    ((active-minibuffer-window)
+      (if (minibufferp)
+          (minibuffer-keyboard-quit)
+        (abort-recursive-edit)))
+    (t
+     (unless (or defining-kbd-macro executing-kbd-macro)
+       (apply orig-fun args)))))
 
   :bind
-  ("C-<wheel-down>" . nil)
-  ("C-<wheel-up>" . nil)
-  ("C-x C-z" . nil)
-  ("C-z" . nil)
   ("C-=" . text-scale-increase)
   ("C--" . text-scale-decrease)
-  ("RET" . newline-and-indent)
-  ("C-o" . other-window))
+  ("RET" . newline-and-indent))
 
 ;; ===============================================================
 ;;; CUSTOM FUNCTIONS
-
-(defun my/jump-to-end-of-block ()
-  "Jump to the end of the current block."
-  (interactive)
-  (beginning-of-defun)
-  (forward-sexp))
 
 (defun my/kill-buffer-window ()
   "Kill the current buffer and close its window."
@@ -240,60 +236,42 @@
     :prefix "SPC"
     :global-prefix "M-SPC")
   (my/keys
-    ;; --- navigation
     "<left>"  '(evil-beginning-of-line :wk ("←" . "beg of line"))
     "<right>" '(evil-end-of-line :wk ("→" . "end of line"))
     "k" '(my/kill-buffer-window :wk "kill buffer")
     "b" '(consult-buffer :wk "search buffer")
-    "y" '(consult-yank-pop :wk "yank-pop")
+    "p" '(consult-yank-pop :wk "copy hist")
+    "/" '(flash-jump :wk "jump anywhere")
     "d" '(dired-jump :wk "file manager")
-    "/" '(flash-jump :wk "search jump")
+    "h" '(devdocs-lookup :wk "devdocs")
+    "c" '(cheat-sh :wk "cheat sheet")
     "f" '(find-file :wk "find file")
+    "t" '(ghostel :wk "terminal"))
 
-    "e"   '(:ignore t :wk "emacs config")
-    "e c" '((lambda () (interactive)
-              (find-file (locate-user-emacs-file "init.el")))
-            :wk "edit config")
-    "e t" '(visual-line-mode :wk "truncated lines")
-    "e r" '(restart-emacs :wk "restart emacs")
-    "e s" '(sudo-edit :wk "sudo edit file")
-
-    "h"   '(:ignore t :wk "help")
-    "h h" '(helpful-at-point :wk "helpful")
-    "h d" '(devdocs-lookup :wk "devdocs")
-
-    "n"  '(:ignore t :wk "remark")
-    "nm" '(org-remark-mark :wk "mark region")
-    "nl" '(org-remark-mark-line :wk "mark line")
-    "no" '(org-remark-open :wk "open note")
-    "nv" '(org-remark-view :wk "view note")
-    "nn" '(org-remark-next :wk "mark next")
-    "np" '(org-remark-prev :wk "mark prev")
-    "nd" '(org-remark-delete :wk "mark delete")
-    "nc" '(org-remark-change :wk "mark chage")
+  (my/keys
+    "m"  '(:ignore t :wk "mark text")
+    "ml" '(org-remark-mark-line :wk "mark line")
+    "md" '(org-remark-delete :wk "mark delete")
+    "mc" '(org-remark-change :wk "mark change")
+    "mm" '(org-remark-mark :wk "mark region")
+    "mo" '(org-remark-open :wk "open note")
+    "mv" '(org-remark-view :wk "view note")
     ;; custom
-    "nb" '(org-remark-mark-blue :wk "mark blue")
-    "nr" '(org-remark-mark-text-red :wk "text red")
+    "mr" '(org-remark-mark-text-red :wk "text red")
+    "mb" '(org-remark-mark-blue :wk "mark blue"))
 
+  (my/keys
     "s"   '(:ignore t :wk "search")
     "s r" '(consult-recent-file :wk "recent files")
     "s l" '(consult-line-multi :wk "line in files")
     "s g" '(consult-ripgrep :wk "ripgrep")
-    "s o" '(consult-outline :wk "outline")
-    "s t" '(consult-theme :wk "themes")
     "s i" '(consult-imenu :wk "imenu")
     "s s" '(consult-line :wk "line")
     "s f" '(consult-fd :wk "file"))
 
   (my/keys
-    :keymaps '(emacs-lisp-mode-map)
-    "e"   '(:ignore t :wk "emacs")
-    "e e" '(my/jump-to-end-of-block :wk "end of block")
-    "e f" '(eval-last-sexp :wk "eval expression"))
-
-  (my/keys
     :keymaps '(prog-mode-map)
-    "l"   '(:ignore t :wk "lsp")
+    "l"   '(:ignore t :wk "lsp actions")
     "l l" '(lsp-bridge-diagnostic-list :wk "list errors")
     "l r" '(lsp-bridge-find-references :wk "references")
     "l c" '(lsp-bridge-code-action :wk "code actions")
@@ -303,21 +281,41 @@
   (my/keys
     :keymaps '(ruby-mode-map ruby-ts-mode-map)
     "r"   '(:ignore t :wk "ruby")
-    "r g" '(ruby-send-buffer-and-go :wk "send buffer go")
     "r r" '(ruby-send-buffer :wk "send buffer")
     "r s" '(ruby-send-region :wk "send region")
     "r l" '(ruby-send-line :wk "send line")
     "r i" '(inf-ruby :wk "open repl"))
-
+  
   (general-def
-    :states '(normal insert visual emacs)
+    :states  '(normal insert visual emacs)
+    :keymaps 'global
     "C-<backspace>" 'my/backward-delete
     "<f2>"  'wdired-change-to-wdired-mode   
-    "M-y"   'consult-yank-pop
-    "C-o"   'other-window
     "C-,"   'popper-toggle
     "C-."   'popper-cycle
-    "<f12>" 'ghostel))
+    "C-o"   'other-window)
+  
+  (general-def
+    :keymaps 'global
+    "C-c v" '(visual-line-mode :wk "truncated lines")
+    "C-c f" '(magit-file-dispatch :wk "magit file")
+    "C-c r" '(restart-emacs :wk "restart emacs")
+    "C-c t" '(consult-theme :wk "change theme")
+    "C-c h" '(helpful-at-point :wk "helpful")
+    "C-c s" '(sudo-edit :wk "edit with sudo")
+    "C-c l"   '((lambda () (interactive)
+                (find-file (locate-user-emacs-file "init.el")))
+              :wk "init.el"))
+    
+  (general-unbind
+    :keymaps 'global
+    "C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z")
+  (general-unbind
+    :keymaps 'emacs-lisp-mode-map
+    "C-c C-b" "C-c C-e" "C-c C-f")
+  (general-unbind
+    :keymaps 'winner-mode-map
+    "C-c <left>" "C-c <right>"))
 
 (use-package evil
   :ensure (:wait t)
@@ -382,9 +380,9 @@
 
 (use-package pixel-themes
   :ensure nil
-  :load-path "~/.config/emacs/themes"
+  :load-path "~/.config/emacs/lisp/pixel-themes"
   :config
-  (pixel-themes-set 'pixel-themes-alia16))
+  (pixel-themes-set 'pixel-themes-miri16))
 
 (use-package rainbow-delimiters
   :ensure t
@@ -478,9 +476,7 @@
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-recursive-deletes 'top)
   (dired-recursive-copies 'always)
-  (dired-free-space nil)
-  :bind
-  (:map dired-mode-map ("C-c o" . dired-omit-mode)))
+  (dired-free-space nil))
 
 (use-package wdired
   :ensure nil
@@ -492,11 +488,10 @@
   :init
   (setopt popper-window-height 15)
   (setopt popper-reference-buffers
-          '("\\*Async Shell Command\\*"
-            "^\\*ghostel.*\\*$"
-            "\\*eldoc\\*"
-            "Output\\*$"
+          '("\\*Async Shell Command\\*" "^\\*ghostel.*\\*" "\\*eldoc\\*" "Output\\*$"
+            "\\*cheat.sh\\*$"
             compilation-mode
+            inf-ruby-mode
             devdocs-mode
             helpful-mode
             ghostel-mode
@@ -509,8 +504,7 @@
 ;;; TREESITTER
 
 (use-package markdown-ts-mode
-  :ensure nil
-  :defer t)
+  :ensure nil)
 
 (use-package lua-ts-mode
   :ensure nil
@@ -530,12 +524,6 @@
 ;; ===============================================================
 ;;; LSP
 
-(use-package exec-path-from-shell
-  :ensure t
-  :demand t
-  :config
-  (exec-path-from-shell-initialize))
-
 (use-package treesit-auto
   :ensure t
   :after emacs
@@ -544,14 +532,6 @@
   :config
   (treesit-auto-add-to-auto-mode-alist 'all)
   (global-treesit-auto-mode t))
-
-(use-package markdown-ts-mode
-  :ensure nil
-  :defer t)
-
-(use-package yasnippet
-  :ensure t
-  :defer t)
 
 (use-package inf-ruby
   :ensure t
@@ -792,17 +772,24 @@
   :config
   (setopt devdocs-header-line nil))
 
-(with-eval-after-load 'shr
-  (set-face-attribute 'shr-text nil
-                      :family my/font :height my/size :weight 'normal)
-  (set-face-attribute 'shr-code nil
-                      :family my/font :height my/size :weight 'normal))
+(use-package shr
+  :ensure nil
+  :config
+  (setq shr-use-fonts nil))
+
+(use-package cheat-sh
+  :load-path "~/.config/emacs/lisp/cheat-sh"
+  :custom
+  (cheat-sh-server-url "https://cheat.sh")
+  (cheat-sh-query-options ""))
 
 ;; ===============================================================
 ;;; VERSION CONTROL
 
 (use-package magit
   :ensure t
-  :defer t)
+  :defer t
+  :config
+  (keymap-set transient-map "<escape>" 'transient-quit-one))
 
 ;;; init.el ends here

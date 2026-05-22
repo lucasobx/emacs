@@ -298,12 +298,12 @@
   (general-def
     :keymaps 'global
     "C-c v" '(visual-line-mode :wk "truncated lines")
-    "C-c f" '(magit-file-dispatch :wk "magit file")
+    "C-c m" '(magit-file-dispatch :wk "magit file")
     "C-c r" '(restart-emacs :wk "restart emacs")
     "C-c t" '(consult-theme :wk "change theme")
     "C-c h" '(helpful-at-point :wk "helpful")
     "C-c s" '(sudo-edit :wk "edit with sudo")
-    "C-c l"   '((lambda () (interactive)
+    "C-c i"   '((lambda () (interactive)
                 (find-file (locate-user-emacs-file "init.el")))
               :wk "init.el"))
     
@@ -521,6 +521,13 @@
   (add-to-list 'treesit-language-source-alist
                '(ruby "https://github.com/tree-sitter/tree-sitter-ruby" "master" "src")))
 
+(use-package python-ts-mode
+  :ensure nil
+  :mode "\\.py\\'"
+  :config
+  (add-to-list 'treesit-language-source-alist
+               '(ruby "https://github.com/tree-sitter/tree-sitter-python" "master" "src")))
+
 ;; ===============================================================
 ;;; LSP
 
@@ -572,6 +579,7 @@
             ruby-mode-hook
             ruby-ts-mode-hook
             lua-ts-mode-hook
+            python-ts-mode
             org-mode-hook))
   (global-lsp-bridge-mode))
 

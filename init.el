@@ -91,6 +91,7 @@
   (zone-all-frames t)
   (truncate-lines t)
   (line-spacing 1)
+
   ;; minibuffer
   (minibuffer-prompt-properties
    '(read-only t cursor-intangible t face minibuffer-prompt))
@@ -103,6 +104,7 @@
   (completion-eager-display 'auto)
   (completion-eager-update t)
   (history-length 25)
+
   ;; editing
   (treesit-auto-install-grammar t)
   (kill-do-not-save-duplicates t)
@@ -112,6 +114,7 @@
   (treesit-enabled-modes t)
   (indent-tabs-mode nil)
   (tab-width 2)
+
   ;; files
   (auto-save-file-name-transforms
    '((".*" "~/.config/emacs/auto-saves/" t)))
@@ -121,6 +124,7 @@
   (auto-save-no-message t)
   (make-backup-files nil)
   (create-lockfiles nil)
+
   ;; scroll
   (pixel-scroll-precision-use-momentum nil)
   (scroll-preserve-screen-position t)
@@ -131,30 +135,35 @@
   (scroll-step 1)
   
   :config
+  ;; benchmark
+  (add-hook 'emacs-startup-hook
+            (lambda () (message "Booted in %s." (emacs-init-time))))
+
   ;; ui
   (set-face-attribute 'default nil :family my/font :height my/font-size)
   (set-face-attribute 'minibuffer-nonselected nil :background)
   (set-face-attribute 'tooltip nil :family my/font)
   (setq-default line-spacing 0)
+  
   ;; minibuffer
   (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
   (add-hook 'minibuffer-setup-hook (lambda () (setq truncate-lines t)))
   (minibuffer-depth-indicate-mode 1)
   (minibuffer-electric-default-mode 1)
+
   ;; buffers
   (defun skip-these-buffers (_window buffer _bury-or-kill)
     "Function for `switch-to-prev-buffer-skip'."
     (string-match "\\*[^*]+\\*" (buffer-name buffer)))
   (setq switch-to-prev-buffer-skip 'skip-these-buffers)
-  ;; benchmark
-  (add-hook 'emacs-startup-hook
-            (lambda () (message "Booted in %s." (emacs-init-time))))
+
   ;; system
   (setq custom-file (locate-user-emacs-file "custom-vars.el"))
   (add-hook 'prog-mode-hook 'display-line-numbers-mode)
   (setopt native-comp-async-query-on-exit t)
   (load custom-file 'noerror 'nomessage)
   (put 'narrow-to-region 'disabled nil)
+
   ;; smart context clearing and quit handler
   (define-key key-translation-map (kbd "ESC") (kbd "C-g"))
   (define-advice keyboard-quit (:around (quit) quit-context-dwim)
@@ -171,6 +180,12 @@
     (t
      (unless (or defining-kbd-macro executing-kbd-macro)
        (apply orig-fun args)))))
+
+  ;; add option `d', allowing a quick preview of the diff of what you're asked to save.
+  (add-to-list 'save-some-buffers-action-alist
+               (list "d"
+                     (lambda (buffer) (diff-buffer-with-file (buffer-file-name buffer)))
+                     "show diff between the buffer and its file"))
 
   :bind
   ("C-=" . text-scale-increase)
@@ -207,6 +222,45 @@
     (delete-horizontal-space t))
    (t
     (backward-delete-char-untabify 1))))
+
+(defun cheat-sh ()
+  "Query cheat.sh and display the result in a dedicated buffer."
+  (interactive)
+  (let* ((input (read-string "cheat.sh: "))
+         (parts (split-string input " " t))
+         (path  (if (cdr parts)
+                    (format "%s/%s"
+                            (car parts)
+                            (url-hexify-string (string-join (cdr parts) " ")))
+                  (url-hexify-string (car parts))))
+         (buffer (get-buffer-create "*cheat.sh*"))
+         (cmd    (format "curl -s 'cheat.sh/%s'" path)))
+    (with-current-buffer buffer
+      (read-only-mode -1)
+      (erase-buffer)
+      (insert (concat "cheat.sh: " input "\n"))
+      (read-only-mode 1))
+    (switch-to-buffer buffer)
+    (cheat-sh--fetch cmd buffer)))
+
+(defun cheat-sh--fetch (cmd buffer &optional)
+  "Execute CMD as a shell command and stream output into buffer."
+  (make-process
+   :name "cheat-sh-fetch"
+   :buffer (generate-new-buffer "*cheat-sh-temp*")
+   :command (list "sh" "-c" cmd)
+   :sentinel
+   (lambda (proc _event)
+     (when (eq (process-status proc) 'exit)
+       (let ((output (with-current-buffer (process-buffer proc)
+                       (buffer-string))))
+         (kill-buffer (process-buffer proc))
+         (with-current-buffer buffer
+           (read-only-mode -1)
+           (insert output)
+           (ansi-color-apply-on-region (point-min) (point-max))
+           (goto-char (point-min))
+           (read-only-mode 1)))))))
 
 ;; ===============================================================
 ;;; KEYBINDINGS
@@ -264,6 +318,7 @@
     "s"   '(:ignore t :wk "search")
     "s r" '(consult-recent-file :wk "recent files")
     "s l" '(consult-line-multi :wk "line in files")
+    "s b" '(consult-bookmark :wk "bookmarks")
     "s g" '(consult-ripgrep :wk "ripgrep")
     "s i" '(consult-imenu :wk "imenu")
     "s s" '(consult-line :wk "line")
@@ -287,25 +342,28 @@
     "r i" '(inf-ruby :wk "open repl"))
   
   (general-def
-    :states  '(normal insert visual emacs)
     :keymaps 'global
+    :states  '(normal insert visual emacs)
     "C-<backspace>" 'my/backward-delete
-    "<f2>"  'wdired-change-to-wdired-mode   
+    "<f2>"  'wdired-change-to-wdired-mode
+    ;; "C-<up>" 'backward-page
+    ;; "C-<down>" 'forward-paragraph
     "C-,"   'popper-toggle
     "C-."   'popper-cycle
     "C-o"   'other-window)
   
   (general-def
     :keymaps 'global
-    "C-c v" '(visual-line-mode :wk "truncated lines")
-    "C-c m" '(magit-file-dispatch :wk "magit file")
-    "C-c r" '(restart-emacs :wk "restart emacs")
-    "C-c t" '(consult-theme :wk "change theme")
-    "C-c h" '(helpful-at-point :wk "helpful")
-    "C-c s" '(sudo-edit :wk "edit with sudo")
-    "C-c i"   '((lambda () (interactive)
+    "C-c C-v" '(visual-line-mode :wk "truncated lines")
+    "C-c C-m" '(magit-file-dispatch :wk "magit file")
+    "C-c C-r" '(restart-emacs :wk "restart emacs")
+    "C-c C-t" '(consult-theme :wk "change theme")
+    "C-c C-h" '(helpful-at-point :wk "helpful")
+    "C-c C-s" '(sudo-edit :wk "edit with sudo")
+    "C-c C-d" '(consult-dir :wk "insert path")
+    "C-c C-i"   '((lambda () (interactive)
                 (find-file (locate-user-emacs-file "init.el")))
-              :wk "init.el"))
+              :wk "go to init.el"))
     
   (general-unbind
     :keymaps 'global
@@ -356,12 +414,59 @@
   (evil-goggles-mode)
   (evil-goggles-use-diff-faces))
 
+;; multiple cursors for evil
+;; `C-n'       - select word at cursor
+;; `n/q'       - add next match/skip match
+;; `Q'         - remove current match
+;; `TAB'       - toggle cursor/extend mode
+;; `c/d/i/a/r' - edit at all cursors
+(use-package evim
+  :ensure t
+  :after evil
+  :config
+  (evim-setup-global-keys)
+  (define-key evil-normal-state-map (kbd "C-<up>") nil)
+  (define-key evil-normal-state-map (kbd "C-<down>") nil)
+  (define-key evil-normal-state-map (kbd "S-<up>") #'evim-add-cursor-up)
+  (define-key evil-normal-state-map (kbd "S-<down>") #'evim-add-cursor-down))
+
 (use-package transient
   :ensure nil
   :defer t)
 
 ;; ===============================================================
 ;;; UI
+
+(use-package window
+  :ensure nil
+  :custom
+  (display-buffer-alist
+   '(("\\`magit:"
+      (display-buffer-in-side-window)
+      (window-height . 0.3)
+      (side . bottom)
+      (slot . 0))
+     ((derived-mode . dired-mode)
+      (display-buffer-in-side-window)
+      (window-height . 0.3)
+      (side . bottom)
+      (slot . 0)))))
+
+(use-package popper
+  :ensure t
+  :defer t
+  :init
+  (setopt popper-window-height 16)
+  (setopt popper-reference-buffers
+          '("^\\*ghostel.*\\*" "\\*eldoc\\*" "\\*cheat.sh*\\*$"
+            compilation-mode
+            inf-ruby-mode
+            devdocs-mode
+            helpful-mode
+            ghostel-mode
+            help-mode))
+  (setopt popper-mode-line "")
+  (popper-mode +1))
 
 (use-package nerd-icons
   :ensure t)
@@ -430,7 +535,9 @@
 (use-package ansi-color
   :ensure nil
   :hook
-  (compilation-filter . ansi-color-compilation-filter))
+  (compilation-filter . ansi-color-compilation-filter)
+  :init
+  (setenv "MANROFFOPT" "-P-c"))
 
 (use-package line-reminder
   :ensure t
@@ -447,6 +554,12 @@
 
 ;; ===============================================================
 ;;; NAVIGATION
+
+(use-package bookmark
+  :ensure nil
+  :custom
+  (bookmark-fringe-mark nil)
+  (bookmark-save-flag 1))
 
 ;; d/y/v + gs
 (use-package flash
@@ -471,34 +584,16 @@
   :custom
   (dired-listing-switches "-lah --almost-all --group-directories-first --sort=extension")
   (dired-hide-details-hide-absolute-location t)
-  (dired-dwim-target t)
-  (dired-omit-files "^\\.")
   (dired-kill-when-opening-new-dired-buffer t)
-  (dired-recursive-deletes 'top)
+  (dired-recursive-deletes 'always)
   (dired-recursive-copies 'always)
-  (dired-free-space nil))
+  (dired-omit-files "^\\.")
+  (dired-free-space nil)
+  (dired-dwim-target t))
 
 (use-package wdired
   :ensure nil
   :commands (wdired-change-to-wdired-mode))
-
-(use-package popper
-  :ensure t
-  :defer t
-  :init
-  (setopt popper-window-height 15)
-  (setopt popper-reference-buffers
-          '("\\*Async Shell Command\\*" "^\\*ghostel.*\\*" "\\*eldoc\\*" "Output\\*$"
-            "\\*cheat.sh\\*$"
-            compilation-mode
-            inf-ruby-mode
-            devdocs-mode
-            helpful-mode
-            ghostel-mode
-            dired-mode
-            help-mode))
-  (setopt popper-mode-line "")
-  (popper-mode +1))
 
 ;; ===============================================================
 ;;; TREESITTER
@@ -576,10 +671,11 @@
   :config
   (setopt lsp-bridge-default-mode-hooks
           '(emacs-lisp-mode-hook
-            ruby-mode-hook
-            ruby-ts-mode-hook
+            python-ts-mode-hook
             lua-ts-mode-hook
-            python-ts-mode
+            bash-ts-mode-hook
+            ruby-ts-mode-hook
+            ruby-mode-hook
             org-mode-hook))
   (global-lsp-bridge-mode))
 
@@ -668,9 +764,7 @@
 
 (use-package consult-dir
   :ensure t
-  :defer t
-  :bind
-  ("C-c c" . consult-dir))
+  :defer t)
 
 (use-package yasnippet
   :ensure t
@@ -784,12 +878,6 @@
   :ensure nil
   :config
   (setq shr-use-fonts nil))
-
-(use-package cheat-sh
-  :load-path "~/.config/emacs/lisp/cheat-sh"
-  :custom
-  (cheat-sh-server-url "https://cheat.sh")
-  (cheat-sh-query-options ""))
 
 ;; ===============================================================
 ;;; VERSION CONTROL

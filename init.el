@@ -481,6 +481,16 @@
   :config
   (pixel-themes-set 'pixel-themes-miri16))
 
+(use-package spacious-padding
+  :ensure t
+  :config
+  (setq spacious-padding-widths
+        '(:internal-border-width 10
+          :right-divider-width 1
+          :mode-line-width 1
+          :fringe-width 4))
+  (spacious-padding-mode 1))
+
 (use-package rainbow-delimiters
   :ensure t
   :hook

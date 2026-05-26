@@ -304,15 +304,15 @@
 
   (my/keys
     "m"  '(:ignore t :wk "mark text")
-    "ml" '(org-remark-mark-line :wk "mark line")
-    "md" '(org-remark-delete :wk "mark delete")
-    "mc" '(org-remark-change :wk "mark change")
-    "mm" '(org-remark-mark :wk "mark region")
-    "mo" '(org-remark-open :wk "open note")
-    "mv" '(org-remark-view :wk "view note")
+    "m l" '(org-remark-mark-line :wk "mark line")
+    "m d" '(org-remark-delete :wk "mark delete")
+    "m c" '(org-remark-change :wk "mark change")
+    "m m" '(org-remark-mark :wk "mark region")
+    "m o" '(org-remark-open :wk "open note")
+    "m v" '(org-remark-view :wk "view note")
     ;; custom
-    "mr" '(org-remark-mark-text-red :wk "text red")
-    "mb" '(org-remark-mark-blue :wk "mark blue"))
+    "m r" '(org-remark-mark-text-red :wk "text red")
+    "m b" '(org-remark-mark-blue :wk "mark blue"))
 
   (my/keys
     "s"   '(:ignore t :wk "search")
@@ -346,16 +346,14 @@
     :states  '(normal insert visual emacs)
     "C-<backspace>" 'my/backward-delete
     "<f2>"  'wdired-change-to-wdired-mode
-    ;; "C-<up>" 'backward-page
-    ;; "C-<down>" 'forward-paragraph
     "C-,"   'popper-toggle
     "C-."   'popper-cycle
     "C-o"   'other-window)
   
   (general-def
     :keymaps 'global
+    "C-c C-m" '(magit-file-dispatch :wk ("C-m" . "magit file"))
     "C-c C-v" '(visual-line-mode :wk "truncated lines")
-    "C-c C-m" '(magit-file-dispatch :wk "magit file")
     "C-c C-r" '(restart-emacs :wk "restart emacs")
     "C-c C-t" '(consult-theme :wk "change theme")
     "C-c C-h" '(helpful-at-point :wk "helpful")
@@ -363,7 +361,7 @@
     "C-c C-d" '(consult-dir :wk "insert path")
     "C-c C-i"   '((lambda () (interactive)
                 (find-file (locate-user-emacs-file "init.el")))
-              :wk "go to init.el"))
+              :wk ("C-i" . "go to init.el")))
     
   (general-unbind
     :keymaps 'global
@@ -414,12 +412,6 @@
   (evil-goggles-mode)
   (evil-goggles-use-diff-faces))
 
-;; multiple cursors for evil
-;; `C-n'       - select word at cursor
-;; `n/q'       - add next match/skip match
-;; `Q'         - remove current match
-;; `TAB'       - toggle cursor/extend mode
-;; `c/d/i/a/r' - edit at all cursors
 (use-package evim
   :ensure t
   :after evil
@@ -613,6 +605,7 @@
   :custom
   (ruby-indent-level 2)
   :config
+  (setq ruby-ts-mode-map (make-sparse-keymap))
   (add-to-list 'treesit-language-source-alist
                '(ruby "https://github.com/tree-sitter/tree-sitter-ruby" "master" "src")))
 

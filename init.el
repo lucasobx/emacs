@@ -279,6 +279,11 @@
   (set-face-attribute 'which-key-note-face nil :height 1.0)
   (setopt which-key-sort-order 'which-key-local-then-key-order))
 
+(use-package devil
+  :ensure t
+  :config
+  (global-devil-mode))
+
 (use-package general
   :ensure (:wait t)
   :demand t
@@ -352,26 +357,25 @@
   
   (general-def
     :keymaps 'global
-    "C-c C-m" '(magit-file-dispatch :wk ("C-m" . "magit file"))
-    "C-c C-v" '(visual-line-mode :wk "truncated lines")
-    "C-c C-r" '(restart-emacs :wk "restart emacs")
-    "C-c C-t" '(consult-theme :wk "change theme")
-    "C-c C-h" '(helpful-at-point :wk "helpful")
-    "C-c C-s" '(sudo-edit :wk "edit with sudo")
-    "C-c C-d" '(consult-dir :wk "insert path")
-    "C-c C-i"   '((lambda () (interactive)
+    "C-c m" '(magit-file-dispatch :wk ("m" . "magit file"))
+    "C-c v" '(visual-line-mode :wk "truncated lines")
+    "C-c r" '(restart-emacs :wk "restart emacs")
+    "C-c t" '(consult-theme :wk "change theme")
+    "C-c h" '(helpful-at-point :wk "helpful")
+    "C-c s" '(sudo-edit :wk "edit with sudo")
+    "C-c d" '(consult-dir :wk "insert path")
+    "C-c i"   '((lambda () (interactive)
                 (find-file (locate-user-emacs-file "init.el")))
-              :wk ("C-i" . "go to init.el")))
-    
+              :wk ("i" . "go to init.el")))
+
   (general-unbind
     :keymaps 'global
     "C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z")
   (general-unbind
     :keymaps 'emacs-lisp-mode-map
     "C-c C-b" "C-c C-e" "C-c C-f")
-  (general-unbind
-    :keymaps 'winner-mode-map
-    "C-c <left>" "C-c <right>"))
+  (dolist (key '("C-c <left>" "C-c <right>"))
+    (keymap-unset winner-mode-map key)))
 
 (use-package evil
   :ensure (:wait t)
@@ -388,6 +392,7 @@
   (define-key evil-normal-state-map (kbd "<escape>") #'keyboard-quit)
   (define-key evil-insert-state-map (kbd "C-y") 'yank)
   (define-key evil-normal-state-map (kbd "C-y") 'yank)
+  (define-key evil-normal-state-map (kbd ",") 'devil)
   (evil-mode 1))
 
 (use-package evil-collection
@@ -422,7 +427,7 @@
   (define-key evil-normal-state-map (kbd "S-<up>") #'evim-add-cursor-up)
   (define-key evil-normal-state-map (kbd "S-<down>") #'evim-add-cursor-down))
 
-(use-package transient
+(use-package transient 
   :ensure nil
   :defer t)
 
@@ -435,7 +440,7 @@
   (display-buffer-alist
    '(("\\`magit:"
       (display-buffer-in-side-window)
-      (window-height . 0.3)
+      (window-height . 0.4)
       (side . bottom)
       (slot . 0))
      ((derived-mode . dired-mode)
@@ -607,7 +612,9 @@
   :ensure nil
   :mode "\\.lua\\'"
   :custom
-  (lua-ts-indent-offset 2))
+  (lua-ts-indent-offset 2)
+  :config
+  (setq lua-ts-mode-map (make-sparse-keymap)))
 
 (use-package ruby-ts-mode
   :ensure nil

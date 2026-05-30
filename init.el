@@ -90,6 +90,7 @@
   (use-dialog-box nil)
   (zone-all-frames t)
   (truncate-lines t)
+  (cursor-type 'bar)
   (line-spacing 1)
 
   ;; minibuffer
@@ -280,7 +281,7 @@
   (setopt which-key-sort-order 'which-key-local-then-key-order))
 
 (use-package devil
-  :ensure t
+  :ensure (:host github :repo "fbrosda/devil" :branch "dev")
   :config
   (global-devil-mode))
 
@@ -289,104 +290,167 @@
   :demand t
   :config
   (general-evil-setup)
+  (general-auto-unbind-keys)
+
+  ;; unbinds
+  (general-unbind
+    "C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z" "C-f" "C-t" "C-l" "C-j" "C-e")
+
+  (general-unbind :keymaps 'emacs-lisp-mode-map
+    "C-c C-b" "C-c C-e" "C-c C-f")
+
+  (general-unbind :keymaps 'winner-mode-map
+    "C-c <left>" "C-c <right>")
+
+  ;; definers
   (general-create-definer my/keys
     :states '(normal insert visual emacs)
+    :keymaps 'override)
+
+  (general-create-definer my/search
+    :states '(normal insert visual emacs)
     :keymaps 'override
-    :prefix "SPC"
-    :global-prefix "M-SPC")
-  (my/keys
-    "<left>"  '(evil-beginning-of-line :wk ("←" . "beg of line"))
-    "<right>" '(evil-end-of-line :wk ("→" . "end of line"))
-    "k" '(my/kill-buffer-window :wk "kill buffer")
-    "b" '(consult-buffer :wk "search buffer")
-    "p" '(consult-yank-pop :wk "copy hist")
-    "/" '(flash-jump :wk "jump anywhere")
-    "d" '(dired-jump :wk "file manager")
-    "h" '(devdocs-lookup :wk "devdocs")
-    "c" '(cheat-sh :wk "cheat sheet")
-    "f" '(find-file :wk "find file")
-    "t" '(ghostel :wk "terminal"))
+    :prefix "C-s")
 
-  (my/keys
-    "m"  '(:ignore t :wk "mark text")
-    "m l" '(org-remark-mark-line :wk "mark line")
-    "m d" '(org-remark-delete :wk "mark delete")
-    "m c" '(org-remark-change :wk "mark change")
-    "m m" '(org-remark-mark :wk "mark region")
-    "m o" '(org-remark-open :wk "open note")
-    "m v" '(org-remark-view :wk "view note")
-    ;; custom
-    "m r" '(org-remark-mark-text-red :wk "text red")
-    "m b" '(org-remark-mark-blue :wk "mark blue"))
+  (general-create-definer my/file
+    :states '(normal insert visual emacs)
+    :keymaps 'override
+    :prefix "C-f")
 
-  (my/keys
-    "s"   '(:ignore t :wk "search")
-    "s r" '(consult-recent-file :wk "recent files")
-    "s l" '(consult-line-multi :wk "line in files")
-    "s b" '(consult-bookmark :wk "bookmarks")
-    "s g" '(consult-ripgrep :wk "ripgrep")
-    "s i" '(consult-imenu :wk "imenu")
-    "s s" '(consult-line :wk "line")
-    "s f" '(consult-fd :wk "file"))
+  (general-create-definer my/jump
+    :states '(normal insert visual emacs)
+    :keymaps 'override
+    :prefix "C-j")
 
-  (my/keys
+  (general-create-definer my/tools
+    :states '(normal insert visual emacs)
+    :keymaps 'override
+    :prefix "C-t")
+
+  (general-create-definer my/lsp
+    :states '(normal insert visual emacs)
+    :keymaps 'override
+    :prefix "C-l")
+
+  (general-create-definer my/mark
+    :states '(normal insert visual emacs)
+    :keymaps 'override
+    :prefix "C-q")
+
+  (general-create-definer my/emacs
+    :states '(normal insert visual emacs)
+    :keymaps 'override
+    :prefix "C-e")
+
+  ;; ---------------------------------------------------------------
+  ;; C-s  Search
+  (my/search
+    "s" '(consult-line        :wk "line")
+    "S" '(consult-line-multi  :wk "line in files")
+    "g" '(consult-ripgrep     :wk "ripgrep")
+    "f" '(consult-fd          :wk "find file")
+    "i" '(consult-imenu       :wk "imenu")
+    "b" '(consult-bookmark    :wk "bookmarks")
+    "r" '(consult-recent-file :wk "recent files"))
+
+  ;; ---------------------------------------------------------------
+  ;; C-f  File / Buffer
+  (my/file
+    "f" '(find-file             :wk "find file")
+    "b" '(consult-buffer        :wk "switch buffer")
+    "p" '(consult-yank-pop      :wk "clipboard history")
+    "k" '(my/kill-buffer-window :wk "kill buffer + window")
+    "K" '(kill-buffer           :wk "kill buffer")
+    "r" '(rename-visited-file   :wk "rename file")
+    "s" '(save-buffer           :wk "save")
+    "S" '(save-some-buffers     :wk "save all"))
+
+  ;; ---------------------------------------------------------------
+  ;; C-j  Jump / Navigate
+  (my/jump
+    "j" '(flash-jump :wk "jump anywhere")
+    "d" '(dired-jump :wk "dired jump"))
+
+  ;; ---------------------------------------------------------------
+  ;; C-t  Terminal / Tools
+  (my/tools
+    "t" '(ghostel          :wk "terminal")
+    "c" '(cheat-sh         :wk "cheat sheet")
+    "d" '(devdocs-lookup   :wk "devdocs")
+    "h" '(helpful-at-point :wk "helpful at point")
+    "H" '(helpful-command  :wk "helpful command"))
+
+  ;; ---------------------------------------------------------------
+  ;; C-l  LSP (prog-mode) + Ruby (ruby modes)
+  (my/lsp
     :keymaps '(prog-mode-map)
-    "l"   '(:ignore t :wk "lsp actions")
-    "l l" '(lsp-bridge-diagnostic-list :wk "list errors")
-    "l r" '(lsp-bridge-find-references :wk "references")
-    "l c" '(lsp-bridge-code-action :wk "code actions")
-    "l d" '(lsp-bridge-find-def :wk "definition")
-    "l n" '(lsp-bridge-rename :wk "rename"))
-  
-  (my/keys
-    :keymaps '(ruby-mode-map ruby-ts-mode-map)
-    "r"   '(:ignore t :wk "ruby")
-    "r r" '(ruby-send-buffer :wk "send buffer")
-    "r s" '(ruby-send-region :wk "send region")
-    "r l" '(ruby-send-line :wk "send line")
-    "r i" '(inf-ruby :wk "open repl"))
-  
-  (general-def
-    :keymaps 'global
-    :states  '(normal insert visual emacs)
-    "C-<backspace>" 'my/backward-delete
-    "<f2>"  'wdired-change-to-wdired-mode
-    "C-,"   'popper-toggle
-    "C-."   'popper-cycle
-    "C-o"   'other-window)
-  
-  (general-def
-    :keymaps 'global
-    "C-c m" '(magit-file-dispatch :wk ("m" . "magit file"))
-    "C-c v" '(visual-line-mode :wk "truncated lines")
-    "C-c r" '(restart-emacs :wk "restart emacs")
-    "C-c t" '(consult-theme :wk "change theme")
-    "C-c h" '(helpful-at-point :wk "helpful")
-    "C-c s" '(sudo-edit :wk "edit with sudo")
-    "C-c d" '(consult-dir :wk "insert path")
-    "C-c i"   '((lambda () (interactive)
-                (find-file (locate-user-emacs-file "init.el")))
-              :wk ("i" . "go to init.el")))
+    "l" '(lsp-bridge-diagnostic-list :wk "list errors")
+    "r" '(lsp-bridge-find-references :wk "references")
+    "c" '(lsp-bridge-code-action     :wk "code actions")
+    "d" '(lsp-bridge-find-def        :wk "definition")
+    "n" '(lsp-bridge-rename          :wk "rename"))
 
-  (general-unbind
+  (my/lsp
+    :keymaps '(ruby-mode-map ruby-ts-mode-map)
+    "R" '(ruby-send-buffer :wk "send buffer")
+    "s" '(ruby-send-region :wk "send region")
+    "L" '(ruby-send-line   :wk "send line")
+    "i" '(inf-ruby         :wk "open repl"))
+
+  ;; ---------------------------------------------------------------
+  ;; C-q  Mark / Remark
+  (my/mark
+    "m" '(org-remark-mark             :wk "mark region")
+    "l" '(org-remark-mark-line        :wk "mark line")
+    "d" '(org-remark-delete           :wk "delete mark")
+    "c" '(org-remark-change           :wk "change mark")
+    "o" '(org-remark-open             :wk "open note")
+    "v" '(org-remark-view             :wk "view note")
+    "r" '(org-remark-mark-color-text  :wk "color text")
+    "b" '(org-remark-mark-custom-mark :wk "custom mark"))
+
+  ;; ---------------------------------------------------------------
+  ;; C-c  Version control (mantido no C-c como antes)
+  (general-def
     :keymaps 'global
-    "C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z")
-  (general-unbind
-    :keymaps 'emacs-lisp-mode-map
-    "C-c C-b" "C-c C-e" "C-c C-f")
-  (dolist (key '("C-c <left>" "C-c <right>"))
-    (keymap-unset winner-mode-map key)))
+    "C-c v" '(magit-status        :wk "magit status")
+    "C-c m" '(magit-file-dispatch :wk "magit file"))
+
+  ;; ---------------------------------------------------------------
+  ;; C-e  Emacs utilities
+  (my/emacs
+    "i" '((lambda () (interactive)
+            (find-file (locate-user-emacs-file "init.el")))
+          :wk "init.el")
+    "t" '(consult-theme    :wk "change theme")
+    "r" '(restart-emacs    :wk "restart emacs")
+    "s" '(sudo-edit        :wk "sudo edit")
+    "d" '(consult-dir      :wk "insert path")
+    "v" '(visual-line-mode :wk "visual line mode")
+    "w" '(winner-undo      :wk "winner undo")
+    "W" '(winner-redo      :wk "winner redo"))
+
+  ;; ---------------------------------------------------------------
+  ;; binds globais avulsos
+  (my/keys
+    "C-<backspace>" '(my/backward-delete           :wk "backward delete")
+    "<f2>"          '(wdired-change-to-wdired-mode :wk "wdired")
+    "C-,"           '(popper-toggle                :wk "popper toggle")
+    "C-."           '(popper-cycle                 :wk "popper cycle")
+    "C-o"           '(other-window                 :wk "other window")
+    "C-="           '(text-scale-increase          :wk "zoom in")
+    "C--"           '(text-scale-decrease          :wk "zoom out")))
 
 (use-package evil
   :ensure (:wait t)
   :demand t
   :init
   (setopt evil-undo-system 'undo-redo
-          evil-want-fine-undo t
-          evil-want-integration t
-          evil-want-keybinding nil
           evil-vsplit-window-right t
           evil-split-window-below t
+          evil-want-keybinding nil
+          evil-want-integration t
+          evil-want-fine-undo t
           evil-shift-width 2)
   :config
   (define-key evil-normal-state-map (kbd "<escape>") #'keyboard-quit)
@@ -481,10 +545,9 @@
   (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
 
 (use-package pixel-themes
-  :ensure nil
-  :load-path "~/.config/emacs/lisp/pixel-themes"
+  :load-path "~/.config/emacs/themes/pixel-themes/"
   :config
-  (pixel-themes-set 'pixel-themes-miri16))
+  (pixel-themes-load 'pixel-miri16))
 
 (use-package spacious-padding
   :ensure t
@@ -656,7 +719,8 @@
   (add-hook 'inf-ruby-mode-hook
             (lambda ()
               (set-process-query-on-exit-flag
-               (get-buffer-process (current-buffer)) nil))))
+               (get-buffer-process (current-buffer)) nil)))
+  (setq inf-ruby-minor-mode-map (make-sparse-keymap)))
 
 (use-package mason
   :ensure t

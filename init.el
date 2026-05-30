@@ -302,6 +302,10 @@
   (general-unbind :keymaps 'winner-mode-map
     "C-c <left>" "C-c <right>")
 
+  (general-unbind :keymaps 'inf-ruby-minor-mode-map
+    "C-c C-l" "C-c C-b" "C-c C-k" "C-c C-q" "C-c C-r" "C-c C-s" "C-c C-x" "C-c C-z"
+    "C-c M-b" "C-c M-r" "C-c M-x")
+
   ;; definers
   (general-create-definer my/keys
     :states '(normal insert visual emacs)
@@ -359,17 +363,9 @@
     "f" '(find-file             :wk "find file")
     "b" '(consult-buffer        :wk "switch buffer")
     "p" '(consult-yank-pop      :wk "clipboard history")
-    "k" '(my/kill-buffer-window :wk "kill buffer + window")
-    "K" '(kill-buffer           :wk "kill buffer")
     "r" '(rename-visited-file   :wk "rename file")
     "s" '(save-buffer           :wk "save")
     "S" '(save-some-buffers     :wk "save all"))
-
-  ;; ---------------------------------------------------------------
-  ;; C-j  Jump / Navigate
-  (my/jump
-    "j" '(flash-jump :wk "jump anywhere")
-    "d" '(dired-jump :wk "dired jump"))
 
   ;; ---------------------------------------------------------------
   ;; C-t  Terminal / Tools
@@ -434,12 +430,15 @@
   ;; binds globais avulsos
   (my/keys
     "C-<backspace>" '(my/backward-delete           :wk "backward delete")
-    "<f2>"          '(wdired-change-to-wdired-mode :wk "wdired")
     "C-,"           '(popper-toggle                :wk "popper toggle")
+    "C-j"           '(flash-jump                   :wk "jump anywhere")
     "C-."           '(popper-cycle                 :wk "popper cycle")
     "C-o"           '(other-window                 :wk "other window")
+    "C-k"           '(my/kill-buffer-window        :wk "kill buffer")
+    "C--"           '(text-scale-decrease          :wk "zoom out")
     "C-="           '(text-scale-increase          :wk "zoom in")
-    "C--"           '(text-scale-decrease          :wk "zoom out")))
+    "<f2>"          '(wdired-change-to-wdired-mode :wk "wdired")
+    "C-d"           '(dired-jump                   :wk "dired")))
 
 (use-package evil
   :ensure (:wait t)
@@ -719,8 +718,7 @@
   (add-hook 'inf-ruby-mode-hook
             (lambda ()
               (set-process-query-on-exit-flag
-               (get-buffer-process (current-buffer)) nil)))
-  (setq inf-ruby-minor-mode-map (make-sparse-keymap)))
+               (get-buffer-process (current-buffer)) nil))))
 
 (use-package mason
   :ensure t
@@ -887,11 +885,6 @@
   :after org
   :hook
   (org-mode . evil-org-mode))
-
-(use-package olivetti
-  :ensure t
-  :hook
-  (org-mode . olivetti-mode))
 
 (use-package org-appear
   :ensure (:host github :repo "awth13/org-appear")

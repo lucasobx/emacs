@@ -92,6 +92,7 @@
   (truncate-lines t)
   (cursor-type 'bar)
   (line-spacing 1)
+  (undo-no-redo t)
 
   ;; minibuffer
   (minibuffer-prompt-properties
@@ -263,6 +264,109 @@
            (goto-char (point-min))
            (read-only-mode 1)))))))
 
+(defun my/open-line-below ()
+  "Create a new line below and move to it."
+  (interactive)
+  (end-of-line)
+  (newline-and-indent))
+
+;; ===============================================================
+;;; TEXT OBJECTS
+
+(defun my/bounds-of-inside-parens ()
+  "Return bounds of content inside parentheses."
+  (when (or (looking-at "(")
+            (ignore-errors (backward-up-list 1) t))
+    (let ((start (1+ (point)))
+          (end   (1- (progn (forward-sexp) (point)))))
+      (cons start end))))
+
+(defun my/bounds-of-inside-brackets ()
+  "Return bounds of content inside square brackets."
+  (when (or (looking-at "\\[")
+            (ignore-errors (backward-up-list 1) t))
+    (let ((start (1+ (point)))
+          (end   (1- (progn (forward-sexp) (point)))))
+      (cons start end))))
+
+(defun my/bounds-of-inside-braces ()
+  "Return bounds of content inside curly braces."
+  (when (or (looking-at "{")
+            (ignore-errors (backward-up-list 1) t))
+    (let ((start (1+ (point)))
+          (end   (1- (progn (forward-sexp) (point)))))
+      (cons start end))))
+
+(defun my/delete-thing (thing)
+  "Delete THING at point and save to kill ring with visual feedback."
+  (let ((bounds (bounds-of-thing-at-point thing)))
+    (when bounds
+      (pulse-momentary-highlight-region (car bounds) (cdr bounds))
+      (sit-for 0.15)
+      (kill-region (car bounds) (cdr bounds)))))
+
+(defun my/delete-inside (bounds-fn)
+  "Delete content inside delimiter using BOUNDS-FN with visual feedback."
+  (let ((bounds (save-excursion (funcall bounds-fn))))
+    (when bounds
+      (pulse-momentary-highlight-region (car bounds) (cdr bounds))
+      (kill-region (car bounds) (cdr bounds)))))
+
+(defun my/copy-thing (thing)
+  "Copy THING at point to kill ring with visual feedback."
+  (let ((bounds (bounds-of-thing-at-point thing)))
+    (when bounds
+      (pulse-momentary-highlight-region (car bounds) (cdr bounds))
+      (kill-ring-save (car bounds) (cdr bounds))
+      (message "Copied %s" (symbol-name thing)))))
+
+(defun my/copy-inside (bounds-fn)
+  "Copy content inside delimiter using BOUNDS-FN with visual feedback."
+  (let ((bounds (save-excursion (funcall bounds-fn))))
+    (when bounds
+      (pulse-momentary-highlight-region (car bounds) (cdr bounds))
+      (kill-ring-save (car bounds) (cdr bounds))
+      (message "Copied region"))))
+
+(defun my/toggle-comment-thing (thing)
+  "Toggle comment on THING at point with visual feedback."
+  (let ((bounds (bounds-of-thing-at-point thing)))
+    (when bounds
+      (let ((start (save-excursion
+                     (goto-char (car bounds))
+                     (line-beginning-position)))
+            (end (save-excursion
+                   (goto-char (cdr bounds))
+                   (line-end-position))))
+        (pulse-momentary-highlight-region start end)
+        (sit-for 0.05)
+        (comment-or-uncomment-region start end)))))
+
+(defun my/delete-word () (interactive) (my/delete-thing 'word))
+(defun my/delete-paragraph () (interactive) (my/delete-thing 'paragraph))
+(defun my/delete-line () (interactive) (my/delete-thing 'line))
+(defun my/delete-symbol () (interactive) (my/delete-thing 'symbol))
+(defun my/delete-defun () (interactive) (my/delete-thing 'defun))
+
+(defun my/delete-inside-parens () (interactive) (my/delete-inside #'my/bounds-of-inside-parens))
+(defun my/delete-inside-brackets () (interactive) (my/delete-inside #'my/bounds-of-inside-brackets))
+(defun my/delete-inside-braces () (interactive) (my/delete-inside #'my/bounds-of-inside-braces))
+
+(defun my/copy-word () (interactive) (my/copy-thing 'word))
+(defun my/copy-paragraph () (interactive) (my/copy-thing 'paragraph))
+(defun my/copy-line () (interactive) (my/copy-thing 'line))
+(defun my/copy-symbol () (interactive) (my/copy-thing 'symbol))
+(defun my/copy-defun () (interactive) (my/copy-thing 'defun))
+
+(defun my/copy-inside-parens () (interactive) (my/copy-inside #'my/bounds-of-inside-parens))
+(defun my/copy-inside-brackets () (interactive) (my/copy-inside #'my/bounds-of-inside-brackets))
+(defun my/copy-inside-braces () (interactive) (my/copy-inside #'my/bounds-of-inside-braces))
+
+(defun my/toggle-comment-word () (interactive) (my/toggle-comment-thing 'word))
+(defun my/toggle-comment-paragraph () (interactive) (my/toggle-comment-thing 'paragraph))
+(defun my/toggle-comment-line () (interactive) (comment-line 1))
+(defun my/toggle-comment-defun () (interactive) (my/toggle-comment-thing 'defun))
+
 ;; ===============================================================
 ;;; KEYBINDINGS
 
@@ -282,6 +386,8 @@
 
 (use-package devil
   :ensure (:host github :repo "fbrosda/devil" :branch "dev")
+  :custom
+  (devil-repeatable-keys '(("%k n n" "%k n p")))
   :config
   (global-devil-mode))
 
@@ -289,12 +395,12 @@
   :ensure (:wait t)
   :demand t
   :config
-  (general-evil-setup)
   (general-auto-unbind-keys)
 
   ;; unbinds
   (general-unbind
-    "C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z" "C-f" "C-t" "C-l" "C-j" "C-e")
+    "C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z" "C-f" "C-t" "C-l" "C-j"
+    "C-d" "C-y" "C-p" "C-n")
 
   (general-unbind :keymaps 'emacs-lisp-mode-map
     "C-c C-b" "C-c C-e" "C-c C-f")
@@ -307,192 +413,186 @@
     "C-c M-b" "C-c M-r" "C-c M-x")
 
   ;; definers
+  (general-create-definer my/delete
+    :keymaps 'override
+    :prefix "C-d")
+
+  (general-create-definer my/copy
+    :keymaps 'override
+    :prefix "C-y")
+
+  (general-create-definer my/comment
+    :keymaps 'override
+    :prefix "C-;")
+
+  (general-create-definer my/mc
+    :keymaps 'override
+    :prefix "C-n")
+  
   (general-create-definer my/keys
-    :states '(normal insert visual emacs)
     :keymaps 'override)
 
   (general-create-definer my/search
-    :states '(normal insert visual emacs)
     :keymaps 'override
     :prefix "C-s")
 
   (general-create-definer my/file
-    :states '(normal insert visual emacs)
     :keymaps 'override
     :prefix "C-f")
 
   (general-create-definer my/jump
-    :states '(normal insert visual emacs)
     :keymaps 'override
     :prefix "C-j")
 
   (general-create-definer my/tools
-    :states '(normal insert visual emacs)
     :keymaps 'override
     :prefix "C-t")
 
   (general-create-definer my/lsp
-    :states '(normal insert visual emacs)
     :keymaps 'override
     :prefix "C-l")
 
   (general-create-definer my/mark
-    :states '(normal insert visual emacs)
     :keymaps 'override
     :prefix "C-q")
 
   (general-create-definer my/emacs
-    :states '(normal insert visual emacs)
     :keymaps 'override
     :prefix "C-e")
 
-  ;; ---------------------------------------------------------------
-  ;; C-s  Search
+  ;; C-d delete text objects
+  (my/delete
+    "p" '(my/delete-paragraph       :wk "delete paragraph")
+    "y" '(my/delete-symbol          :wk "delete symbol")
+    "f" '(my/delete-defun           :wk "delete defun")
+    "w" '(my/delete-word            :wk "delete word")
+    "d" '(my/delete-line            :wk "delete line")
+    "(" '(my/delete-inside-parens   :wk "delete inside ()")
+    "[" '(my/delete-inside-brackets :wk "delete inside []")
+    "{" '(my/delete-inside-braces   :wk "delete inside {}"))
+
+  ;; C-y copy text objects
+  (my/copy
+    "p" '(my/copy-paragraph       :wk "copy paragraph")
+    "s" '(my/copy-symbol          :wk "copy symbol")
+    "f" '(my/copy-defun           :wk "copy defun")
+    "w" '(my/copy-word            :wk "copy word")
+    "y" '(my/copy-line            :wk "copy line")
+    "(" '(my/copy-inside-parens   :wk "inside ()")
+    "[" '(my/copy-inside-brackets :wk "inside []")
+    "{" '(my/copy-inside-braces   :wk "inside {}"))
+
+  ;; C-; comment
+  (my/comment
+    "p" '(my/toggle-comment-paragraph :wk "paragraph")
+    "f" '(my/toggle-comment-defun     :wk "defun")
+    "w" '(my/toggle-comment-word      :wk "word")
+    ";" '(my/toggle-comment-line      :wk "line"))
+
+  ;; C-n multiple cursors
+  (my/mc
+    "n" '(mc/mark-next-like-this        :wk "mark next")
+    "p" '(mc/mark-previous-like-this    :wk "mark previous")
+    "N" '(mc/skip-to-next-like-this     :wk "skip to next")
+    "P" '(mc/skip-to-previous-like-this :wk "skip to previous")
+    "u" '(mc/unmark-next-like-this      :wk "unmark next")
+    "U" '(mc/unmark-previous-like-this  :wk "unmark previous")
+    "a" '(mc/mark-all-like-this         :wk "mark all")
+    "A" '(mc/mark-all-dwim              :wk "mark all dwim")
+    "i" '(mc/insert-numbers             :wk "insert numbers")
+    "l" '(mc/insert-letters             :wk "insert letters"))
+
+  ;; C-s search
   (my/search
-    "s" '(consult-line        :wk "line")
     "S" '(consult-line-multi  :wk "line in files")
-    "g" '(consult-ripgrep     :wk "ripgrep")
-    "f" '(consult-fd          :wk "find file")
-    "i" '(consult-imenu       :wk "imenu")
+    "r" '(consult-recent-file :wk "recent files")
     "b" '(consult-bookmark    :wk "bookmarks")
-    "r" '(consult-recent-file :wk "recent files"))
+    "f" '(consult-fd          :wk "find file")
+    "g" '(consult-ripgrep     :wk "ripgrep")
+    "i" '(consult-imenu       :wk "imenu")
+    "s" '(consult-line        :wk "line"))
 
-  ;; ---------------------------------------------------------------
-  ;; C-f  File / Buffer
+  ;; C-f file
   (my/file
-    "f" '(find-file             :wk "find file")
     "b" '(consult-buffer        :wk "switch buffer")
-    "p" '(consult-yank-pop      :wk "clipboard history")
+    "p" '(consult-yank-pop      :wk "copy history")
     "r" '(rename-visited-file   :wk "rename file")
-    "s" '(save-buffer           :wk "save")
-    "S" '(save-some-buffers     :wk "save all"))
-
-  ;; ---------------------------------------------------------------
-  ;; C-t  Terminal / Tools
+    "f" '(find-file             :wk "find file")
+    "S" '(save-some-buffers     :wk "save all")
+    "s" '(save-buffer           :wk "save"))
+  
+  ;; C-t tools
   (my/tools
-    "t" '(ghostel          :wk "terminal")
-    "c" '(cheat-sh         :wk "cheat sheet")
-    "d" '(devdocs-lookup   :wk "devdocs")
     "h" '(helpful-at-point :wk "helpful at point")
-    "H" '(helpful-command  :wk "helpful command"))
+    "c" '(cheat-sh         :wk "cheat sheet")
+    "t" '(ghostel          :wk "terminal")
+    "d" '(devdocs-lookup   :wk "devdocs"))
 
-  ;; ---------------------------------------------------------------
-  ;; C-l  LSP (prog-mode) + Ruby (ruby modes)
+  ;; C-l lsp/prog-mode
   (my/lsp
     :keymaps '(prog-mode-map)
-    "l" '(lsp-bridge-diagnostic-list :wk "list errors")
-    "r" '(lsp-bridge-find-references :wk "references")
     "c" '(lsp-bridge-code-action     :wk "code actions")
+    "e" '(lsp-bridge-diagnostic-list :wk "list errors")
+    "R" '(lsp-bridge-find-references :wk "references")
     "d" '(lsp-bridge-find-def        :wk "definition")
     "n" '(lsp-bridge-rename          :wk "rename"))
 
+  ;; C-l lsp/prog-mode
   (my/lsp
     :keymaps '(ruby-mode-map ruby-ts-mode-map)
-    "R" '(ruby-send-buffer :wk "send buffer")
+    "b" '(ruby-send-buffer :wk "send buffer")
     "s" '(ruby-send-region :wk "send region")
-    "L" '(ruby-send-line   :wk "send line")
-    "i" '(inf-ruby         :wk "open repl"))
+    "l" '(ruby-send-line   :wk "send line")
+    "r" '(inf-ruby         :wk "open repl"))
 
-  ;; ---------------------------------------------------------------
-  ;; C-q  Mark / Remark
+  ;; C-q remark
   (my/mark
     "m" '(org-remark-mark             :wk "mark region")
-    "l" '(org-remark-mark-line        :wk "mark line")
     "d" '(org-remark-delete           :wk "delete mark")
     "c" '(org-remark-change           :wk "change mark")
+    "l" '(org-remark-mark-line        :wk "mark line")
     "o" '(org-remark-open             :wk "open note")
     "v" '(org-remark-view             :wk "view note")
-    "r" '(org-remark-mark-color-text  :wk "color text")
-    "b" '(org-remark-mark-custom-mark :wk "custom mark"))
+    "b" '(org-remark-mark-custom-mark :wk "custom mark")
+    "r" '(org-remark-mark-color-text  :wk "color text"))
 
-  ;; ---------------------------------------------------------------
-  ;; C-c  Version control (mantido no C-c como antes)
+  ;; C-c
   (general-def
     :keymaps 'global
-    "C-c v" '(magit-status        :wk "magit status")
-    "C-c m" '(magit-file-dispatch :wk "magit file"))
-
-  ;; ---------------------------------------------------------------
-  ;; C-e  Emacs utilities
-  (my/emacs
-    "i" '((lambda () (interactive)
+    "C-c i" '((lambda () (interactive)
             (find-file (locate-user-emacs-file "init.el")))
-          :wk "init.el")
-    "t" '(consult-theme    :wk "change theme")
-    "r" '(restart-emacs    :wk "restart emacs")
-    "s" '(sudo-edit        :wk "sudo edit")
-    "d" '(consult-dir      :wk "insert path")
-    "v" '(visual-line-mode :wk "visual line mode")
-    "w" '(winner-undo      :wk "winner undo")
-    "W" '(winner-redo      :wk "winner redo"))
-
-  ;; ---------------------------------------------------------------
-  ;; binds globais avulsos
+                                  :wk "open init.el")
+    "C-c s" '(sudo-edit           :wk "edit with sudo")
+    "C-c v" '(visual-line-mode    :wk "truncate lines")
+    "C-c r" '(restart-emacs       :wk "restart emacs")
+    "C-c m" '(magit-status        :wk "magit status")
+    "C-c f" '(magit-file-dispatch :wk "magit file"))
+  
+  ;; random
   (my/keys
-    "C-<backspace>" '(my/backward-delete           :wk "backward delete")
-    "C-,"           '(popper-toggle                :wk "popper toggle")
-    "C-j"           '(flash-jump                   :wk "jump anywhere")
-    "C-."           '(popper-cycle                 :wk "popper cycle")
-    "C-o"           '(other-window                 :wk "other window")
-    "C-k"           '(my/kill-buffer-window        :wk "kill buffer")
-    "C--"           '(text-scale-decrease          :wk "zoom out")
-    "C-="           '(text-scale-increase          :wk "zoom in")
-    "<f2>"          '(wdired-change-to-wdired-mode :wk "wdired")
-    "C-d"           '(dired-jump                   :wk "dired")))
+    "<f1>" 'scratch-buffer
+    "<f2>" 'wdired-change-to-wdired-mode
+    "C-<backspace>" 'my/backward-delete
+    "C-<tab>" 'other-window
+    "C-k" 'my/kill-buffer-window
+    "C--" 'text-scale-decrease
+    "C-+" 'text-scale-increase
+    "C-o" 'my/open-line-below
+    "C-=" 'er/expand-region
+    "C-," 'popper-toggle
+    "C-." 'popper-cycle
+    "C-j" 'flash-jump
+    "C-p" 'yank))
 
-(use-package evil
-  :ensure (:wait t)
-  :demand t
-  :init
-  (setopt evil-undo-system 'undo-redo
-          evil-vsplit-window-right t
-          evil-split-window-below t
-          evil-want-keybinding nil
-          evil-want-integration t
-          evil-want-fine-undo t
-          evil-shift-width 2)
-  :config
-  (define-key evil-normal-state-map (kbd "<escape>") #'keyboard-quit)
-  (define-key evil-insert-state-map (kbd "C-y") 'yank)
-  (define-key evil-normal-state-map (kbd "C-y") 'yank)
-  (define-key evil-normal-state-map (kbd ",") 'devil)
-  (evil-mode 1))
-
-(use-package evil-collection
-  :ensure t
-  :after evil
-  :config
-  (setopt evil-collection-mode-list '(dired ibuffer magit))
-  (evil-collection-init))
-
-(use-package evil-commentary
-  :ensure t
-  :after evil
-  :config
-  (evil-commentary-mode))
-
-(use-package evil-goggles
+(use-package multiple-cursors
   :ensure t
   :custom
-  (evil-goggles-duration 0.100)
-  (evil-goggles-enable-paste nil)
+  (mc/list-file (locate-user-emacs-file "mc-lists.el"))
   :config
-  (evil-goggles-mode)
-  (evil-goggles-use-diff-faces))
+  (set-face-attribute 'mc/cursor-bar-face nil :underline t))
 
-(use-package evim
-  :ensure t
-  :after evil
-  :config
-  (evim-setup-global-keys)
-  (define-key evil-normal-state-map (kbd "C-<up>") nil)
-  (define-key evil-normal-state-map (kbd "C-<down>") nil)
-  (define-key evil-normal-state-map (kbd "S-<up>") #'evim-add-cursor-up)
-  (define-key evil-normal-state-map (kbd "S-<down>") #'evim-add-cursor-down))
-
-(use-package transient 
-  :ensure nil
-  :defer t)
+(use-package expand-region
+  :ensure t)
 
 ;; ===============================================================
 ;;; UI
@@ -630,19 +730,14 @@
   (bookmark-fringe-mark nil)
   (bookmark-save-flag 1))
 
-;; d/y/v + gs
 (use-package flash
   :ensure (:host github :repo "Prgebish/flash")
   :commands (flash-jump flash-jump-continue flash-treesitter)
   :custom
-  (flash-multi-window t)
-  (flash-autojump t)
-  (flash-nohlsearch t)
   (flash-char-jump-labels t)
-  :init
-  (with-eval-after-load 'evil
-    (require 'flash-evil)
-    (flash-evil-setup t)))
+  (flash-multi-window t)
+  (flash-nohlsearch t)
+  (flash-autojump t))
 
 (use-package dired
   :ensure nil
@@ -834,10 +929,6 @@
      buffers))
   (advice-add #'consult--buffer-query :filter-return #'my/consult-buffer-filter-modes))
 
-(use-package consult-dir
-  :ensure t
-  :defer t)
-
 (use-package yasnippet
   :ensure t
   :defer t)
@@ -861,15 +952,18 @@
 (use-package org
   :ensure nil
   :hook
-  ((org-mode . visual-line-mode)
+  ((org-mode . turn-off-auto-fill)
+   (org-mode . visual-line-mode)
    (org-mode . org-indent-mode)
-   (org-mode . (lambda () (auto-fill-mode 0))))
+   (org-mode . hl-line-mode))
   :custom
+  (org-src-content-indentation 2)
+  (org-hide-emphasis-markers t)
+  (org-hide-block-startup t)
   (org-catch-invisible-edits 'show-and-error)
+  (org-agenda-files '("~/Documents/org"))
   (org-insert-heading-respect-content t)
   (org-cycle-hide-drawer-startup t)
-  (org-agenda-files '("~/Documents/org"))
-  (org-hide-emphasis-markers t)
   (org-return-follows-link t)
   (org-hide-leading-stars t)
   (org-auto-align-tags nil)
@@ -877,14 +971,7 @@
   (org-tags-column 0)
   (org-ellipsis " ∷")
   :config
-  (setopt evil-auto-indent nil)
   (set-face-attribute 'org-ellipsis nil :underline nil))
-
-(use-package evil-org
-  :ensure t
-  :after org
-  :hook
-  (org-mode . evil-org-mode))
 
 (use-package org-appear
   :ensure (:host github :repo "awth13/org-appear")
@@ -924,9 +1011,7 @@
 
 (use-package ghostel
   :ensure t
-  :defer t
-  :hook
-  (ghostel-mode . evil-emacs-state))
+  :defer t)
 
 ;; ===============================================================
 ;;; DOCS

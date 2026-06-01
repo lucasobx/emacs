@@ -6,4 +6,4 @@
 * fd-find
 
 ___
-<img width="1268" height="1536" alt="image" src="https://github.com/user-attachments/assets/cd401862-0e85-4f31-a4f8-294ef487f5f8" />
+<img width="1267" height="1536" alt="image" src="https://github.com/user-attachments/assets/0ca43a21-3675-4781-ac9d-5d3b7d6d89bd" />

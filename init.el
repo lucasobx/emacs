@@ -46,7 +46,7 @@
   (elpaca-use-package-mode))
 
 ;; ===============================================================
-;;; CORE SETTINGS
+;;; EMACS
 
 (defvar my/font "Berkeley Mono ExtraCondensed Regular")
 (defvar my/font-size 120)
@@ -55,13 +55,8 @@
   :ensure nil
   :init
   (defun display-startup-echo-area-message () (message ""))
-  (global-auto-revert-mode t)
-  (file-name-shadow-mode 1)
   (delete-selection-mode 1)
   (global-hl-line-mode -1)
-  (electric-indent-mode 1)
-  (electric-pair-mode 1)
-  (column-number-mode 1)
   (save-place-mode 1)
   (tooltip-mode -1)
   (savehist-mode 1)
@@ -69,9 +64,7 @@
   (winner-mode 1)
 
   :custom
-  ;; ui
   (display-fill-column-indicator-warning nil)
-  (redisplay-skip-fontification-on-input t)
   (uniquify-buffer-name-style 'forward)
   (display-line-numbers-type 'relative)
   (warning-minimum-level :emergency)
@@ -84,7 +77,6 @@
   (split-width-threshold 100)
   (inhibit-startup-message t)
   (treesit-font-lock-level 4)
-  (message-truncate-lines t)
   (echo-keystrokes 0.1)
   (use-short-answers t)
   (use-dialog-box nil)
@@ -137,61 +129,64 @@
   (scroll-step 1)
   
   :config
-  ;; benchmark
+  (setq custom-file (locate-user-emacs-file "custom-vars.el"))
+  (load custom-file 'noerror 'nomessage)
+
+  ;; global modes
+  (minibuffer-electric-default-mode 1)
+  (minibuffer-depth-indicate-mode 1)
+  (global-auto-revert-mode 1)
+  (file-name-shadow-mode 1)
+  (electric-indent-mode 1)
+  (electric-pair-mode 1)
+  (column-number-mode 1)
+
+  ;; hooks
   (add-hook 'emacs-startup-hook
             (lambda () (message "Booted in %s." (emacs-init-time))))
+  (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
+  (add-hook 'prog-mode-hook 'display-line-numbers-mode)
 
-  ;; ui
+  ;; faces
   (set-face-attribute 'default nil :family my/font :height my/font-size)
   (set-face-attribute 'minibuffer-nonselected nil :background)
   (set-face-attribute 'tooltip nil :family my/font)
   (setq-default line-spacing 0)
-  
-  ;; minibuffer
-  (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
-  (add-hook 'minibuffer-setup-hook (lambda () (setq truncate-lines t)))
-  (minibuffer-depth-indicate-mode 1)
-  (minibuffer-electric-default-mode 1)
 
-  ;; buffers
+  ;; misc
+  (setq redisplay-skip-fontification-on-input t)
+  (setq native-comp-async-query-on-exit t)
+  (put 'narrow-to-region 'disabled nil)
+  (setq message-truncate-lines t)
+
   (defun skip-these-buffers (_window buffer _bury-or-kill)
     "Function for `switch-to-prev-buffer-skip'."
     (string-match "\\*[^*]+\\*" (buffer-name buffer)))
   (setq switch-to-prev-buffer-skip 'skip-these-buffers)
 
-  ;; system
-  (setq custom-file (locate-user-emacs-file "custom-vars.el"))
-  (add-hook 'prog-mode-hook 'display-line-numbers-mode)
-  (setopt native-comp-async-query-on-exit t)
-  (load custom-file 'noerror 'nomessage)
-  (put 'narrow-to-region 'disabled nil)
-
   ;; smart context clearing and quit handler
   (define-key key-translation-map (kbd "ESC") (kbd "C-g"))
   (define-advice keyboard-quit (:around (quit) quit-context-dwim)
     (cond
-    ((and (region-active-p)
-          (not (active-minibuffer-window)))
-      (keyboard-quit))
-    ((derived-mode-p 'completion-list-mode)
+     ((and (region-active-p)
+           (not (active-minibuffer-window)))
+      (funcall quit))
+     ((derived-mode-p 'completion-list-mode)
       (delete-completion-window))
-    ((active-minibuffer-window)
+     ((active-minibuffer-window)
       (if (minibufferp)
           (minibuffer-keyboard-quit)
         (abort-recursive-edit)))
-    (t
-     (unless (or defining-kbd-macro executing-kbd-macro)
-       (apply orig-fun args)))))
+     (t
+      (unless (or defining-kbd-macro executing-kbd-macro)
+        (funcall quit)))))
 
   ;; add option `d', allowing a quick preview of the diff of what you're asked to save.
   (add-to-list 'save-some-buffers-action-alist
                (list "d"
                      (lambda (buffer) (diff-buffer-with-file (buffer-file-name buffer)))
                      "show diff between the buffer and its file"))
-
   :bind
-  ("C-=" . text-scale-increase)
-  ("C--" . text-scale-decrease)
   ("RET" . newline-and-indent))
 
 ;; ===============================================================
@@ -387,8 +382,9 @@
 (use-package devil
   :ensure (:host github :repo "fbrosda/devil" :branch "dev")
   :custom
-  (devil-repeatable-keys '(("%k n n" "%k n p")))
+  (devil-repeatable-keys '(("%k \\ n" "%k \\ p")))
   :config
+  (setq devil-prompt " %t")
   (global-devil-mode))
 
 (use-package general
@@ -400,7 +396,7 @@
   ;; unbinds
   (general-unbind
     "C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z" "C-f" "C-t" "C-l" "C-j"
-    "C-d" "C-y" "C-p" "C-n")
+    "C-d" "C-y" "C-p")
 
   (general-unbind :keymaps 'emacs-lisp-mode-map
     "C-c C-b" "C-c C-e" "C-c C-f")
@@ -427,7 +423,7 @@
 
   (general-create-definer my/mc
     :keymaps 'override
-    :prefix "C-n")
+    :prefix "C-\\")
   
   (general-create-definer my/keys
     :keymaps 'override)
@@ -489,7 +485,7 @@
     "w" '(my/toggle-comment-word      :wk "word")
     ";" '(my/toggle-comment-line      :wk "line"))
 
-  ;; C-n multiple cursors
+  ;; C-\ multiple cursors
   (my/mc
     "n" '(mc/mark-next-like-this        :wk "mark next")
     "p" '(mc/mark-previous-like-this    :wk "mark previous")

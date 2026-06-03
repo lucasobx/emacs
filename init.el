@@ -185,8 +185,16 @@
                (list "d"
                      (lambda (buffer) (diff-buffer-with-file (buffer-file-name buffer)))
                      "show diff between the buffer and its file"))
+
   :bind
-  ("RET" . newline-and-indent))
+  ("RET"       . newline-and-indent)
+  ("C-_"       . text-scale-decrease)
+  ("C-+"       . text-scale-increase)
+  ("<f2>"      . wdired-change-to-wdired-mode)
+  ("<f1>"      . scratch-buffer)
+  ("C-<tab>"   . other-window)
+  ("M-<left>"  . beginning-of-line)
+  ("M-<right>" . end-of-line))
 
 ;; ===============================================================
 ;;; CUSTOM FUNCTIONS
@@ -389,156 +397,84 @@
   :demand t
   :config
   (general-auto-unbind-keys)
-
-  ;; unbinds
-  (general-unbind
-    "C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z" "C-f" "C-t" "C-l" "C-j"
-    "C-d" "C-y" "C-p")
-
-  (general-unbind :keymaps 'emacs-lisp-mode-map
-    "C-c C-b" "C-c C-e" "C-c C-f")
-
-  (general-unbind :keymaps 'winner-mode-map
-    "C-c <left>" "C-c <right>")
-
-  (general-unbind :keymaps 'inf-ruby-minor-mode-map
-    "C-c C-l" "C-c C-b" "C-c C-k" "C-c C-q" "C-c C-r" "C-c C-s" "C-c C-x" "C-c C-z"
-    "C-c M-b" "C-c M-r" "C-c M-x")
+  (general-unbind "C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z")
+  (general-unbind :keymaps 'emacs-lisp-mode-map "C-c C-b" "C-c C-e" "C-c C-f")
+  (general-unbind :keymaps 'winner-mode-map "C-c <left>" "C-c <right>")
+  ;; (general-unbind :keymaps 'inf-ruby-minor-mode-map
+    ;; "C-c C-l" "C-c C-b" "C-c C-k" "C-c C-q" "C-c C-r" "C-c C-s" "C-c C-x" "C-c C-z"
+    ;; "C-c M-b" "C-c M-r" "C-c M-x")
 
   ;; definers
-  (general-create-definer my/delete
-    :keymaps 'override
-    :prefix "C-d")
+  (general-create-definer my/keys    :keymaps 'override)
+  (general-create-definer my/delete  :keymaps 'override :prefix "C-d")
+  (general-create-definer my/emacs   :keymaps 'override :prefix "C-e")
+  (general-create-definer my/file    :keymaps 'override :prefix "C-f")
+  (general-create-definer my/lsp     :keymaps 'override :prefix "C-l")
+  (general-create-definer my/mark    :keymaps 'override :prefix "C-q")
+  (general-create-definer my/search  :keymaps 'override :prefix "C-s")
+  (general-create-definer my/tools   :keymaps 'override :prefix "C-t")
+  (general-create-definer my/copy    :keymaps 'override :prefix "C-y")
+  (general-create-definer my/comment :keymaps 'override :prefix "C-;")
 
-  (general-create-definer my/copy
-    :keymaps 'override
-    :prefix "C-y")
+  (general-def ;; dired
+    :keymaps 'dired-mode-map
+    "M-<left>" 'dired-up-directory)
 
-  (general-create-definer my/comment
-    :keymaps 'override
-    :prefix "C-;")
+  (my/keys
+    "M-<up>" 'move-text-up
+    "M-<down>" 'move-text-down
+    "C-<backspace>" 'my/backward-delete
+    "M-p" 'mc/mark-previous-like-this
+    "M-n" 'mc/mark-next-like-this
+    "C-k" 'my/kill-buffer-window
+    "C-o" 'my/open-line-below
+    "C-=" 'er/expand-region
+    "C-," 'popper-toggle
+    "C-." 'popper-cycle
+    "M-j" 'flash-jump
+    "C-p" 'yank)
 
-  (general-create-definer my/mc
-    :keymaps 'override
-    :prefix "C-\\")
-  
-  (general-create-definer my/keys
-    :keymaps 'override)
-
-  (general-create-definer my/search
-    :keymaps 'override
-    :prefix "C-s")
-
-  (general-create-definer my/file
-    :keymaps 'override
-    :prefix "C-f")
-
-  (general-create-definer my/jump
-    :keymaps 'override
-    :prefix "C-j")
-
-  (general-create-definer my/tools
-    :keymaps 'override
-    :prefix "C-t")
-
-  (general-create-definer my/lsp
-    :keymaps 'override
-    :prefix "C-l")
-
-  (general-create-definer my/mark
-    :keymaps 'override
-    :prefix "C-q")
-
-  (general-create-definer my/emacs
-    :keymaps 'override
-    :prefix "C-e")
-
-  ;; C-d delete text objects
   (my/delete
     "p" '(my/delete-paragraph       :wk "delete paragraph")
     "y" '(my/delete-symbol          :wk "delete symbol")
     "f" '(my/delete-defun           :wk "delete defun")
-    "w" '(my/delete-word            :wk "delete word")
     "d" '(my/delete-line            :wk "delete line")
-    "(" '(my/delete-inside-parens   :wk "delete inside ()")
-    "[" '(my/delete-inside-brackets :wk "delete inside []")
-    "{" '(my/delete-inside-braces   :wk "delete inside {}"))
+    "(" '(my/delete-in-parens       :wk "delete inside ()")
+    "[" '(my/delete-in-brackets     :wk "delete inside []")
+    "{" '(my/delete-in-braces       :wk "delete inside {}"))
 
-  ;; C-y copy text objects
-  (my/copy
-    "p" '(my/copy-paragraph       :wk "copy paragraph")
-    "s" '(my/copy-symbol          :wk "copy symbol")
-    "f" '(my/copy-defun           :wk "copy defun")
-    "w" '(my/copy-word            :wk "copy word")
-    "y" '(my/copy-line            :wk "copy line")
-    "(" '(my/copy-inside-parens   :wk "inside ()")
-    "[" '(my/copy-inside-brackets :wk "inside []")
-    "{" '(my/copy-inside-braces   :wk "inside {}"))
-
-  ;; C-; comment
-  (my/comment
-    "p" '(my/toggle-comment-paragraph :wk "paragraph")
-    "f" '(my/toggle-comment-defun     :wk "defun")
-    "w" '(my/toggle-comment-word      :wk "word")
-    ";" '(my/toggle-comment-line      :wk "line"))
-
-  ;; C-\ multiple cursors
-  (my/mc
-    "n" '(mc/mark-next-like-this        :wk "mark next")
-    "p" '(mc/mark-previous-like-this    :wk "mark previous")
-    "N" '(mc/skip-to-next-like-this     :wk "skip to next")
-    "P" '(mc/skip-to-previous-like-this :wk "skip to previous")
-    "u" '(mc/unmark-next-like-this      :wk "unmark next")
-    "U" '(mc/unmark-previous-like-this  :wk "unmark previous")
-    "a" '(mc/mark-all-like-this         :wk "mark all")
-    "A" '(mc/mark-all-dwim              :wk "mark all dwim")
-    "i" '(mc/insert-numbers             :wk "insert numbers")
-    "l" '(mc/insert-letters             :wk "insert letters"))
-
-  ;; C-s search
-  (my/search
-    "S" '(consult-line-multi  :wk "line in files")
-    "r" '(consult-recent-file :wk "recent files")
-    "b" '(consult-bookmark    :wk "bookmarks")
-    "f" '(consult-fd          :wk "find file")
-    "g" '(consult-ripgrep     :wk "ripgrep")
-    "i" '(consult-imenu       :wk "imenu")
-    "s" '(consult-line        :wk "line"))
-
-  ;; C-f file
+  (my/emacs
+    "i" '((lambda () (interactive)
+                (find-file (locate-user-emacs-file "init.el")))
+              :wk "open init.el")
+    "s" '(sudo-edit           :wk "edit with sudo")
+    "v" '(visual-line-mode    :wk "truncate lines")
+    "r" '(restart-emacs       :wk "restart emacs")
+    "m" '(magit-status        :wk "magit status"))
+  
   (my/file
     "b" '(consult-buffer        :wk "switch buffer")
     "p" '(consult-yank-pop      :wk "copy history")
+    "F" '(consult-fd            :wk "fd-find file")
     "r" '(rename-visited-file   :wk "rename file")
     "f" '(find-file             :wk "find file")
-    "S" '(save-some-buffers     :wk "save all")
     "s" '(save-buffer           :wk "save"))
-  
-  ;; C-t tools
-  (my/tools
-    "h" '(helpful-at-point :wk "helpful at point")
-    "c" '(cheat-sh         :wk "cheat sheet")
-    "t" '(ghostel          :wk "terminal")
-    "d" '(devdocs-lookup   :wk "devdocs"))
 
-  ;; C-l lsp/prog-mode
-  (my/lsp
+  (my/lsp ;; lsp/prog-mode
     :keymaps '(prog-mode-map)
     "c" '(lsp-bridge-code-action     :wk "code actions")
     "e" '(lsp-bridge-diagnostic-list :wk "list errors")
     "R" '(lsp-bridge-find-references :wk "references")
     "d" '(lsp-bridge-find-def        :wk "definition")
     "n" '(lsp-bridge-rename          :wk "rename"))
-
-  ;; C-l lsp/prog-mode
-  (my/lsp
+  
+  (my/lsp ;; ruby/prog-mode
     :keymaps '(ruby-mode-map ruby-ts-mode-map)
     "b" '(ruby-send-buffer :wk "send buffer")
     "s" '(ruby-send-region :wk "send region")
     "l" '(ruby-send-line   :wk "send line")
     "r" '(inf-ruby         :wk "open repl"))
 
-  ;; C-q remark
   (my/mark
     "m" '(org-remark-mark             :wk "mark region")
     "d" '(org-remark-delete           :wk "delete mark")
@@ -549,43 +485,33 @@
     "b" '(org-remark-mark-custom-mark :wk "custom mark")
     "r" '(org-remark-mark-color-text  :wk "color text"))
 
-  ;; C-c
-  (general-def
-    :keymaps 'global
-    "C-c i" '((lambda () (interactive)
-            (find-file (locate-user-emacs-file "init.el")))
-                                  :wk "open init.el")
-    "C-c s" '(sudo-edit           :wk "edit with sudo")
-    "C-c v" '(visual-line-mode    :wk "truncate lines")
-    "C-c r" '(restart-emacs       :wk "restart emacs")
-    "C-c m" '(magit-status        :wk "magit status")
-    "C-c f" '(magit-file-dispatch :wk "magit file"))
+  (my/search
+    "S" '(consult-line-multi  :wk "line in files")
+    "r" '(consult-recent-file :wk "recent files")
+    "b" '(consult-bookmark    :wk "bookmarks")
+    "g" '(consult-ripgrep     :wk "ripgrep")
+    "i" '(consult-imenu       :wk "imenu")
+    "s" '(consult-line        :wk "line"))
+
+  (my/tools
+    "h" '(helpful-at-point :wk "helpful at point")
+    "c" '(cheat-sh         :wk "cheat sheet")
+    "t" '(ghostel          :wk "terminal")
+    "d" '(devdocs-lookup   :wk "devdocs"))
+
+  (my/comment
+    "p" '(my/toggle-comment-paragraph :wk "paragraph")
+    "f" '(my/toggle-comment-defun     :wk "defun")
+    ";" '(my/toggle-comment-line      :wk "line"))
   
-  ;; random
-  (my/keys
-    "<f1>" 'scratch-buffer
-    "<f2>" 'wdired-change-to-wdired-mode
-    "C-<backspace>" 'my/backward-delete
-    "C-<tab>" 'other-window
-    "C-k" 'my/kill-buffer-window
-    "C--" 'text-scale-decrease
-    "C-+" 'text-scale-increase
-    "C-o" 'my/open-line-below
-    "C-=" 'er/expand-region
-    "C-," 'popper-toggle
-    "C-." 'popper-cycle
-    "C-j" 'flash-jump
-    "C-p" 'yank))
-
-(use-package multiple-cursors
-  :ensure t
-  :custom
-  (mc/list-file (locate-user-emacs-file "mc-lists.el"))
-  :config
-  (set-face-attribute 'mc/cursor-bar-face nil :underline t))
-
-(use-package expand-region
-  :ensure t)
+  (my/copy
+    "p" '(my/copy-paragraph       :wk "copy paragraph")
+    "s" '(my/copy-symbol          :wk "copy symbol")
+    "f" '(my/copy-defun           :wk "copy defun")
+    "y" '(my/copy-line            :wk "copy line")
+    "(" '(my/copy-inside-parens   :wk "inside ()")
+    "[" '(my/copy-inside-brackets :wk "inside []")
+    "{" '(my/copy-inside-braces   :wk "inside {}")))
 
 ;; ===============================================================
 ;;; UI

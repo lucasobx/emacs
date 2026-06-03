@@ -48,8 +48,8 @@
 ;; ===============================================================
 ;;; EMACS
 
-(defvar my/font "Berkeley Mono ExtraCondensed Regular")
-(defvar my/font-size 120)
+(defvar my/font "TX-02")
+(defvar my/font-size 110)
 
 (use-package emacs
   :ensure nil
@@ -82,7 +82,6 @@
   (use-dialog-box nil)
   (zone-all-frames t)
   (truncate-lines t)
-  (cursor-type 'bar)
   (line-spacing 1)
   (undo-no-redo t)
 
@@ -148,7 +147,7 @@
   (add-hook 'prog-mode-hook 'display-line-numbers-mode)
 
   ;; faces
-  (set-face-attribute 'default nil :family my/font :height my/font-size)
+  (set-face-attribute 'default nil :family my/font :height my/font-size :width 'condensed)
   (set-face-attribute 'minibuffer-nonselected nil :background)
   (set-face-attribute 'tooltip nil :family my/font)
   (setq-default line-spacing 0)
@@ -268,7 +267,7 @@
 ;; ===============================================================
 ;;; TEXT OBJECTS
 
-(defun my/bounds-of-inside-parens ()
+(defun my/inside-parens ()
   "Return bounds of content inside parentheses."
   (when (or (looking-at "(")
             (ignore-errors (backward-up-list 1) t))
@@ -276,7 +275,7 @@
           (end   (1- (progn (forward-sexp) (point)))))
       (cons start end))))
 
-(defun my/bounds-of-inside-brackets ()
+(defun my/inside-brackets ()
   "Return bounds of content inside square brackets."
   (when (or (looking-at "\\[")
             (ignore-errors (backward-up-list 1) t))
@@ -284,7 +283,7 @@
           (end   (1- (progn (forward-sexp) (point)))))
       (cons start end))))
 
-(defun my/bounds-of-inside-braces ()
+(defun my/inside-braces ()
   "Return bounds of content inside curly braces."
   (when (or (looking-at "{")
             (ignore-errors (backward-up-list 1) t))
@@ -337,30 +336,28 @@
         (sit-for 0.05)
         (comment-or-uncomment-region start end)))))
 
-(defun my/delete-word () (interactive) (my/delete-thing 'word))
 (defun my/delete-paragraph () (interactive) (my/delete-thing 'paragraph))
-(defun my/delete-line () (interactive) (my/delete-thing 'line))
 (defun my/delete-symbol () (interactive) (my/delete-thing 'symbol))
 (defun my/delete-defun () (interactive) (my/delete-thing 'defun))
+(defun my/delete-line () (interactive) (my/delete-thing 'line))
 
-(defun my/delete-inside-parens () (interactive) (my/delete-inside #'my/bounds-of-inside-parens))
-(defun my/delete-inside-brackets () (interactive) (my/delete-inside #'my/bounds-of-inside-brackets))
-(defun my/delete-inside-braces () (interactive) (my/delete-inside #'my/bounds-of-inside-braces))
+(defun my/delete-in-brackets () (interactive) (my/delete-inside #'my/inside-brackets))
+(defun my/delete-in-parens () (interactive) (my/delete-inside #'my/inside-parens))
+(defun my/delete-in-braces () (interactive) (my/delete-inside #'my/inside-braces))
 
-(defun my/copy-word () (interactive) (my/copy-thing 'word))
 (defun my/copy-paragraph () (interactive) (my/copy-thing 'paragraph))
-(defun my/copy-line () (interactive) (my/copy-thing 'line))
 (defun my/copy-symbol () (interactive) (my/copy-thing 'symbol))
 (defun my/copy-defun () (interactive) (my/copy-thing 'defun))
+(defun my/copy-word () (interactive) (my/copy-thing 'word))
+(defun my/copy-line () (interactive) (my/copy-thing 'line))
 
-(defun my/copy-inside-parens () (interactive) (my/copy-inside #'my/bounds-of-inside-parens))
-(defun my/copy-inside-brackets () (interactive) (my/copy-inside #'my/bounds-of-inside-brackets))
-(defun my/copy-inside-braces () (interactive) (my/copy-inside #'my/bounds-of-inside-braces))
+(defun my/copy-inside-brackets () (interactive) (my/copy-inside #'my/inside-brackets))
+(defun my/copy-inside-parens () (interactive) (my/copy-inside #'my/inside-parens))
+(defun my/copy-inside-braces () (interactive) (my/copy-inside #'my/inside-braces))
 
-(defun my/toggle-comment-word () (interactive) (my/toggle-comment-thing 'word))
 (defun my/toggle-comment-paragraph () (interactive) (my/toggle-comment-thing 'paragraph))
-(defun my/toggle-comment-line () (interactive) (comment-line 1))
 (defun my/toggle-comment-defun () (interactive) (my/toggle-comment-thing 'defun))
+(defun my/toggle-comment-line () (interactive) (comment-line 1))
 
 ;; ===============================================================
 ;;; KEYBINDINGS
@@ -382,9 +379,9 @@
 (use-package devil
   :ensure (:host github :repo "fbrosda/devil" :branch "dev")
   :custom
-  (devil-repeatable-keys '(("%k \\ n" "%k \\ p")))
+  (devil-highlight-repeatable t)
+  (devil-prompt " %t")
   :config
-  (setq devil-prompt " %t")
   (global-devil-mode))
 
 (use-package general
@@ -612,20 +609,23 @@
   :ensure t
   :defer t
   :init
-  (setopt popper-window-height 16)
-  (setopt popper-reference-buffers
-          '("^\\*ghostel.*\\*" "\\*eldoc\\*" "\\*cheat.sh*\\*$"
-            compilation-mode
-            inf-ruby-mode
-            devdocs-mode
-            helpful-mode
-            ghostel-mode
-            help-mode))
-  (setopt popper-mode-line "")
-  (popper-mode +1))
+  (popper-mode +1)
+  :custom
+  (popper-window-height 16)
+  (popper-mode-line "")
+  (popper-reference-buffers
+   '("^\\*ghostel.*\\*" "\\*eldoc\\*" "\\*cheat.sh*\\*$"
+     compilation-mode
+     inf-ruby-mode
+     devdocs-mode
+     helpful-mode
+     ghostel-mode
+     help-mode)))
 
 (use-package nerd-icons
-  :ensure t)
+  :ensure t
+  :custom
+  (nerd-icons-scale-factor 1.0))
 
 (use-package nerd-icons-dired
   :ensure t
@@ -640,18 +640,27 @@
   (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
 
 (use-package pixel-themes
-  :load-path "~/.config/emacs/themes/pixel-themes/"
+  :ensure nil
+  :load-path "~/.config/emacs/themes/pixel-themes"
   :config
-  (pixel-themes-load 'pixel-miri16))
+  (pixel-themes-load-theme 'pixel-themes-miri16))
+
+(use-package modus-flexoki
+  :ensure (:host github :repo "dpassen/modus-flexoki"))
 
 (use-package spacious-padding
   :ensure t
   :config
-  (setq spacious-padding-widths
-        '(:internal-border-width 10
-          :right-divider-width 1
-          :mode-line-width 1
-          :fringe-width 4))
+  (advice-add
+   'spacious-padding-set-faces :after
+   (lambda (&rest _)
+     (set-face-attribute 'mode-line-active nil
+                         :inherit 'mode-line)))
+  (setopt spacious-padding-widths
+          '(:internal-border-width 10
+            :right-divider-width 1
+            :mode-line-width 1
+            :fringe-width 4))
   (spacious-padding-mode 1))
 
 (use-package rainbow-delimiters
@@ -667,7 +676,6 @@
   (doom-modeline-buffer-encoding nil)
   (doom-modeline-major-mode-icon t)
   (doom-modeline-check-icon nil)
-  (nerd-icons-scale-factor 1.0)
   (doom-modeline-modal-icon t)
   (doom-modeline-height 25)
   (doom-modeline-modal t)
@@ -699,10 +707,10 @@
 
 (use-package ansi-color
   :ensure nil
-  :hook
-  (compilation-filter . ansi-color-compilation-filter)
   :init
-  (setenv "MANROFFOPT" "-P-c"))
+  (setenv "MANROFFOPT" "-P-c")
+  :hook
+  (compilation-filter . ansi-color-compilation-filter))
 
 (use-package line-reminder
   :ensure t
@@ -731,16 +739,14 @@
   :commands (flash-jump flash-jump-continue flash-treesitter)
   :custom
   (flash-char-jump-labels t)
+  (flash-labels "asdfqwe")
   (flash-multi-window t)
   (flash-nohlsearch t)
+  (flash-backdrop nil)
   (flash-autojump t))
 
 (use-package dired
   :ensure nil
-  :hook
-  (dired-mode . dired-hide-details-mode)
-  (dired-mode . dired-omit-mode)
-  (dired-mode . hl-line-mode)
   :custom
   (dired-listing-switches "-lah --almost-all --group-directories-first --sort=extension")
   (dired-hide-details-hide-absolute-location t)
@@ -749,7 +755,11 @@
   (dired-recursive-copies 'always)
   (dired-omit-files "^\\.")
   (dired-free-space nil)
-  (dired-dwim-target t))
+  (dired-dwim-target t)
+  :hook
+  (dired-mode . dired-hide-details-mode)
+  (dired-mode . dired-omit-mode)
+  (dired-mode . hl-line-mode))
 
 (use-package wdired
   :ensure nil
@@ -757,9 +767,6 @@
 
 ;; ===============================================================
 ;;; TREESITTER
-
-(use-package markdown-ts-mode
-  :ensure nil)
 
 (use-package lua-ts-mode
   :ensure nil
@@ -779,24 +786,15 @@
   (add-to-list 'treesit-language-source-alist
                '(ruby "https://github.com/tree-sitter/tree-sitter-ruby" "master" "src")))
 
-(use-package python-ts-mode
-  :ensure nil
-  :mode "\\.py\\'"
+(use-package treesit-auto
+  :ensure t
+  :custom
+  (treesit-auto-install t)
   :config
-  (add-to-list 'treesit-language-source-alist
-               '(ruby "https://github.com/tree-sitter/tree-sitter-python" "master" "src")))
+  (global-treesit-auto-mode t))
 
 ;; ===============================================================
 ;;; LSP
-
-(use-package treesit-auto
-  :ensure t
-  :after emacs
-  :custom
-  (treesit-auto-install 'prompt)
-  :config
-  (treesit-auto-add-to-auto-mode-alist 'all)
-  (global-treesit-auto-mode t))
 
 (use-package inf-ruby
   :ensure t
@@ -805,7 +803,7 @@
   :config
   (when (executable-find "pry")
     (add-to-list 'inf-ruby-implementations '("pry" . "pry"))
-    (setq inf-ruby-default-implementation "pry"))
+    (setopt inf-ruby-default-implementation "pry"))
   (add-hook 'inf-ruby-mode-hook
             (lambda ()
               (set-process-query-on-exit-flag
@@ -947,11 +945,6 @@
 
 (use-package org
   :ensure nil
-  :hook
-  ((org-mode . turn-off-auto-fill)
-   (org-mode . visual-line-mode)
-   (org-mode . org-indent-mode)
-   (org-mode . hl-line-mode))
   :custom
   (org-src-content-indentation 2)
   (org-hide-emphasis-markers t)
@@ -966,25 +959,30 @@
   (org-special-ctrl-a/e t)
   (org-tags-column 0)
   (org-ellipsis " ∷")
+  :hook
+  ((org-mode . turn-off-auto-fill)
+   (org-mode . visual-line-mode)
+   (org-mode . org-indent-mode)
+   (org-mode . hl-line-mode))
   :config
   (set-face-attribute 'org-ellipsis nil :underline nil))
 
 (use-package org-appear
   :ensure (:host github :repo "awth13/org-appear")
-  :hook
-  (org-mode . org-appear-mode)
   :custom
-  (org-appear-autoemphasis t))
+  (org-appear-autoemphasis t)
+  :hook
+  (org-mode . org-appear-mode))
 
 (use-package org-modern
   :ensure t
-  :hook
-  (org-mode . org-modern-mode)
   :custom
   (org-modern-star 'replace)
   (org-modern-replace-stars '("◉" "○" "◈" "◇" "•"))
   (org-modern-checkbox nil)
-  (org-modern-list '((?- . "›") (?+ . "»") (?* . "»»"))))
+  (org-modern-list '((?- . "›") (?+ . "»") (?* . "»»")))
+  :hook
+  (org-mode . org-modern-mode))
 
 (use-package org-remark
   :ensure t
@@ -1025,7 +1023,7 @@
 (use-package shr
   :ensure nil
   :config
-  (setq shr-use-fonts nil))
+  (setopt shr-use-fonts nil))
 
 ;; ===============================================================
 ;;; VERSION CONTROL
@@ -1033,6 +1031,8 @@
 (use-package magit
   :ensure t
   :defer t
+  :bind
+  ("C-c M-g" . nil)
   :config
   (keymap-set transient-map "<escape>" 'transient-quit-one))
 

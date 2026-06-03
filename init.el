@@ -740,42 +740,16 @@
   :config
   (mason-setup))
 
-(use-package lsp-bridge
-  :ensure '(lsp-bridge :type git :host github :repo "manateelazycat/lsp-bridge"
-            :files (:defaults "*.el" "*.py" "acm" "core" "langserver" "multiserver" "resources")
-            :build (:not compile))
-  :custom
-  (lsp-bridge-lua-lsp-server "sumneko")
-  (lsp-bridge-ruby-lsp-server "ruby-lsp")
-  (lsp-bridge-python-lsp-server "pyright")
-  (lsp-bridge-enable-document-highlight t)
-  (lsp-bridge-enable-auto-format-code t)
-  (lsp-bridge-enable-hover-diagnostic t)
-  (lsp-bridge-enable-diagnostics t)
-  (lsp-bridge-enable-org-babel t)
-  (acm-enable-doc nil)
-  (acm-menu-length 5)
-  :config
-  (setopt lsp-bridge-default-mode-hooks
-          '(emacs-lisp-mode-hook
-            python-ts-mode-hook
-            lua-ts-mode-hook
-            bash-ts-mode-hook
-            ruby-ts-mode-hook
-            ruby-mode-hook
-            org-mode-hook))
-  (global-lsp-bridge-mode))
-
 (use-package eldoc
   :ensure nil
+  :init
+  (global-eldoc-mode)
   :custom
   (eldoc-help-at-pt t)
   (eldoc-documentation-strategy 'eldoc-documentation-compose)
   (eldoc-echo-area-display-truncation-message nil)
   (eldoc-echo-area-prefer-doc-buffer t)
-  (eldoc-echo-area-use-multiline-p nil)
-  :init
-  (global-eldoc-mode))
+  (eldoc-echo-area-use-multiline-p nil))
 
 ;; ===============================================================
 ;;; COMPLETION

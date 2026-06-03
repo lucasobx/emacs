@@ -856,11 +856,18 @@
 ;; ==============================================================
 ;;; EDITING
 
+(use-package expand-region
+  :ensure t)
+
 (use-package move-text
+  :ensure t)
+
+(use-package multiple-cursors
   :ensure t
-  :bind
-  (("M-<up>" . move-text-up)
-   ("M-<down>" . move-text-down)))
+  :custom
+  (mc/list-file (locate-user-emacs-file "mc-lists.el"))
+  :config
+  (set-face-attribute 'mc/cursor-bar-face nil :underline t))
 
 (use-package sudo-edit
   :ensure t

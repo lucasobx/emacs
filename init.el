@@ -566,13 +566,10 @@
   (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
 
 (use-package pixel-themes
-  :ensure nil
-  :load-path "~/.config/emacs/themes/pixel-themes"
+  :ensure (:host github :repo "lucasobx/pixel-themes")
   :config
-  (pixel-themes-load-theme 'pixel-themes-miri16))
-
-(use-package modus-flexoki
-  :ensure (:host github :repo "dpassen/modus-flexoki"))
+  (pixel-themes-mode 1)
+  (pixel-themes-load-theme 'pixel-themes-psygnosia))
 
 (use-package spacious-padding
   :ensure t

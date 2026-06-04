@@ -619,10 +619,16 @@
 
 (use-package nerd-icons-completion
   :ensure t
-  :after(:all nerd-icons marginalia)
+  :after (:all nerd-icons marginalia)
   :config
   (nerd-icons-completion-mode)
   (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
+
+(use-package nerd-icons-corfu
+  :ensure t
+  :after corfu
+  :config
+  (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 
 (use-package pixel-themes
   :ensure (:host github :repo "lucasobx/pixel-themes")
@@ -799,13 +805,75 @@
   :config
   (mason-setup))
 
+(use-package eglot
+  :ensure nil
+  :custom
+  (eglot-ignored-server-capabilities '(:inlayHintProvider))
+  (eglot-events-buffer-config '(:size 0 :format full))
+  (eglot-code-action-indications nil)
+  (eglot-prefer-plaintext nil)
+  (jsonrpc-event-hook nil)
+  (eglot-autoshutdown t)
+  :init
+  (fset #'jsonrpc--log-event #'ignore)
+  :hook
+  (ruby-ts-mode . eglot-ensure)
+  (lua-ts-mode  . eglot-ensure)
+  :config
+  (add-to-list 'eglot-server-programs
+               '((ruby-mode ruby-ts-mode) "solargraph")
+               '((ruby-mode lua-ts-mode) "sumneko")))
+
+(use-package flymake
+  :ensure nil
+  :hook
+  (prog-mode . flymake-mode)
+  :custom
+  (flymake-show-diagnostics-at-end-of-line nil)
+  (flymake-indicator-type 'margins)
+  (flymake-margin-indicators-string
+   '((error "" compilation-error)
+     (warning "" compilation-warning)
+     (note "" compilation-info))))
+
+(use-package corfu
+  :ensure t
+  :defer t
+  :custom
+  (corfu-popupinfo-margin-width 0)
+  (corfu-right-margin-width 0)
+  (corfu-left-margin-width 0)
+  (corfu-popupinfo-delay 1.0)
+  (corfu-popupinfo-mode t)
+  (corfu-quit-no-match t)
+  (corfu-scroll-margin 0)
+  (corfu-auto-prefix 1)
+  (corfu-min-width 40)
+  (corfu-max-width 40)
+  (corfu-bar-width 0)
+  (corfu-auto nil)
+  (corfu-count 7)
+  :config
+  (global-corfu-mode))
+
+(use-package cape
+  :ensure t
+  :init
+  (add-hook 'completion-at-point-functions #'cape-file)
+  (add-hook 'completion-at-point-functions #'cape-dabbrev)
+  :hook
+  (eglot-managed-mode . (lambda ()
+    (setq-local completion-at-point-functions
+                (list #'eglot-completion-at-point
+                      #'cape-file
+                      #'cape-dabbrev)))))
+
 (use-package eldoc
   :ensure nil
   :init
   (global-eldoc-mode)
   :custom
   (eldoc-help-at-pt t)
-  (eldoc-documentation-strategy 'eldoc-documentation-compose)
   (eldoc-echo-area-display-truncation-message nil)
   (eldoc-echo-area-prefer-doc-buffer t)
   (eldoc-echo-area-use-multiline-p nil))

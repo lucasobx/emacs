@@ -69,7 +69,6 @@
   (display-line-numbers-type 'relative)
   (warning-minimum-level :emergency)
   (ibuffer-human-readable-size t)
-  (initial-major-mode 'text-mode)
   (display-line-numbers-width 4)
   (zone-all-windows-in-frame t)
   (initial-scratch-message "")
@@ -110,7 +109,7 @@
 
   ;; files
   (auto-save-file-name-transforms
-   '((".*" "~/.config/emacs/auto-saves/" t)))
+   `((".*" ,(expand-file-name "auto-saves/" user-emacs-directory) t)))
   (find-file-suppress-same-file-warnings t)
   (global-auto-revert-non-file-buffers t)
   (kill-buffer-delete-auto-save-files t)
@@ -128,6 +127,7 @@
   (scroll-step 1)
   
   :config
+  (make-directory (expand-file-name "auto-saves/" user-emacs-directory) t)
   (setq custom-file (locate-user-emacs-file "custom-vars.el"))
   (load custom-file 'noerror 'nomessage)
 
@@ -148,7 +148,7 @@
 
   ;; faces
   (set-face-attribute 'default nil :family my/font :height my/font-size :width 'condensed)
-  (set-face-attribute 'minibuffer-nonselected nil :background)
+  (set-face-attribute 'minibuffer-nonselected nil :background 'unspecified)
   (set-face-attribute 'tooltip nil :family my/font)
   (setq-default line-spacing 0)
 
@@ -208,20 +208,18 @@
       (delete-window))
     (kill-buffer buffer)))
 
-(defun my/delete-dont-kill (arg)
-  "Delete characters backward until encountering the beginning of a word.
-   With argument ARG, do this that many times. Don't add to kill ring."
-  (interactive "p")
-  (delete-region (point) (progn (backward-word arg) (point))))
+(defun my/delete-dont-kill ()
+  "Delete word backward without adding to kill ring."
+  (delete-region (point) (progn (backward-word 1) (point))))
 
 (defun my/backward-delete ()
   "Delete a word, a character, or whitespace."
   (interactive)
   (cond
    ((looking-back (rx (char word)) 1)
-    (my/delete-dont-kill 1))
+    (my/delete-dont-kill))
    ((looking-back (rx (seq (char word) (= 1 blank))) 1)
-	(my/delete-dont-kill 1))
+    (my/delete-dont-kill))
    ((looking-back (rx (char blank)) 1)
     (delete-horizontal-space t))
    (t
@@ -248,7 +246,7 @@
     (cheat-sh--fetch cmd buffer)))
 
 (defun cheat-sh--fetch (cmd buffer &optional)
-  "Execute CMD as a shell command and stream output into buffer."
+  "Execute CMD as a shell command and stream output into BUFFER."
   (make-process
    :name "cheat-sh-fetch"
    :buffer (generate-new-buffer "*cheat-sh-temp*")
@@ -344,28 +342,95 @@
         (sit-for 0.05)
         (comment-or-uncomment-region start end)))))
 
-(defun my/delete-paragraph () (interactive) (my/delete-thing 'paragraph))
-(defun my/delete-symbol () (interactive) (my/delete-thing 'symbol))
-(defun my/delete-defun () (interactive) (my/delete-thing 'defun))
-(defun my/delete-line () (interactive) (my/delete-thing 'line))
+(defun my/delete-paragraph ()
+  "Delete paragraph at point."
+  (interactive)
+  (my/delete-thing 'paragraph))
 
-(defun my/delete-in-brackets () (interactive) (my/delete-inside #'my/inside-brackets))
-(defun my/delete-in-parens () (interactive) (my/delete-inside #'my/inside-parens))
-(defun my/delete-in-braces () (interactive) (my/delete-inside #'my/inside-braces))
+(defun my/delete-symbol ()
+  "Delete symbol at point."
+  (interactive)
+  (my/delete-thing 'symbol))
 
-(defun my/copy-paragraph () (interactive) (my/copy-thing 'paragraph))
-(defun my/copy-symbol () (interactive) (my/copy-thing 'symbol))
-(defun my/copy-defun () (interactive) (my/copy-thing 'defun))
-(defun my/copy-word () (interactive) (my/copy-thing 'word))
-(defun my/copy-line () (interactive) (my/copy-thing 'line))
+(defun my/delete-defun ()
+  "Delete defun at point."
+  (interactive)
+  (my/delete-thing 'defun))
 
-(defun my/copy-inside-brackets () (interactive) (my/copy-inside #'my/inside-brackets))
-(defun my/copy-inside-parens () (interactive) (my/copy-inside #'my/inside-parens))
-(defun my/copy-inside-braces () (interactive) (my/copy-inside #'my/inside-braces))
+(defun my/delete-line ()
+  "Delete line at point."
+  (interactive)
+  (my/delete-thing 'line))
 
-(defun my/toggle-comment-paragraph () (interactive) (my/toggle-comment-thing 'paragraph))
-(defun my/toggle-comment-defun () (interactive) (my/toggle-comment-thing 'defun))
-(defun my/toggle-comment-line () (interactive) (comment-line 1))
+(defun my/delete-in-brackets ()
+  "Delete text inside brackets."
+  (interactive)
+  (my/delete-inside #'my/inside-brackets))
+
+(defun my/delete-in-parens ()
+  "Delete text inside parentheses."
+  (interactive)
+  (my/delete-inside #'my/inside-parens))
+
+(defun my/delete-in-braces ()
+  "Delete text inside braces."
+  (interactive)
+  (my/delete-inside #'my/inside-braces))
+
+(defun my/copy-paragraph ()
+  "Copy paragraph at point."
+  (interactive)
+  (my/copy-thing 'paragraph))
+
+(defun my/copy-symbol ()
+  "Copy symbol at point."
+  (interactive)
+  (my/copy-thing 'symbol))
+
+(defun my/copy-defun ()
+  "Copy defun at point."
+  (interactive)
+  (my/copy-thing 'defun))
+
+(defun my/copy-word ()
+  "Copy word at point."
+  (interactive)
+  (my/copy-thing 'word))
+
+(defun my/copy-line ()
+  "Copy line at point."
+  (interactive)
+  (my/copy-thing 'line))
+
+(defun my/copy-inside-brackets ()
+  "Copy text inside brackets."
+  (interactive)
+  (my/copy-inside #'my/inside-brackets))
+
+(defun my/copy-inside-parens ()
+  "Copy text inside parentheses."
+  (interactive)
+  (my/copy-inside #'my/inside-parens))
+
+(defun my/copy-inside-braces ()
+  "Copy text inside braces."
+  (interactive)
+  (my/copy-inside #'my/inside-braces))
+
+(defun my/toggle-comment-paragraph ()
+  "Toggle comment on paragraph at point."
+  (interactive)
+  (my/toggle-comment-thing 'paragraph))
+
+(defun my/toggle-comment-defun ()
+  "Toggle comment on defun at point."
+  (interactive)
+  (my/toggle-comment-thing 'defun))
+
+(defun my/toggle-comment-line ()
+  "Toggle comment on current line."
+  (interactive)
+  (comment-line 1))
 
 ;; ===============================================================
 ;;; KEYBINDINGS
@@ -400,9 +465,6 @@
   (general-unbind "C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z")
   (general-unbind :keymaps 'emacs-lisp-mode-map "C-c C-b" "C-c C-e" "C-c C-f")
   (general-unbind :keymaps 'winner-mode-map "C-c <left>" "C-c <right>")
-  ;; (general-unbind :keymaps 'inf-ruby-minor-mode-map
-    ;; "C-c C-l" "C-c C-b" "C-c C-k" "C-c C-q" "C-c C-r" "C-c C-s" "C-c C-x" "C-c C-z"
-    ;; "C-c M-b" "C-c M-r" "C-c M-x")
 
   ;; definers
   (general-create-definer my/keys    :keymaps 'override)
@@ -447,26 +509,23 @@
     "i" '((lambda () (interactive)
                 (find-file (locate-user-emacs-file "init.el")))
               :wk "open init.el")
-    "s" '(sudo-edit           :wk "edit with sudo")
-    "v" '(visual-line-mode    :wk "truncate lines")
-    "r" '(restart-emacs       :wk "restart emacs")
-    "m" '(magit-status        :wk "magit status"))
+    "s" '(sudo-edit        :wk "edit with sudo")
+    "v" '(visual-line-mode :wk "truncate lines")
+    "r" '(restart-emacs    :wk "restart emacs")
+    "m" '(magit-status     :wk "magit status"))
   
   (my/file
-    "b" '(consult-buffer        :wk "switch buffer")
-    "p" '(consult-yank-pop      :wk "copy history")
-    "F" '(consult-fd            :wk "fd-find file")
-    "r" '(rename-visited-file   :wk "rename file")
-    "f" '(find-file             :wk "find file")
-    "s" '(save-buffer           :wk "save"))
+    "b" '(consult-buffer      :wk "switch buffer")
+    "p" '(consult-yank-pop    :wk "copy history")
+    "F" '(consult-fd          :wk "fd-find file")
+    "r" '(rename-visited-file :wk "rename file")
+    "f" '(find-file           :wk "find file")
+    "s" '(save-buffer         :wk "save"))
 
   (my/lsp ;; lsp/prog-mode
     :keymaps '(prog-mode-map)
-    "c" '(lsp-bridge-code-action     :wk "code actions")
-    "e" '(lsp-bridge-diagnostic-list :wk "list errors")
-    "R" '(lsp-bridge-find-references :wk "references")
-    "d" '(lsp-bridge-find-def        :wk "definition")
-    "n" '(lsp-bridge-rename          :wk "rename"))
+    "d" '(consult-flymake       :wk "jump to diagnostic")
+    "r" '(eglot-rename          :wk "rename"))
   
   (my/lsp ;; ruby/prog-mode
     :keymaps '(ruby-mode-map ruby-ts-mode-map)
@@ -676,6 +735,7 @@
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-recursive-deletes 'always)
   (dired-recursive-copies 'always)
+  (dired-auto-revert-buffer t)
   (dired-omit-files "^\\.")
   (dired-free-space nil)
   (dired-dwim-target t)
@@ -717,13 +777,15 @@
   (global-treesit-auto-mode t))
 
 ;; ===============================================================
-;;; LSP
+;;; PROG-MODE
 
 (use-package inf-ruby
   :ensure t
   :hook
   (ruby-ts-mode . inf-ruby-minor-mode)
   :config
+  (setcdr (assq 'inf-ruby-minor-mode minor-mode-map-alist)
+          (make-sparse-keymap))
   (when (executable-find "pry")
     (add-to-list 'inf-ruby-implementations '("pry" . "pry"))
     (setopt inf-ruby-default-implementation "pry"))

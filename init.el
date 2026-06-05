@@ -798,6 +798,14 @@
   (add-to-list 'treesit-language-source-alist
                '(ruby "https://github.com/tree-sitter/tree-sitter-ruby" "master" "src")))
 
+(use-package python-ts-mode
+  :ensure nil
+  :mode "\\.py\\'"
+  :config
+  (setq python-ts-mode-map (make-sparse-keymap))
+  (add-to-list 'treesit-language-source-alist
+               '(ruby "https://github.com/tree-sitter/tree-sitter-python" "master" "src")))
+
 (use-package treesit-auto
   :ensure t
   :custom
@@ -844,8 +852,9 @@
   (lua-ts-mode  . eglot-ensure)
   :config
   (add-to-list 'eglot-server-programs
+               '((ruby-mode lua-ts-mode) "sumneko")
                '((ruby-mode ruby-ts-mode) "solargraph")
-               '((ruby-mode lua-ts-mode) "sumneko")))
+               '((python-mode python-ts-mode) "pyright")))
 
 (use-package flymake
   :ensure nil

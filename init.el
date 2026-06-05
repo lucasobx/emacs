@@ -474,6 +474,7 @@
   (general-create-definer my/lsp     :keymaps 'override :prefix "C-l")
   (general-create-definer my/mark    :keymaps 'override :prefix "C-q")
   (general-create-definer my/search  :keymaps 'override :prefix "C-s")
+  (general-create-definer my/replace :keymaps 'override :prefix "C-r")
   (general-create-definer my/tools   :keymaps 'override :prefix "C-t")
   (general-create-definer my/copy    :keymaps 'override :prefix "C-y")
   (general-create-definer my/comment :keymaps 'override :prefix "C-;")
@@ -544,6 +545,13 @@
     "b" '(org-remark-mark-custom-mark :wk "custom mark")
     "r" '(org-remark-mark-color-text  :wk "color text"))
 
+  (my/replace
+   "r" '(replace-string       :wk "replace string")
+   "R" '(replace-regexp       :wk "replace regexp")
+   "q" '(query-replace        :wk "query replace")
+   "Q" '(query-replace-regexp :wk "query replace regexp")
+   "m" '(flush-lines          :wk "remove matching lines"))
+  
   (my/search
     "S" '(consult-line-multi  :wk "line in files")
     "r" '(consult-recent-file :wk "recent files")

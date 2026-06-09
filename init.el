@@ -492,6 +492,7 @@
     "C-k" 'my/kill-buffer-window
     "C-o" 'my/open-line-below
     "C-=" 'er/expand-region
+    "C-b" 'consult-buffer
     "C-," 'popper-toggle
     "C-." 'popper-cycle
     "M-j" 'flash-jump
@@ -516,25 +517,16 @@
     "m" '(magit-status     :wk "magit status"))
   
   (my/file
-    "b" '(consult-buffer      :wk "switch buffer")
-    "p" '(consult-yank-pop    :wk "copy history")
-    "F" '(consult-fd          :wk "fd-find file")
+    "d" '(consult-fd          :wk "fd-find file")
     "r" '(rename-visited-file :wk "rename file")
     "f" '(find-file           :wk "find file")
     "s" '(save-buffer         :wk "save"))
 
-  (my/lsp ;; lsp/prog-mode
-    :keymaps '(prog-mode-map)
+  (my/lsp
+    :keymaps 'prog-mode-map
     "d" '(consult-flymake       :wk "jump to diagnostic")
-    "r" '(eglot-rename          :wk "rename"))
+    "n" '(eglot-rename          :wk "rename"))
   
-  (my/lsp ;; ruby/prog-mode
-    :keymaps '(ruby-mode-map ruby-ts-mode-map)
-    "b" '(ruby-send-buffer :wk "send buffer")
-    "s" '(ruby-send-region :wk "send region")
-    "l" '(ruby-send-line   :wk "send line")
-    "r" '(inf-ruby         :wk "open repl"))
-
   (my/mark
     "m" '(org-remark-mark             :wk "mark region")
     "d" '(org-remark-delete           :wk "delete mark")
@@ -554,6 +546,7 @@
   
   (my/search
     "S" '(consult-line-multi  :wk "line in files")
+    "c" '(consult-yank-pop    :wk "copy history")
     "r" '(consult-recent-file :wk "recent files")
     "b" '(consult-bookmark    :wk "bookmarks")
     "g" '(consult-ripgrep     :wk "ripgrep")
@@ -808,6 +801,7 @@
 
 (use-package treesit-auto
   :ensure t
+  :after emacs
   :custom
   (treesit-auto-install t)
   :config
@@ -829,7 +823,13 @@
   (add-hook 'inf-ruby-mode-hook
             (lambda ()
               (set-process-query-on-exit-flag
-               (get-buffer-process (current-buffer)) nil))))
+               (get-buffer-process (current-buffer)) nil)))
+  (my/lsp
+    :keymaps 'ruby-ts-mode-map
+    "b" '(ruby-send-buffer :wk "send buffer")
+    "s" '(ruby-send-region :wk "send region")
+    "l" '(ruby-send-line   :wk "send line")
+    "r" '(inf-ruby         :wk "open repl")))
 
 (use-package mason
   :ensure t

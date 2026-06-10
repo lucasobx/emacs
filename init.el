@@ -187,15 +187,9 @@
                      "show diff between the buffer and its file"))
 
   :bind
-  ("C-p"       . yank)
   ("RET"       . newline-and-indent)
   ("C-_"       . text-scale-decrease)
-  ("C-+"       . text-scale-increase)
-  ("<f2>"      . wdired-change-to-wdired-mode)
-  ("<f1>"      . scratch-buffer)
-  ("C-<tab>"   . other-window)
-  ("M-<left>"  . my/beginning-of-line)
-  ("M-<right>" . end-of-line))
+  ("C-+"       . text-scale-increase))
 
 ;; ===============================================================
 ;;; CUSTOM FUNCTIONS
@@ -404,9 +398,15 @@
   (my/copy-thing 'word))
 
 (defun my/copy-line ()
-  "Copy line at point."
+  "Copy line at point, or active region if one exists."
   (interactive)
-  (my/copy-thing 'line))
+  (if (use-region-p)
+      (progn
+        (pulse-momentary-highlight-region (region-beginning) (region-end))
+        (kill-ring-save (region-beginning) (region-end))
+        (deactivate-mark)
+        (message "Copied region"))
+    (my/copy-thing 'line)))
 
 (defun my/copy-inside-brackets ()
   "Copy text inside brackets."
@@ -462,6 +462,8 @@
   (devil-prompt " %t")
   :config
   (global-devil-mode)
+  (add-to-list 'devil-repeatable-keys
+               '("%k . ." "%k . /"))
   (add-to-list 'devil-repeatable-keys ;; delete
                '("%k d s" "%k d d" "%k d p" "%k d f"
                  "%k d w" "%k d (" "%k d [" "%k d {"))
@@ -478,120 +480,127 @@
   (general-unbind "C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z")
   (general-unbind :keymaps 'emacs-lisp-mode-map "C-c C-b" "C-c C-e" "C-c C-f")
   (general-unbind :keymaps 'winner-mode-map "C-c <left>" "C-c <right>")
+  (general-unbind :keymaps 'ghostel-semi-char-mode-map "C-<tab>")
 
   ;; definers
   (general-create-definer my/keys    :keymaps 'override)
+  (general-create-definer my/dired   :keymaps 'dired-mode-map)
   (general-create-definer my/C-c     :keymaps 'override :prefix "C-c")
+  (general-create-definer my/copy    :keymaps 'override :prefix "C-y")
   (general-create-definer my/delete  :keymaps 'override :prefix "C-d")
-  (general-create-definer my/emacs   :keymaps 'override :prefix "C-e")
+  (general-create-definer my/comment :keymaps 'override :prefix "C-;")
+  (general-create-definer my/replace :keymaps 'override :prefix "C-r")
+  (general-create-definer my/cursors :keymaps 'override :prefix "C-.")
+  (general-create-definer my/search  :keymaps 'override :prefix "C-s")
   (general-create-definer my/file    :keymaps 'override :prefix "C-f")
+  (general-create-definer my/emacs   :keymaps 'override :prefix "C-e")
   (general-create-definer my/lsp     :keymaps 'override :prefix "C-l")
   (general-create-definer my/mark    :keymaps 'override :prefix "C-q")
-  (general-create-definer my/search  :keymaps 'override :prefix "C-s")
-  (general-create-definer my/replace :keymaps 'override :prefix "C-r")
   (general-create-definer my/tools   :keymaps 'override :prefix "C-t")
-  (general-create-definer my/copy    :keymaps 'override :prefix "C-y")
-  (general-create-definer my/comment :keymaps 'override :prefix "C-;")
-
-  (general-def ;; dired
-    :keymaps 'dired-mode-map
-    "M-<left>" 'dired-up-directory)
-
+  
   (my/keys
-    "M-<up>" 'move-text-up
-    "M-<down>" 'move-text-down
     "C-<backspace>" 'my/backward-delete
-    "M-p" 'mc/mark-previous-like-this
-    "M-n" 'mc/mark-next-like-this
-    "C-k" 'my/kill-buffer-window
-    "C-o" 'my/open-line-below
-    "C-=" 'er/expand-region
-    "C-b" 'consult-buffer
-    "C-," 'popper-toggle
-    "C-." 'popper-cycle
-    "M-j" 'flash-jump)
+    "M-<right>" 'end-of-line
+    "M-<left>" 'my/beginning-of-line
+    "M-<up>"   'move-text-up
+    "M-<down>" 'move-text-down
+    "M-j"      'flash-jump
+    "M-d"      'dired-jump
+    "<f1>"     'scratch-buffer
+    "<f2>"     'wdired-change-to-wdired-mode
+    "<f5>"     'my/select-theme
+    "<f6>"     'my/rotate-theme
+    "C-<tab>"  'other-window
+    "C-k"      'my/kill-buffer-window
+    "C-o"      'my/open-line-below
+    "C-="      'er/expand-region
+    "C-b"      'consult-buffer
+    "C-,"      'popper-toggle
+    "C-<"      'popper-cycle
+    "C-p"      'yank)
 
   (my/C-c
-   "d" '(duplicate-line :wk "duplicate line"))
-  
+    "d" '(duplicate-line :wk "duplicate line"))
+
+  (my/C-c ;; org
+   :keymaps 'org-mode-map
+   "t d" '(org-hide-drawers-toggle :wk "toggle drawers"))
+
+  (my/dired
+    "M-<left>" 'dired-up-directory
+    "M-."      'dired-omit-mode
+    "RET"      'my/dired-find-file)
+
+  (my/copy
+    "w" '(my/copy-word            :wk "copy word")
+    "s" '(my/copy-symbol          :wk "copy symbol")
+    "y" '(my/copy-line            :wk "copy line")
+    "p" '(my/copy-paragraph       :wk "copy paragraph")
+    "(" '(my/copy-inside-parens   :wk "inside ()")
+    "[" '(my/copy-inside-brackets :wk "inside []")
+    "{" '(my/copy-inside-braces   :wk "inside {}"))
+
   (my/delete
-    "p" '(my/delete-paragraph   :wk "delete paragraph")
     "w" '(my/delete-word        :wk "delete word")
     "s" '(my/delete-symbol      :wk "delete symbol")
-    "f" '(my/delete-defun       :wk "delete defun")
     "d" '(my/delete-line        :wk "delete line")
+    "p" '(my/delete-paragraph   :wk "delete paragraph")
     "(" '(my/delete-in-parens   :wk "delete inside ()")
     "[" '(my/delete-in-brackets :wk "delete inside []")
     "{" '(my/delete-in-braces   :wk "delete inside {}"))
 
-  (my/emacs
-    "i" '((lambda () (interactive)
-            (find-file (locate-user-emacs-file "init.el")))
-          :wk "open init.el")
-    "k" '((lambda () (interactive)
-            (find-file (locate-user-emacs-file "bindings.org")))
-          :wk "key bindings reference")
-    "s" '(sudo-edit        :wk "edit with sudo")
-    "v" '(visual-line-mode :wk "truncate lines")
-    "r" '(restart-emacs    :wk "restart emacs"))
+  (my/comment
+    "p" '(my/toggle-comment-paragraph :wk "paragraph")
+    ";" '(my/toggle-comment-line      :wk "line"))
   
+  (my/replace
+    "r" '(replace-string       :wk "replace string")
+    "q" '(query-replace        :wk "query replace")
+    "m" '(flush-lines          :wk "remove matching lines"))
+
+  (my/cursors
+   "." '(mc/mark-next-like-this     :wk "cursor next")
+   "/" '(mc/mark-previous-like-this :wk "cursor prev")
+   "m" '(mc/mark-all-in-region      :wk "cursor region")
+   "l" '(mc/edit-lines              :wk "cursor lines"))
+  
+  (my/search
+    "r" '(consult-recent-file :wk "recent files")
+    "b" '(consult-bookmark    :wk "bookmarks")
+    "g" '(consult-ripgrep     :wk "ripgrep")
+    "s" '(consult-line        :wk "line"))
+
   (my/file
     "d" '(consult-fd          :wk "fd-find file")
     "r" '(rename-visited-file :wk "rename file")
     "f" '(find-file           :wk "find file")
     "s" '(save-buffer         :wk "save"))
 
+  (my/emacs
+    "i" '((lambda () (interactive)
+            (find-file (locate-user-emacs-file "init.el")))
+          :wk "open init.el")
+    "s" '(sudo-edit        :wk "edit with sudo")
+    "v" '(visual-line-mode :wk "truncate lines")
+    "r" '(restart-emacs    :wk "restart emacs"))
+
   (my/lsp
     :keymaps 'prog-mode-map
     "d" '(consult-flymake :wk "jump to diagnostic")
-    "n" '(eglot-rename    :wk "rename"))
+    "n" '(eglot-rename    :wk "rename symbol"))
   
   (my/mark
-    "m" '(org-remark-mark             :wk "mark region")
-    "d" '(org-remark-delete           :wk "delete mark")
-    "c" '(org-remark-change           :wk "change mark")
-    "l" '(org-remark-mark-line        :wk "mark line")
-    "o" '(org-remark-open             :wk "open note")
-    "v" '(org-remark-view             :wk "view note")
-    "b" '(org-remark-mark-custom-mark :wk "custom mark")
-    "r" '(org-remark-mark-color-text  :wk "color text"))
-
-  (my/replace
-    "r" '(replace-string       :wk "replace string")
-    "R" '(replace-regexp       :wk "replace regexp")
-    "q" '(query-replace        :wk "query replace")
-    "Q" '(query-replace-regexp :wk "query replace regexp")
-    "m" '(flush-lines          :wk "remove matching lines"))
+    "q" '(org-remark-mark   :wk "highlight region")
+    "d" '(org-remark-delete :wk "highlight delete")
+    "c" '(org-remark-change :wk "highlight change")
+    "o" '(org-remark-open   :wk "open notes"))
   
-  (my/search
-    "S" '(consult-line-multi  :wk "line in files")
-    "r" '(consult-recent-file :wk "recent files")
-    "b" '(consult-bookmark    :wk "bookmarks")
-    "g" '(consult-ripgrep     :wk "ripgrep")
-    "i" '(consult-imenu       :wk "imenu")
-    "s" '(consult-line        :wk "line"))
-
   (my/tools
     "h" '(helpful-at-point :wk "helpful at point")
     "m" '(magit-status     :wk "magit status")
     "c" '(cheat-sh         :wk "cheat sheet")
     "t" '(ghostel          :wk "terminal")
-    "d" '(devdocs-lookup   :wk "devdocs"))
-
-  (my/comment
-    "p" '(my/toggle-comment-paragraph :wk "paragraph")
-    "f" '(my/toggle-comment-defun     :wk "defun")
-    ";" '(my/toggle-comment-line      :wk "line"))
-  
-  (my/copy
-    "p" '(my/copy-paragraph       :wk "copy paragraph")
-    "w" '(my/copy-word            :wk "copy word")
-    "s" '(my/copy-symbol          :wk "copy symbol")
-    "f" '(my/copy-defun           :wk "copy defun")
-    "y" '(my/copy-line            :wk "copy line")
-    "(" '(my/copy-inside-parens   :wk "inside ()")
-    "[" '(my/copy-inside-brackets :wk "inside []")
-    "{" '(my/copy-inside-braces   :wk "inside {}")))
+    "d" '(devdocs-lookup   :wk "devdocs")))
 
 ;; ===============================================================
 ;;; UI
@@ -607,7 +616,7 @@
       (slot . 0))
      ((derived-mode . dired-mode)
       (display-buffer-in-side-window)
-      (window-height . 0.3)
+      (window-height . 0.4)
       (side . bottom)
       (slot . 0)))))
 
@@ -620,7 +629,10 @@
   (popper-window-height 16)
   (popper-mode-line "")
   (popper-reference-buffers
-   '("^\\*ghostel.*\\*" "\\*eldoc\\*" "\\*cheat.sh*\\*$" "bindings\\.org$"
+   '("\\*eldoc\\*"
+     "\\*marginal notes\\*"
+     "\\*cheat.sh*\\*$"
+     "^\\*ghostel.*\\*"
      compilation-mode
      inf-ruby-mode
      devdocs-mode
@@ -769,7 +781,14 @@
   :hook
   (dired-mode . dired-hide-details-mode)
   (dired-mode . dired-omit-mode)
-  (dired-mode . hl-line-mode))
+  (dired-mode . hl-line-mode)
+  :config
+  (defun my/dired-find-file ()
+    "Open file from dired in full window, closing dired."
+    (interactive)
+    (let ((file (dired-get-file-for-visit)))
+      (kill-buffer (current-buffer))
+      (find-file file))))
 
 (use-package wdired
   :ensure nil
@@ -1094,7 +1113,7 @@
 (use-package ghostel
   :ensure t
   :defer t)
-
+  
 ;; ===============================================================
 ;;; DOCS
 

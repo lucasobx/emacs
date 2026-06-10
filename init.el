@@ -480,6 +480,7 @@
 
   ;; definers
   (general-create-definer my/keys    :keymaps 'override)
+  (general-create-definer my/C-c     :keymaps 'override :prefix "C-c")
   (general-create-definer my/delete  :keymaps 'override :prefix "C-d")
   (general-create-definer my/emacs   :keymaps 'override :prefix "C-e")
   (general-create-definer my/file    :keymaps 'override :prefix "C-f")
@@ -510,19 +511,23 @@
     "M-j" 'flash-jump
     "C-p" 'yank)
 
+  (my/C-c
+   "d" '(duplicate-line :wk "duplicate line"))
+  
   (my/delete
-    "p" '(my/delete-paragraph       :wk "delete paragraph")
-    "s" '(my/delete-symbol          :wk "delete symbol")
-    "f" '(my/delete-defun           :wk "delete defun")
-    "d" '(my/delete-line            :wk "delete line")
-    "(" '(my/delete-in-parens       :wk "delete inside ()")
-    "[" '(my/delete-in-brackets     :wk "delete inside []")
-    "{" '(my/delete-in-braces       :wk "delete inside {}"))
+    "p" '(my/delete-paragraph   :wk "delete paragraph")
+    "w" '(my/delete-word        :wk "delete word")
+    "s" '(my/delete-symbol      :wk "delete symbol")
+    "f" '(my/delete-defun       :wk "delete defun")
+    "d" '(my/delete-line        :wk "delete line")
+    "(" '(my/delete-in-parens   :wk "delete inside ()")
+    "[" '(my/delete-in-brackets :wk "delete inside []")
+    "{" '(my/delete-in-braces   :wk "delete inside {}"))
 
   (my/emacs
     "i" '((lambda () (interactive)
-                (find-file (locate-user-emacs-file "init.el")))
-              :wk "open init.el")
+            (find-file (locate-user-emacs-file "init.el")))
+          :wk "open init.el")
     "s" '(sudo-edit        :wk "edit with sudo")
     "v" '(visual-line-mode :wk "truncate lines")
     "r" '(restart-emacs    :wk "restart emacs")
@@ -550,15 +555,14 @@
     "r" '(org-remark-mark-color-text  :wk "color text"))
 
   (my/replace
-   "r" '(replace-string       :wk "replace string")
-   "R" '(replace-regexp       :wk "replace regexp")
-   "q" '(query-replace        :wk "query replace")
-   "Q" '(query-replace-regexp :wk "query replace regexp")
-   "m" '(flush-lines          :wk "remove matching lines"))
+    "r" '(replace-string       :wk "replace string")
+    "R" '(replace-regexp       :wk "replace regexp")
+    "q" '(query-replace        :wk "query replace")
+    "Q" '(query-replace-regexp :wk "query replace regexp")
+    "m" '(flush-lines          :wk "remove matching lines"))
   
   (my/search
     "S" '(consult-line-multi  :wk "line in files")
-    "c" '(consult-yank-pop    :wk "copy history")
     "r" '(consult-recent-file :wk "recent files")
     "b" '(consult-bookmark    :wk "bookmarks")
     "g" '(consult-ripgrep     :wk "ripgrep")
@@ -1110,5 +1114,47 @@
   ("C-c M-g" . nil)
   :config
   (keymap-set transient-map "<escape>" 'transient-quit-one))
+
+;; ===============================================================
+;;; TOOLS
+
+(defun cheat-sh ()
+  "Query cheat.sh and display the result in a dedicated buffer."
+  (interactive)
+  (let* ((input (read-string "cheat.sh: "))
+         (parts (split-string input " " t))
+         (path  (if (cdr parts)
+                    (format "%s/%s"
+                            (car parts)
+                            (url-hexify-string (string-join (cdr parts) " ")))
+                  (url-hexify-string (car parts))))
+         (buffer (get-buffer-create "*cheat.sh*"))
+         (cmd    (format "curl -s 'cheat.sh/%s'" path)))
+    (with-current-buffer buffer
+      (read-only-mode -1)
+      (erase-buffer)
+      (insert (concat "cheat.sh: " input "\n"))
+      (read-only-mode 1))
+    (switch-to-buffer buffer)
+    (cheat-sh--fetch cmd buffer)))
+
+(defun cheat-sh--fetch (cmd buffer &optional)
+  "Execute CMD as a shell command and stream output into BUFFER."
+  (make-process
+   :name "cheat-sh-fetch"
+   :buffer (generate-new-buffer "*cheat-sh-temp*")
+   :command (list "sh" "-c" cmd)
+   :sentinel
+   (lambda (proc _event)
+     (when (eq (process-status proc) 'exit)
+       (let ((output (with-current-buffer (process-buffer proc)
+                       (buffer-string))))
+         (kill-buffer (process-buffer proc))
+         (with-current-buffer buffer
+           (read-only-mode -1)
+           (insert output)
+           (ansi-color-apply-on-region (point-min) (point-max))
+           (goto-char (point-min))
+           (read-only-mode 1)))))))
 
 ;;; init.el ends here

@@ -193,7 +193,7 @@
   ("<f2>"      . wdired-change-to-wdired-mode)
   ("<f1>"      . scratch-buffer)
   ("C-<tab>"   . other-window)
-  ("M-<left>"  . beginning-of-line)
+  ("M-<left>"  . my/beginning-of-line)
   ("M-<right>" . end-of-line))
 
 ;; ===============================================================
@@ -225,50 +225,19 @@
    (t
     (backward-delete-char-untabify 1))))
 
-(defun cheat-sh ()
-  "Query cheat.sh and display the result in a dedicated buffer."
-  (interactive)
-  (let* ((input (read-string "cheat.sh: "))
-         (parts (split-string input " " t))
-         (path  (if (cdr parts)
-                    (format "%s/%s"
-                            (car parts)
-                            (url-hexify-string (string-join (cdr parts) " ")))
-                  (url-hexify-string (car parts))))
-         (buffer (get-buffer-create "*cheat.sh*"))
-         (cmd    (format "curl -s 'cheat.sh/%s'" path)))
-    (with-current-buffer buffer
-      (read-only-mode -1)
-      (erase-buffer)
-      (insert (concat "cheat.sh: " input "\n"))
-      (read-only-mode 1))
-    (switch-to-buffer buffer)
-    (cheat-sh--fetch cmd buffer)))
-
-(defun cheat-sh--fetch (cmd buffer &optional)
-  "Execute CMD as a shell command and stream output into BUFFER."
-  (make-process
-   :name "cheat-sh-fetch"
-   :buffer (generate-new-buffer "*cheat-sh-temp*")
-   :command (list "sh" "-c" cmd)
-   :sentinel
-   (lambda (proc _event)
-     (when (eq (process-status proc) 'exit)
-       (let ((output (with-current-buffer (process-buffer proc)
-                       (buffer-string))))
-         (kill-buffer (process-buffer proc))
-         (with-current-buffer buffer
-           (read-only-mode -1)
-           (insert output)
-           (ansi-color-apply-on-region (point-min) (point-max))
-           (goto-char (point-min))
-           (read-only-mode 1)))))))
-
 (defun my/open-line-below ()
   "Create a new line below and move to it."
   (interactive)
   (end-of-line)
   (newline-and-indent))
+
+(defun my/beginning-of-line ()
+  "Go to first non-whitespace char, or column 0 if already there."
+  (interactive)
+  (let ((origin (point)))
+    (back-to-indentation)
+    (when (= origin (point))
+      (beginning-of-line))))
 
 ;; ===============================================================
 ;;; TEXT OBJECTS
@@ -500,7 +469,7 @@
 
   (my/delete
     "p" '(my/delete-paragraph       :wk "delete paragraph")
-    "y" '(my/delete-symbol          :wk "delete symbol")
+    "s" '(my/delete-symbol          :wk "delete symbol")
     "f" '(my/delete-defun           :wk "delete defun")
     "d" '(my/delete-line            :wk "delete line")
     "(" '(my/delete-in-parens       :wk "delete inside ()")

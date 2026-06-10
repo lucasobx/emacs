@@ -460,7 +460,14 @@
   (devil-highlight-repeatable t)
   (devil-prompt " %t")
   :config
-  (global-devil-mode))
+  (global-devil-mode)
+  (add-to-list 'devil-repeatable-keys ;; delete
+               '("%k d s" "%k d d" "%k d p" "%k d f"
+                 "%k d w" "%k d (" "%k d [" "%k d {"))
+  (add-to-list 'devil-repeatable-keys ;; comment
+             '("%k ; ;" "%k ; p" "%k ; f"))
+  (add-to-list 'devil-repeatable-keys ;; C-c
+             '("%k c d")))
 
 (use-package general
   :ensure (:wait t)

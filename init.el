@@ -663,11 +663,69 @@
   :config
   (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 
+;; ── THEMES
+
 (use-package pixel-themes
-  :ensure (:host github :repo "lucasobx/pixel-themes")
-  :config
-  (pixel-themes-mode 1)
-  (pixel-themes-load-theme 'pixel-themes-psygnosia))
+  :ensure (:host github :repo "lucasobx/pixel-themes"))
+
+(use-package doric-themes
+  :ensure t)
+
+(defvar my/theme nil
+  "Currently active theme.")
+
+(defvar my/theme-builtin
+  '(adwaita deeper-blue dichromacy leuven leuven-dark light-blue manoj-dark
+    misterioso newcomers-presets tango tango-dark tsdh-dark tsdh-light
+    wheatgrass whiteboard wombat doric-magma doric-copper)
+  "Built-in Emacs themes to exclude from selection.")
+
+(defun my/theme-list ()
+  "Return filtered list of available themes."
+  (cl-remove-if (lambda (theme)
+                  (or (memq theme my/theme-builtin)
+                      (string-prefix-p "modus-" (symbol-name theme))
+                      (and (boundp 'doric-themes-light-themes)
+                           (memq theme doric-themes-light-themes))))
+                (custom-available-themes)))
+
+(defun my/load-theme (theme &optional no-save)
+  "Load THEME. Do not save configuration if NO-SAVE is non-nil."
+  (mapc #'disable-theme custom-enabled-themes)
+  (setq my/theme theme)
+  (load-theme theme :no-confirm)
+  (unless no-save
+    (customize-save-variable 'my/theme theme)))
+
+(defun my/select-theme ()
+  "Interactively select and load a theme."
+  (interactive)
+  ;; Emacs 30 completing-read aceita uma lista de símbolos diretamente
+  (let ((choice (completing-read "Theme: " (my/theme-list) nil t)))
+    (when (org-string-nw-p choice) ; Garante que não é uma string vazia
+      (my/load-theme (intern choice)))))
+
+(defun my/rotate-theme ()
+  "Rotate to the next theme in the filtered list."
+  (interactive)
+  (let* ((filtered (my/theme-list))
+         ;; Se não achar o tema atual, começa do início (index 0)
+         (curr-idx (or (cl-position (car custom-enabled-themes) filtered) -1))
+         (next-idx (mod (1+ curr-idx) (length filtered))))
+    (my/load-theme (nth next-idx filtered))))
+
+(add-hook 'elpaca-after-init-hook
+          (lambda ()
+            (when my/theme
+              (my/load-theme my/theme :no-save))))
+;; --
+
+;; (use-package pixel-themes
+;;   :ensure nil
+;;   :load-path "~/.config/emacs/pixel-themes-local"
+;;   :config
+;;   (pixel-themes-load-theme 'pixel-themes-psygnosia))
+
 
 (use-package spacious-padding
   :ensure t

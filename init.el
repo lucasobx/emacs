@@ -1072,15 +1072,21 @@
   (org-remark-global-tracking-mode +1)
   :custom
   (org-remark-notes-file-name "~/.config/emacs/org/annotations.org")
+  (org-remark-icon-notes nil)
   :config
+  (with-eval-after-load 'org-remark
+    (setq org-remark-notes-display-buffer-action
+          nil))
   (org-remark-create "custom1"
     'mode-line-active
     '(CATEGORY "custom")))
 
-(use-package org-tidy
+(use-package org-hide-drawers
   :ensure t
+  :custom
+  (org-hide-drawers-display-strings'((all " ⚙")))
   :hook
-  (org-mode . org-tidy-mode))
+  (org-mode . org-hide-drawers-mode))
 
 ;; ===============================================================
 ;;; TERMINAL

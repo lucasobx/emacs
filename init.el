@@ -187,6 +187,7 @@
                      "show diff between the buffer and its file"))
 
   :bind
+  ("C-p"       . yank)
   ("RET"       . newline-and-indent)
   ("C-_"       . text-scale-decrease)
   ("C-+"       . text-scale-increase)
@@ -465,9 +466,9 @@
                '("%k d s" "%k d d" "%k d p" "%k d f"
                  "%k d w" "%k d (" "%k d [" "%k d {"))
   (add-to-list 'devil-repeatable-keys ;; comment
-             '("%k ; ;" "%k ; p" "%k ; f"))
+               '("%k ; ;" "%k ; p" "%k ; f"))
   (add-to-list 'devil-repeatable-keys ;; C-c
-             '("%k c d")))
+               '("%k c d")))
 
 (use-package general
   :ensure (:wait t)
@@ -508,8 +509,7 @@
     "C-b" 'consult-buffer
     "C-," 'popper-toggle
     "C-." 'popper-cycle
-    "M-j" 'flash-jump
-    "C-p" 'yank)
+    "M-j" 'flash-jump)
 
   (my/C-c
    "d" '(duplicate-line :wk "duplicate line"))
@@ -528,10 +528,12 @@
     "i" '((lambda () (interactive)
             (find-file (locate-user-emacs-file "init.el")))
           :wk "open init.el")
+    "k" '((lambda () (interactive)
+            (find-file (locate-user-emacs-file "bindings.org")))
+          :wk "key bindings reference")
     "s" '(sudo-edit        :wk "edit with sudo")
     "v" '(visual-line-mode :wk "truncate lines")
-    "r" '(restart-emacs    :wk "restart emacs")
-    "m" '(magit-status     :wk "magit status"))
+    "r" '(restart-emacs    :wk "restart emacs"))
   
   (my/file
     "d" '(consult-fd          :wk "fd-find file")
@@ -541,8 +543,8 @@
 
   (my/lsp
     :keymaps 'prog-mode-map
-    "d" '(consult-flymake       :wk "jump to diagnostic")
-    "n" '(eglot-rename          :wk "rename"))
+    "d" '(consult-flymake :wk "jump to diagnostic")
+    "n" '(eglot-rename    :wk "rename"))
   
   (my/mark
     "m" '(org-remark-mark             :wk "mark region")
@@ -571,6 +573,7 @@
 
   (my/tools
     "h" '(helpful-at-point :wk "helpful at point")
+    "m" '(magit-status     :wk "magit status")
     "c" '(cheat-sh         :wk "cheat sheet")
     "t" '(ghostel          :wk "terminal")
     "d" '(devdocs-lookup   :wk "devdocs"))
@@ -617,7 +620,7 @@
   (popper-window-height 16)
   (popper-mode-line "")
   (popper-reference-buffers
-   '("^\\*ghostel.*\\*" "\\*eldoc\\*" "\\*cheat.sh*\\*$"
+   '("^\\*ghostel.*\\*" "\\*eldoc\\*" "\\*cheat.sh*\\*$" "bindings\\.org$"
      compilation-mode
      inf-ruby-mode
      devdocs-mode

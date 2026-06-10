@@ -316,10 +316,41 @@
   (interactive)
   (my/delete-thing 'paragraph))
 
-(defun my/delete-symbol ()
-  "Delete symbol at point."
+(defun my/delete-word ()
+  "Delete word at point, cleaning up leftover whitespace."
   (interactive)
-  (my/delete-thing 'symbol))
+  (let ((bounds (bounds-of-thing-at-point 'word)))
+    (when bounds
+      (pulse-momentary-highlight-region (car bounds) (cdr bounds))
+      (sit-for 0.15)
+      (let ((preceded-by-space (save-excursion
+                                 (goto-char (car bounds))
+                                 (looking-back "\\s-" 1)))
+            (followed-by-space (save-excursion
+                                 (goto-char (cdr bounds))
+                                 (looking-at "\\s-"))))
+        (delete-region (car bounds) (cdr bounds))
+        (cond
+         (followed-by-space (delete-char 1))
+         (preceded-by-space (delete-char -1)))))))
+
+(defun my/delete-symbol ()
+  "Delete symbol at point, cleaning up leftover whitespace."
+  (interactive)
+  (let ((bounds (bounds-of-thing-at-point 'symbol)))
+    (when bounds
+      (pulse-momentary-highlight-region (car bounds) (cdr bounds))
+      (sit-for 0.15)
+      (let ((preceded-by-space (save-excursion
+                                 (goto-char (car bounds))
+                                 (looking-back "\\s-" 1)))
+            (followed-by-space (save-excursion
+                                 (goto-char (cdr bounds))
+                                 (looking-at "\\s-"))))
+        (delete-region (car bounds) (cdr bounds))
+        (cond
+         (followed-by-space (delete-char 1))
+         (preceded-by-space (delete-char -1)))))))
 
 (defun my/delete-defun ()
   "Delete defun at point."
@@ -350,6 +381,11 @@
   "Copy paragraph at point."
   (interactive)
   (my/copy-thing 'paragraph))
+
+(defun my/copy-word ()
+  "Copy word at point."
+  (interactive)
+  (my/copy-thing 'word))
 
 (defun my/copy-symbol ()
   "Copy symbol at point."
@@ -535,6 +571,7 @@
   
   (my/copy
     "p" '(my/copy-paragraph       :wk "copy paragraph")
+    "w" '(my/copy-word            :wk "copy word")
     "s" '(my/copy-symbol          :wk "copy symbol")
     "f" '(my/copy-defun           :wk "copy defun")
     "y" '(my/copy-line            :wk "copy line")

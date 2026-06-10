@@ -982,10 +982,6 @@
      buffers))
   (advice-add #'consult--buffer-query :filter-return #'my/consult-buffer-filter-modes))
 
-(use-package yasnippet
-  :ensure t
-  :defer t)
-
 ;; ==============================================================
 ;;; EDITING
 

@@ -187,9 +187,12 @@
                      "show diff between the buffer and its file"))
 
   :bind
-  ("RET"       . newline-and-indent)
+  ("M-d"       . dired-jump)
+  ("M-<right>" . end-of-line)
+  ("M-<left>"  . my/beginning-of-line)
   ("C-_"       . text-scale-decrease)
-  ("C-+"       . text-scale-increase))
+  ("C-+"       . text-scale-increase)
+  ("RET"       . newline-and-indent))
 
 ;; ===============================================================
 ;;; CUSTOM FUNCTIONS
@@ -506,18 +509,14 @@
 
   (my/keys
     "C-<backspace>" 'my/backward-delete
-    "M-<right>" 'end-of-line
-    "M-<left>"  'my/beginning-of-line
     "M-<down>"  'move-text-down
     "M-<up>"    'move-text-up
     "M-j"       'flash-jump
-    "M-d"       'dired-jump
     "M-k"       'kill-line
     "M-u"       'upcase-dwim
     "M-l"       'downcase-dwim
     "M-c"       'capitalize-dwim
     "<f1>"      'scratch-buffer
-    "<f2>"      'wdired-change-to-wdired-mode
     "<f5>"      'my/select-theme
     "<f6>"      'my/rotate-theme
     "C-<tab>"   'other-window
@@ -537,9 +536,12 @@
    "t d" '(org-hide-drawers-toggle :wk "toggle drawers"))
 
   (my/dired
+    "RET"      'my/dired-find-file
+    "<f2>"     'wdired-change-to-wdired-mode
+    "M-f"      'dired-create-empty-file
+    "M-d"      'dired-create-directory
     "M-<left>" 'dired-up-directory
-    "M-."      'dired-omit-mode
-    "RET"      'my/dired-find-file)
+    "M-."      'dired-omit-mode)
 
   (my/copy
     "w" '(my/copy-word            :wk "copy word")
@@ -583,9 +585,9 @@
     "s" '(consult-line        :wk "line"))
 
   (my/file
-    "d" '(consult-fd          :wk "fd-find file")
     "r" '(rename-visited-file :wk "rename file")
     "f" '(find-file           :wk "find file")
+    "d" '(consult-fd          :wk "fd-find")
     "s" '(save-buffer         :wk "save"))
 
   (my/emacs

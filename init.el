@@ -836,6 +836,11 @@
   (set-face-attribute 'line-reminder-saved-sign-face nil
                       :foreground (face-attribute 'default :background)))
 
+(use-package whitespace
+  :ensure nil
+  :defer t
+  :hook (before-save . whitespace-cleanup))
+
 ;; ===============================================================
 ;;; NAVIGATION
 

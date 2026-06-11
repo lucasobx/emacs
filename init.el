@@ -700,16 +700,14 @@
 (defun my/select-theme ()
   "Interactively select and load a theme."
   (interactive)
-  ;; Emacs 30 completing-read aceita uma lista de símbolos diretamente
   (let ((choice (completing-read "Theme: " (my/theme-list) nil t)))
-    (when (org-string-nw-p choice) ; Garante que não é uma string vazia
+    (when (org-string-nw-p choice)
       (my/load-theme (intern choice)))))
 
 (defun my/rotate-theme ()
   "Rotate to the next theme in the filtered list."
   (interactive)
   (let* ((filtered (my/theme-list))
-         ;; Se não achar o tema atual, começa do início (index 0)
          (curr-idx (or (cl-position (car custom-enabled-themes) filtered) -1))
          (next-idx (mod (1+ curr-idx) (length filtered))))
     (my/load-theme (nth next-idx filtered))))
@@ -725,7 +723,6 @@
 ;;   :load-path "~/.config/emacs/pixel-themes-local"
 ;;   :config
 ;;   (pixel-themes-load-theme 'pixel-themes-psygnosia))
-
 
 (use-package spacious-padding
   :ensure t
@@ -771,7 +768,11 @@
               (dolist (face (face-list))
                 (when (string-prefix-p "doom-modeline" (symbol-name face))
                   (set-face-attribute face nil :weight 'normal :slant 'normal)))))
-  (doom-modeline-mode 1))
+  (doom-modeline-mode 1)
+  ;; fix doom-modeline leaking mode-line-inactive background into active window.
+  (advice-add 'doom-modeline-display-text :override
+            (lambda (text)
+              (string-replace "%" "%%" text))))
 
 (use-package colorful-mode
   :ensure t

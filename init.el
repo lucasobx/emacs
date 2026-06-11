@@ -670,6 +670,11 @@
   :hook
   (dired-mode . nerd-icons-dired-mode))
 
+(use-package nerd-icons-ibuffer
+  :ensure t
+  :hook
+  (ibuffer-mode . nerd-icons-ibuffer-mode))
+
 (use-package nerd-icons-completion
   :ensure t
   :after (:all nerd-icons marginalia)

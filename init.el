@@ -228,7 +228,7 @@
 
 (defun my/beginning-of-line ()
   "Go to first non-whitespace char, or column 0 if already there."
-  (interactive)
+  (interactive "^")
   (let ((origin (point)))
     (back-to-indentation)
     (when (= origin (point))

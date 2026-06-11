@@ -353,9 +353,15 @@
   (my/delete-thing 'defun))
 
 (defun my/delete-line ()
-  "Delete line at point."
+  "Delete line at point, or active region if one exists."
   (interactive)
-  (my/delete-thing 'line))
+  (if (use-region-p)
+      (progn
+        (pulse-momentary-highlight-region (region-beginning) (region-end))
+        (sit-for 0.15)
+        (kill-region (region-beginning) (region-end))
+        (deactivate-mark))
+    (my/delete-thing 'line)))
 
 (defun my/delete-in-brackets ()
   "Delete text inside brackets."

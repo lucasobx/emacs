@@ -1,11 +1,11 @@
 auto-save-list/
 custom-vars.el
-.lsp-session
+.mc-lists.el
 tree-sitter/
 recentf.eld
+mc-lists.el
 auto-saves/
 places.eld
-nov-places
 eln-cache/
 transient/
 devdocs/
@@ -17,4 +17,3 @@ elpaca
 places
 mason/
 tramp
-lisp/

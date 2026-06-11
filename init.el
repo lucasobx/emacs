@@ -125,7 +125,7 @@
   (scroll-conservatively 101)
   (scroll-margin 10)
   (scroll-step 1)
-  
+
   :config
   (make-directory (expand-file-name "auto-saves/" user-emacs-directory) t)
   (setq custom-file (locate-user-emacs-file "custom-vars.el"))
@@ -138,7 +138,6 @@
   (file-name-shadow-mode 1)
   (electric-indent-mode 1)
   (electric-pair-mode 1)
-  (column-number-mode 1)
 
   ;; hooks
   (add-hook 'emacs-startup-hook
@@ -154,6 +153,7 @@
 
   ;; misc
   (setq redisplay-skip-fontification-on-input t)
+  (setq ibuffer-show-empty-filter-groups nil)
   (setq native-comp-async-query-on-exit t)
   (put 'narrow-to-region 'disabled nil)
   (setq message-truncate-lines t)
@@ -503,30 +503,34 @@
   (general-create-definer my/lsp     :keymaps 'override :prefix "C-l")
   (general-create-definer my/mark    :keymaps 'override :prefix "C-q")
   (general-create-definer my/tools   :keymaps 'override :prefix "C-t")
-  
+
   (my/keys
     "C-<backspace>" 'my/backward-delete
     "M-<right>" 'end-of-line
-    "M-<left>" 'my/beginning-of-line
-    "M-<up>"   'move-text-up
-    "M-<down>" 'move-text-down
-    "M-j"      'flash-jump
-    "M-d"      'dired-jump
-    "<f1>"     'scratch-buffer
-    "<f2>"     'wdired-change-to-wdired-mode
-    "<f5>"     'my/select-theme
-    "<f6>"     'my/rotate-theme
-    "C-<tab>"  'other-window
-    "C-k"      'my/kill-buffer-window
-    "C-o"      'my/open-line-below
-    "C-="      'er/expand-region
-    "C-b"      'consult-buffer
-    "C-,"      'popper-toggle
-    "C-<"      'popper-cycle
-    "C-p"      'yank)
+    "M-<left>"  'my/beginning-of-line
+    "M-<down>"  'move-text-down
+    "M-<up>"    'move-text-up
+    "M-j"       'flash-jump
+    "M-d"       'dired-jump
+    "M-k"       'kill-line
+    "M-u"       'upcase-dwim
+    "M-l"       'downcase-dwim
+    "M-c"       'capitalize-dwim
+    "<f1>"      'scratch-buffer
+    "<f2>"      'wdired-change-to-wdired-mode
+    "<f5>"      'my/select-theme
+    "<f6>"      'my/rotate-theme
+    "C-<tab>"   'other-window
+    "C-k"       'my/kill-buffer-window
+    "C-o"       'my/open-line-below
+    "C-="       'er/expand-region
+    "C-b"       'consult-buffer
+    "C-,"       'popper-toggle
+    "C-<"       'popper-cycle
+    "C-p"       'yank)
 
   (my/C-c
-    "d" '(duplicate-line :wk "duplicate line"))
+    "d" '(duplicate-dwim :wk "duplicate region"))
 
   (my/C-c ;; org
    :keymaps 'org-mode-map
@@ -558,7 +562,7 @@
   (my/comment
     "p" '(my/toggle-comment-paragraph :wk "paragraph")
     ";" '(my/toggle-comment-line      :wk "line"))
-  
+
   (my/replace
     "r" '(replace-string       :wk "replace string")
     "q" '(query-replace        :wk "query replace")
@@ -569,11 +573,13 @@
    "/" '(mc/mark-previous-like-this :wk "cursor prev")
    "m" '(mc/mark-all-in-region      :wk "cursor region")
    "l" '(mc/edit-lines              :wk "cursor lines"))
-  
+
   (my/search
     "r" '(consult-recent-file :wk "recent files")
     "b" '(consult-bookmark    :wk "bookmarks")
     "g" '(consult-ripgrep     :wk "ripgrep")
+    "t" '(consult-outline     :wk "heading")
+    "i" '(consult-imenu       :wk "imenu")
     "s" '(consult-line        :wk "line"))
 
   (my/file
@@ -594,18 +600,19 @@
     :keymaps 'prog-mode-map
     "d" '(consult-flymake :wk "jump to diagnostic")
     "n" '(eglot-rename    :wk "rename symbol"))
-  
+
   (my/mark
     "q" '(org-remark-mark   :wk "highlight region")
     "d" '(org-remark-delete :wk "highlight delete")
     "c" '(org-remark-change :wk "highlight change")
     "o" '(org-remark-open   :wk "open notes"))
-  
+
   (my/tools
     "h" '(helpful-at-point :wk "helpful at point")
     "m" '(magit-status     :wk "magit status")
     "c" '(cheat-sh         :wk "cheat sheet")
     "t" '(ghostel          :wk "terminal")
+    "i" '(ibuffer          :wk "ibuffer")
     "d" '(devdocs-lookup   :wk "devdocs")))
 
 ;; ===============================================================
@@ -615,16 +622,21 @@
   :ensure nil
   :custom
   (display-buffer-alist
-   '(("\\`magit:"
+   '(((derived-mode . magit-mode)
       (display-buffer-in-side-window)
-      (window-height . 0.4)
       (side . bottom)
-      (slot . 0))
+      (slot . 0)
+      (window-height . 0.5))
      ((derived-mode . dired-mode)
       (display-buffer-in-side-window)
-      (window-height . 0.4)
       (side . bottom)
-      (slot . 0)))))
+      (slot . 0)
+      (window-height . 0.4))
+     ("\\*Ibuffer\\*"
+      (display-buffer-in-side-window)
+      (side . bottom)
+      (slot . 0)
+      (window-height . 0.4)))))
 
 (use-package popper
   :ensure t
@@ -753,13 +765,19 @@
 (use-package doom-modeline
   :ensure t
   :custom
+  (doom-modeline-buffer-file-name-style 'buffer-name)
+  (doom-modeline-project-detection 'project)
+  (mode-line-right-align-edge 'right-fringe)
   (doom-modeline-window-width-limit 0)
   (doom-modeline-total-line-number t)
   (doom-modeline-buffer-encoding nil)
   (doom-modeline-major-mode-icon t)
   (doom-modeline-check-icon nil)
+  (doom-modeline-persp-icon nil)
+  (doom-modeline-persp-name nil)
   (doom-modeline-modal-icon t)
   (doom-modeline-height 25)
+  (doom-modeline-time nil)
   (doom-modeline-modal t)
   (doom-modeline-icon t)
   :config
@@ -990,7 +1008,9 @@
   (corfu-auto nil)
   (corfu-count 7)
   :config
-  (global-corfu-mode))
+  (global-corfu-mode)
+  (advice-add #'lsp-completion-at-point
+              :around #'cape-wrap-noninterruptible))
 
 (use-package cape
   :ensure t
@@ -1073,18 +1093,18 @@
   (setopt consult-buffer-sources '(consult-source-buffer))
   (setopt consult-buffer-filter
           (append consult-buffer-filter
-                  '("\\*Async Shell Command\\*" "\\*eldoc\\*" "Output\\*$"
-                    "annotations.org" "\\*Messages\\*" "\\*lsp-bridge.*\\*"
-                    "\\*helpful.*\\*" "\\*ghostel.*\\*")))
+                  '("\\*Async Shell Command\\*" "Output\\*$" "\\*Help\\*" "\\*Messages\\*"
+                    "\\*eldoc\\*" "\\*helpful.*\\*" "annotations.org" "\\*Ibuffer\\*"
+                    "\\*Warnings\\*" "\\*ghostel.*\\*")))
   ;; prevent dired buffer from surfacing in consult-buffer when hidden by popper.
-  (defun my/consult-buffer-filter-modes (buffers)
-    (cl-remove-if
-     (lambda (buf)
-       (let ((buffer (if (stringp buf) (get-buffer buf) (cdr buf))))
-         (when buffer
-           (memq (buffer-local-value 'major-mode buffer) '(dired-mode)))))
-     buffers))
-  (advice-add #'consult--buffer-query :filter-return #'my/consult-buffer-filter-modes))
+  (advice-add
+   #'consult--buffer-query :filter-return
+   (lambda (buffers)
+     (seq-remove
+      (lambda (buf)
+        (with-current-buffer (if (consp buf) (cdr buf) buf)
+          (derived-mode-p 'dired-mode)))
+      buffers))))
 
 ;; ==============================================================
 ;;; EDITING
@@ -1178,7 +1198,7 @@
 (use-package ghostel
   :ensure t
   :defer t)
-  
+
 ;; ===============================================================
 ;;; DOCS
 
@@ -1205,8 +1225,18 @@
   :defer t
   :bind
   ("C-c M-g" . nil)
+  :preface
+  (defun my/magit-kill-buffers ()
+    "Restore window configuration and kill all Magit buffers."
+    (interactive)
+    (let ((buffers (magit-mode-get-buffers)))
+      (magit-restore-window-configuration)
+      (mapc #'kill-buffer buffers)))
+  :bind
+  (:map magit-status-mode-map ("q" . my/magit-kill-buffers))
   :config
-  (keymap-set transient-map "<escape>" 'transient-quit-one))
+  (magit-process-apply-ansi-colors t)
+  (keymap-set transient-map "<escape>" #'transient-quit-one))
 
 ;; ===============================================================
 ;;; TOOLS

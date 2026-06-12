@@ -190,21 +190,10 @@
   ("M-d"       . dired-jump)
   ("M-<right>" . end-of-line)
   ("M-<left>"  . my/beginning-of-line)
-  ("C-_"       . text-scale-decrease)
-  ("C-+"       . text-scale-increase)
   ("RET"       . newline-and-indent))
 
 ;; ===============================================================
 ;;; CUSTOM FUNCTIONS
-
-(defun my/kill-buffer-window ()
-  "Kill the current buffer and close its window."
-  (interactive)
-  (let ((buffer (current-buffer)))
-    (when (and (> (count-windows) 1)
-               (not (one-window-p)))
-      (delete-window))
-    (kill-buffer buffer)))
 
 (defun my/delete-dont-kill ()
   "Delete word backward without adding to kill ring."
@@ -508,28 +497,36 @@
   (general-create-definer my/tools   :keymaps 'override :prefix "C-t")
 
   (my/keys
+    ;; editing
+    "C-p"           'yank
+    "M-k"           'kill-line
+    "M-<up>"        'move-text-up
+    "M-<down>"      'move-text-down
     "C-<backspace>" 'my/backward-delete
-    "M-<down>"  'move-text-down
-    "M-<up>"    'move-text-up
-    "M-j"       'flash-jump
-    "M-k"       'kill-line
-    "M-u"       'upcase-dwim
-    "M-l"       'downcase-dwim
-    "M-c"       'capitalize-dwim
-    "<f1>"      'scratch-buffer
-    "<f5>"      'my/select-theme
-    "<f6>"      'my/rotate-theme
-    "C-<tab>"   'other-window
-    "C-k"       'my/kill-buffer-window
-    "C-o"       'my/open-line-below
-    "C-="       'er/expand-region
-    "C-b"       'consult-buffer
-    "C-,"       'popper-toggle
-    "C-<"       'popper-cycle
-    "C-p"       'yank)
+    "C-o"           'my/open-line-below
+    "C-="           'er/expand-region
+    "M-c"           'capitalize-dwim
+    "M-p"           'duplicate-dwim
+    "M-l"           'downcase-dwim
+    "M-u"           'upcase-dwim
+    ;; movement
+    "C-<tab>"       'other-window
+    "M-j"           'flash-jump
+    ;; misc
+    "<f1>"          'scratch-buffer
+    "<f5>"          'my/select-theme
+    "<f6>"          'my/rotate-theme
+    "C-+"           'text-scale-increase
+    "C-_"           'text-scale-decrease
+    ;; buffers
+    "C-k"           'kill-buffer-and-window
+    "C-b"           'consult-buffer
+    "C-,"           'popper-toggle
+    "C-<"           'popper-cycle)
 
-  (my/C-c
-    "d" '(duplicate-dwim :wk "duplicate region"))
+  ;; (my/C-c
+  ;;   "a" '( :wk "")
+  ;;   "b" '( :wk ""))
 
   (my/C-c ;; org
    :keymaps 'org-mode-map
@@ -646,7 +643,7 @@
   :init
   (popper-mode +1)
   :custom
-  (popper-window-height 16)
+  (popper-window-height 15)
   (popper-mode-line "")
   (popper-reference-buffers
    '("\\*eldoc\\*"
@@ -982,8 +979,9 @@
   :init
   (fset #'jsonrpc--log-event #'ignore)
   :hook
-  (ruby-ts-mode . eglot-ensure)
-  (lua-ts-mode  . eglot-ensure)
+  (python-ts-mode . eglot-ensure)
+  (ruby-ts-mode   . eglot-ensure)
+  (lua-ts-mode    . eglot-ensure)
   :config
   (add-to-list 'eglot-server-programs
                '((ruby-mode lua-ts-mode) "sumneko")

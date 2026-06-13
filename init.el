@@ -195,6 +195,29 @@
 ;; ===============================================================
 ;;; CUSTOM FUNCTIONS
 
+(defun my/set-exec-path-from-shell-PATH ()
+  "Load PATH from user's shell."
+  (interactive)
+  (let* ((shell (getenv "SHELL"))
+         (shell-name (file-name-nondirectory shell))
+         (command (cond ((string= shell-name "fish")
+                         "fish -c 'string join : $PATH'")
+                        ((string= shell-name "zsh")
+                         "zsh -i -c 'printenv PATH'")
+                        ((string= shell-name "bash")
+                         "bash --login -c 'echo $PATH'")
+                        (t nil))))
+    (when command
+      (let ((path-from-shell (replace-regexp-in-string
+                              "[ \t\n]*$" ""
+                              (shell-command-to-string command))))
+        (when (and path-from-shell (not (string= path-from-shell "")))
+          (setenv "PATH" path-from-shell)
+          (setq exec-path (split-string path-from-shell path-separator)))))))
+
+(add-hook 'after-init-hook #'my/set-exec-path-from-shell-PATH)
+;; --
+
 (defun my/delete-dont-kill ()
   "Delete word backward without adding to kill ring."
   (delete-region (point) (progn (backward-word 1) (point))))

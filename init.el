@@ -672,7 +672,6 @@
   (popper-reference-buffers
    '("\\*eldoc\\*"
      "\\*marginal notes\\*"
-     "\\*cheat.sh*\\*$"
      "^\\*ghostel.*\\*"
      compilation-mode
      inf-ruby-mode
@@ -971,11 +970,6 @@
     "l" '(ruby-send-line   :wk "send line")
     "r" '(inf-ruby         :wk "open repl")))
 
-(use-package mason
-  :ensure t
-  :config
-  (mason-setup))
-
 (use-package eglot
   :ensure nil
   :custom
@@ -1254,47 +1248,5 @@
   :config
   (magit-process-apply-ansi-colors t)
   (keymap-set transient-map "<escape>" #'transient-quit-one))
-
-;; ===============================================================
-;;; TOOLS
-
-(defun cheat-sh ()
-  "Query cheat.sh and display the result in a dedicated buffer."
-  (interactive)
-  (let* ((input (read-string "cheat.sh: "))
-         (parts (split-string input " " t))
-         (path  (if (cdr parts)
-                    (format "%s/%s"
-                            (car parts)
-                            (url-hexify-string (string-join (cdr parts) " ")))
-                  (url-hexify-string (car parts))))
-         (buffer (get-buffer-create "*cheat.sh*"))
-         (cmd    (format "curl -s 'cheat.sh/%s'" path)))
-    (with-current-buffer buffer
-      (read-only-mode -1)
-      (erase-buffer)
-      (insert (concat "cheat.sh: " input "\n"))
-      (read-only-mode 1))
-    (switch-to-buffer buffer)
-    (cheat-sh--fetch cmd buffer)))
-
-(defun cheat-sh--fetch (cmd buffer &optional)
-  "Execute CMD as a shell command and stream output into BUFFER."
-  (make-process
-   :name "cheat-sh-fetch"
-   :buffer (generate-new-buffer "*cheat-sh-temp*")
-   :command (list "sh" "-c" cmd)
-   :sentinel
-   (lambda (proc _event)
-     (when (eq (process-status proc) 'exit)
-       (let ((output (with-current-buffer (process-buffer proc)
-                       (buffer-string))))
-         (kill-buffer (process-buffer proc))
-         (with-current-buffer buffer
-           (read-only-mode -1)
-           (insert output)
-           (ansi-color-apply-on-region (point-min) (point-max))
-           (goto-char (point-min))
-           (read-only-mode 1)))))))
 
 ;;; init.el ends here

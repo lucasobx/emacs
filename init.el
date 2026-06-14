@@ -48,6 +48,8 @@
 ;; ===============================================================
 ;;; EMACS
 
+(defvar my/font "TX-02")
+
 (use-package emacs
   :ensure nil
   :init
@@ -78,7 +80,6 @@
   (use-dialog-box nil)
   (zone-all-frames t)
   (truncate-lines t)
-  (line-spacing 0)
   (undo-no-redo t)
 
   ;; minibuffer
@@ -143,9 +144,9 @@
   (add-hook 'prog-mode-hook 'display-line-numbers-mode)
 
   ;; faces
-  (set-face-attribute 'default nil :family "TX-02" :height 115 :width 'condensed)
-  (set-face-attribute 'minibuffer-nonselected nil :background 'unspecified)
   (set-face-attribute 'tooltip nil :family my/font)
+  (set-face-attribute 'default nil :family my/font :height 115 :width 'condensed)
+  (set-face-attribute 'minibuffer-nonselected nil :background 'unspecified)
 
   ;; misc
   (setq redisplay-skip-fontification-on-input t)
@@ -189,30 +190,7 @@
   ("RET"       . newline-and-indent))
 
 ;; ===============================================================
-;;; CUSTOM FUNCTIONS
-
-(defun my/set-exec-path-from-shell-PATH ()
-  "Load PATH from user's shell."
-  (interactive)
-  (let* ((shell (getenv "SHELL"))
-         (shell-name (file-name-nondirectory shell))
-         (command (cond ((string= shell-name "fish")
-                         "fish -c 'string join : $PATH'")
-                        ((string= shell-name "zsh")
-                         "zsh -i -c 'printenv PATH'")
-                        ((string= shell-name "bash")
-                         "bash --login -c 'echo $PATH'")
-                        (t nil))))
-    (when command
-      (let ((path-from-shell (replace-regexp-in-string
-                              "[ \t\n]*$" ""
-                              (shell-command-to-string command))))
-        (when (and path-from-shell (not (string= path-from-shell "")))
-          (setenv "PATH" path-from-shell)
-          (setq exec-path (split-string path-from-shell path-separator)))))))
-
-(add-hook 'after-init-hook #'my/set-exec-path-from-shell-PATH)
-;; --
+;;; CUSTOM
 
 (defun my/delete-dont-kill ()
   "Delete word backward without adding to kill ring."
@@ -244,9 +222,6 @@
     (back-to-indentation)
     (when (= origin (point))
       (beginning-of-line))))
-
-;; ===============================================================
-;;; TEXT OBJECTS
 
 (defun my/inside-parens ()
   "Return bounds of content inside parentheses."
@@ -485,9 +460,7 @@
                '("%k d s" "%k d d" "%k d p" "%k d f"
                  "%k d w" "%k d (" "%k d [" "%k d {"))
   (add-to-list 'devil-repeatable-keys ;; comment
-               '("%k ; ;" "%k ; p" "%k ; f"))
-  (add-to-list 'devil-repeatable-keys ;; C-c
-               '("%k c d")))
+               '("%k ; ;" "%k ; p" "%k ; f")))
 
 (use-package general
   :ensure (:wait t)
@@ -499,58 +472,51 @@
   (general-unbind :keymaps 'winner-mode-map "C-c <left>" "C-c <right>")
   (general-unbind :keymaps 'ghostel-semi-char-mode-map "C-<tab>")
 
-  ;; definers
   (general-create-definer my/keys    :keymaps 'override)
   (general-create-definer my/dired   :keymaps 'dired-mode-map)
-  (general-create-definer my/C-c     :keymaps 'override :prefix "C-c")
-  (general-create-definer my/copy    :keymaps 'override :prefix "C-y")
-  (general-create-definer my/delete  :keymaps 'override :prefix "C-d")
-  (general-create-definer my/comment :keymaps 'override :prefix "C-;")
-  (general-create-definer my/replace :keymaps 'override :prefix "C-r")
-  (general-create-definer my/cursors :keymaps 'override :prefix "C-.")
-  (general-create-definer my/search  :keymaps 'override :prefix "C-s")
-  (general-create-definer my/file    :keymaps 'override :prefix "C-f")
-  (general-create-definer my/emacs   :keymaps 'override :prefix "C-e")
-  (general-create-definer my/lsp     :keymaps 'override :prefix "C-l")
-  (general-create-definer my/mark    :keymaps 'override :prefix "C-q")
-  (general-create-definer my/tools   :keymaps 'override :prefix "C-t")
-  (general-create-definer my/help    :keymaps 'override :prefix "C-h")
+  (general-create-definer my/C-c     :keymaps 'override     :prefix "C-c")
+  (general-create-definer my/copy    :keymaps 'override     :prefix "C-y")
+  (general-create-definer my/delete  :keymaps 'override     :prefix "C-d")
+  (general-create-definer my/comment :keymaps 'override     :prefix "C-;")
+  (general-create-definer my/replace :keymaps 'override     :prefix "C-r")
+  (general-create-definer my/cursors :keymaps 'override     :prefix "C-.")
+  (general-create-definer my/search  :keymaps 'override     :prefix "C-s")
+  (general-create-definer my/file    :keymaps 'override     :prefix "C-f")
+  (general-create-definer my/emacs   :keymaps 'override     :prefix "C-e")
+  (general-create-definer my/lsp     :keymaps 'override     :prefix "C-l")
+  (general-create-definer my/mark    :keymaps 'override     :prefix "C-q")
+  (general-create-definer my/tools   :keymaps 'override     :prefix "C-t")
+  (general-create-definer my/org     :keymaps 'org-mode-map :prefix "C-o")
 
   (my/keys
-    ;; editing
-    "C-p"           'yank
-    "M-k"           'kill-line
-    "M-<up>"        'move-text-up
-    "M-<down>"      'move-text-down
-    "C-<backspace>" 'my/backward-delete
-    "C-o"           'my/open-line-below
-    "C-="           'er/expand-region
-    "M-c"           'capitalize-dwim
-    "M-p"           'duplicate-dwim
-    "M-l"           'downcase-dwim
-    "M-u"           'upcase-dwim
-    ;; movement
-    "C-<tab>"       'other-window
-    "M-j"           'flash-jump
-    ;; misc
     "<f1>"          'scratch-buffer
     "<f5>"          'my/select-theme
     "<f6>"          'my/rotate-theme
-    "C-+"           'text-scale-increase
-    "C-_"           'text-scale-decrease
-    ;; buffers
+
+    "C-<backspace>" 'my/backward-delete
+    "C-<tab>"       'other-window
     "C-k"           'kill-buffer-and-window
+    "C-="           'er/expand-region
+    "C-_"           'text-scale-decrease
+    "C-+"           'text-scale-increase
     "C-b"           'consult-buffer
     "C-,"           'popper-toggle
-    "C-<"           'popper-cycle)
+    "C-<"           'popper-cycle
+    "C-p"           'yank
 
-  ;; (my/C-c
-  ;;   "a" '( :wk "")
-  ;;   "b" '( :wk ""))
+    "M-o"           'my/open-line-below
+    "M-<down>"      'move-text-down
+    "M-<up>"        'move-text-up
+    "M-j"           'flash-jump
+    "M-k"           'kill-line
+    "M-u"           'upcase-dwim
+    "M-m"           'mark-paragraph
+    "M-l"           'downcase-dwim
+    "M-p"           'duplicate-dwim
+    "M-c"           'capitalize-dwim)
 
-  (my/C-c ;; org
-    :keymaps 'org-mode-map
-    "t d" '(org-hide-drawers-toggle :wk "toggle drawers"))
+  (my/org
+    "t" '(org-hide-drawers-toggle :wk "toggle drawers"))
 
   (my/dired
     "RET"      'my/dired-find-file
@@ -626,15 +592,14 @@
     "c" '(org-remark-change :wk "highlight change")
     "o" '(org-remark-open   :wk "open notes"))
 
-  (my/help
-    "v" '(helpful-variable :wk "describe variable")
-    "f" '(helpful-function :wk "describe function")
-    "h" '(helpful-at-point :wk "help at point")
-    "d" '(devdocs-lookup   :wk "devdocs"))
+  ;; (my/help
+  ;;   "v" '(helpful-variable :wk "describe variable")
+  ;;   "f" '(helpful-function :wk "describe function")
+  ;;   "h" '(helpful-at-point :wk "help at point")
+  ;;   "d" '(devdocs-lookup   :wk "devdocs"))
 
   (my/tools
     "m" '(magit-status     :wk "magit status")
-    "c" '(cheat-sh         :wk "cheat sheet")
     "t" '(ghostel          :wk "terminal")
     "i" '(ibuffer          :wk "ibuffer")))
 
@@ -818,6 +783,13 @@
             (lambda (text)
               (string-replace "%" "%%" text))))
 
+(use-package emacs-goose
+  :ensure nil
+  :load-path "~/.config/emacs/emacs-goose"
+  :demand t
+  :config
+  (emacs-goose-mode))
+
 (use-package colorful-mode
   :ensure t
   :custom
@@ -949,6 +921,16 @@
 ;; ===============================================================
 ;;; PROG-MODE
 
+(use-package eldoc
+  :ensure nil
+  :init
+  (global-eldoc-mode)
+  :custom
+  (eldoc-help-at-pt t)
+  (eldoc-echo-area-display-truncation-message nil)
+  (eldoc-echo-area-prefer-doc-buffer t)
+  (eldoc-echo-area-use-multiline-p nil))
+
 (use-package inf-ruby
   :ensure t
   :hook
@@ -982,8 +964,8 @@
   :init
   (fset #'jsonrpc--log-event #'ignore)
   :hook
-  (ruby-ts-mode   . eglot-ensure)
-  (lua-ts-mode    . eglot-ensure)
+  (ruby-ts-mode . eglot-ensure)
+  (lua-ts-mode  . eglot-ensure)
   :config
   (add-to-list 'eglot-server-programs
                '((ruby-mode lua-ts-mode) "sumneko")
@@ -1034,16 +1016,6 @@
                 (list #'eglot-completion-at-point
                       #'cape-file
                       #'cape-dabbrev)))))
-
-(use-package eldoc
-  :ensure nil
-  :init
-  (global-eldoc-mode)
-  :custom
-  (eldoc-help-at-pt t)
-  (eldoc-echo-area-display-truncation-message nil)
-  (eldoc-echo-area-prefer-doc-buffer t)
-  (eldoc-echo-area-use-multiline-p nil))
 
 ;; ===============================================================
 ;;; COMPLETION

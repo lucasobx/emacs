@@ -48,9 +48,6 @@
 ;; ===============================================================
 ;;; EMACS
 
-(defvar my/font "TX-02")
-(defvar my/font-size 110)
-
 (use-package emacs
   :ensure nil
   :init
@@ -81,7 +78,7 @@
   (use-dialog-box nil)
   (zone-all-frames t)
   (truncate-lines t)
-  (line-spacing 1)
+  (line-spacing 0)
   (undo-no-redo t)
 
   ;; minibuffer
@@ -146,10 +143,9 @@
   (add-hook 'prog-mode-hook 'display-line-numbers-mode)
 
   ;; faces
-  (set-face-attribute 'default nil :family my/font :height my/font-size :width 'condensed)
+  (set-face-attribute 'default nil :family "TX-02" :height 115 :width 'condensed)
   (set-face-attribute 'minibuffer-nonselected nil :background 'unspecified)
   (set-face-attribute 'tooltip nil :family my/font)
-  (setq-default line-spacing 0)
 
   ;; misc
   (setq redisplay-skip-fontification-on-input t)
@@ -518,6 +514,7 @@
   (general-create-definer my/lsp     :keymaps 'override :prefix "C-l")
   (general-create-definer my/mark    :keymaps 'override :prefix "C-q")
   (general-create-definer my/tools   :keymaps 'override :prefix "C-t")
+  (general-create-definer my/help    :keymaps 'override :prefix "C-h")
 
   (my/keys
     ;; editing
@@ -552,8 +549,8 @@
   ;;   "b" '( :wk ""))
 
   (my/C-c ;; org
-   :keymaps 'org-mode-map
-   "t d" '(org-hide-drawers-toggle :wk "toggle drawers"))
+    :keymaps 'org-mode-map
+    "t d" '(org-hide-drawers-toggle :wk "toggle drawers"))
 
   (my/dired
     "RET"      'my/dired-find-file
@@ -629,13 +626,17 @@
     "c" '(org-remark-change :wk "highlight change")
     "o" '(org-remark-open   :wk "open notes"))
 
+  (my/help
+    "v" '(helpful-variable :wk "describe variable")
+    "f" '(helpful-function :wk "describe function")
+    "h" '(helpful-at-point :wk "help at point")
+    "d" '(devdocs-lookup   :wk "devdocs"))
+
   (my/tools
-    "h" '(helpful-at-point :wk "helpful at point")
     "m" '(magit-status     :wk "magit status")
     "c" '(cheat-sh         :wk "cheat sheet")
     "t" '(ghostel          :wk "terminal")
-    "i" '(ibuffer          :wk "ibuffer")
-    "d" '(devdocs-lookup   :wk "devdocs")))
+    "i" '(ibuffer          :wk "ibuffer")))
 
 ;; ===============================================================
 ;;; UI
@@ -666,7 +667,7 @@
   :init
   (popper-mode +1)
   :custom
-  (popper-window-height 15)
+  (popper-window-height 12)
   (popper-mode-line "")
   (popper-reference-buffers
    '("\\*eldoc\\*"
@@ -713,25 +714,20 @@
 (use-package pixel-themes
   :ensure (:host github :repo "lucasobx/pixel-themes"))
 
-(use-package doric-themes
-  :ensure t)
-
 (defvar my/theme nil
   "Currently active theme.")
 
 (defvar my/theme-builtin
   '(adwaita deeper-blue dichromacy leuven leuven-dark light-blue manoj-dark
     misterioso newcomers-presets tango tango-dark tsdh-dark tsdh-light
-    wheatgrass whiteboard wombat doric-magma doric-copper)
+    wheatgrass whiteboard wombat)
   "Built-in Emacs themes to exclude from selection.")
 
 (defun my/theme-list ()
   "Return filtered list of available themes."
   (cl-remove-if (lambda (theme)
                   (or (memq theme my/theme-builtin)
-                      (string-prefix-p "modus-" (symbol-name theme))
-                      (and (boundp 'doric-themes-light-themes)
-                           (memq theme doric-themes-light-themes))))
+                      (string-prefix-p "modus-" (symbol-name theme))))
                 (custom-available-themes)))
 
 (defun my/load-theme (theme &optional no-save)
@@ -796,6 +792,7 @@
   (doom-modeline-project-detection 'project)
   (mode-line-right-align-edge 'right-fringe)
   (doom-modeline-window-width-limit 0)
+  (doom-modeline-percent-position nil)
   (doom-modeline-total-line-number t)
   (doom-modeline-buffer-encoding nil)
   (doom-modeline-major-mode-icon t)
@@ -811,9 +808,6 @@
   (defun doom-modeline-check-icon (_icon _unicode _text &optional _face) "")
   (setopt doom-modeline-always-show-macro-register t)
   (setopt doom-modeline-buffer-modification-icon nil)
-  (custom-set-faces
-   '(mode-line ((t (:inherit default :height 118 :weight normal))))
-   '(mode-line-inactive ((t (:inherit default :height 118 :weight normal)))))
   (add-hook 'doom-modeline-mode-hook
             (lambda ()
               (dolist (face (face-list))
@@ -945,14 +939,6 @@
   (add-to-list 'treesit-language-source-alist
                '(ruby "https://github.com/tree-sitter/tree-sitter-ruby" "master" "src")))
 
-(use-package python-ts-mode
-  :ensure nil
-  :mode "\\.py\\'"
-  :config
-  (setq python-ts-mode-map (make-sparse-keymap))
-  (add-to-list 'treesit-language-source-alist
-               '(ruby "https://github.com/tree-sitter/tree-sitter-python" "master" "src")))
-
 (use-package treesit-auto
   :ensure t
   :after emacs
@@ -1002,14 +988,12 @@
   :init
   (fset #'jsonrpc--log-event #'ignore)
   :hook
-  (python-ts-mode . eglot-ensure)
   (ruby-ts-mode   . eglot-ensure)
   (lua-ts-mode    . eglot-ensure)
   :config
   (add-to-list 'eglot-server-programs
                '((ruby-mode lua-ts-mode) "sumneko")
-               '((ruby-mode ruby-ts-mode) "solargraph")
-               '((python-mode python-ts-mode) "pyright")))
+               '((ruby-mode ruby-ts-mode) "solargraph")))
 
 (use-package flymake
   :ensure nil
@@ -1076,7 +1060,7 @@
   (vertico-mode)
   :custom
   (vertico-cycle nil)
-  (vertico-count 6)
+  (vertico-count 5)
   :config
   ;; add a visual indicator to the currently selected candidate
   (advice-add #'vertico--format-candidate :around
@@ -1095,10 +1079,10 @@
   :init
   (marginalia-mode)
   :config
-  ;; restrict annotations to 'face' and 'command' categories
+  ;; restrict annotations to 'face' category only
   (setopt marginalia-annotators
           (mapcar (lambda (pair)
-                    (if (memq (car pair) '(face command))
+                    (if (eq (car pair) 'face)
                         pair
                       (cons (car pair) '(none))))
                   marginalia-annotators)))
@@ -1160,7 +1144,7 @@
   :defer t)
 
 ;; ===============================================================
-;;; WRITING & READING
+;;; ORG
 
 (use-package org
   :ensure nil

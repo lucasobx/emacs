@@ -470,7 +470,6 @@
   (general-unbind "C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z")
   (general-unbind :keymaps 'emacs-lisp-mode-map "C-c C-b" "C-c C-e" "C-c C-f")
   (general-unbind :keymaps 'winner-mode-map "C-c <left>" "C-c <right>")
-  (general-unbind :keymaps 'ghostel-semi-char-mode-map "C-<tab>")
 
   (general-create-definer my/keys    :keymaps 'override)
   (general-create-definer my/dired   :keymaps 'dired-mode-map)
@@ -600,7 +599,7 @@
 
   (my/tools
     "m" '(magit-status     :wk "magit status")
-    "t" '(ghostel          :wk "terminal")
+    "t" '(vterm            :wk "terminal")
     "i" '(ibuffer          :wk "ibuffer")))
 
 ;; ===============================================================
@@ -637,12 +636,11 @@
   (popper-reference-buffers
    '("\\*eldoc\\*"
      "\\*marginal notes\\*"
-     "^\\*ghostel.*\\*"
+     "\\*vterm\\*"
      compilation-mode
      inf-ruby-mode
      devdocs-mode
      helpful-mode
-     ghostel-mode
      help-mode)))
 
 (use-package nerd-icons
@@ -1078,7 +1076,7 @@
           (append consult-buffer-filter
                   '("\\*Async Shell Command\\*" "Output\\*$" "\\*Help\\*" "\\*Messages\\*"
                     "\\*eldoc\\*" "\\*helpful.*\\*" "annotations.org" "\\*Ibuffer\\*"
-                    "\\*Warnings\\*" "\\*ghostel.*\\*")))
+                    "\\*Warnings\\*" "\\*vterm\\*")))
   ;; prevent dired buffer from surfacing in consult-buffer when hidden by popper.
   (advice-add
    #'consult--buffer-query :filter-return
@@ -1178,7 +1176,7 @@
 ;; ===============================================================
 ;;; TERMINAL
 
-(use-package ghostel
+(use-package vterm
   :ensure t
   :defer t)
 

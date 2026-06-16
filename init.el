@@ -223,29 +223,23 @@
     (when (= origin (point))
       (beginning-of-line))))
 
-(defun my/inside-parens ()
-  "Return bounds of content inside parentheses."
-  (when (or (looking-at "(")
-            (ignore-errors (backward-up-list 1) t))
-    (let ((start (1+ (point)))
-          (end   (1- (progn (forward-sexp) (point)))))
-      (cons start end))))
+;; delimiter bounds
 
-(defun my/inside-brackets ()
-  "Return bounds of content inside square brackets."
-  (when (or (looking-at "\\[")
-            (ignore-errors (backward-up-list 1) t))
-    (let ((start (1+ (point)))
-          (end   (1- (progn (forward-sexp) (point)))))
-      (cons start end))))
+(defmacro my/define-inside (suffix open)
+  "Define an inside-bounds function named from SUFFIX for the OPEN delimiter."
+  `(defun ,(intern (format "my/inside-%s" suffix)) ()
+     ,(format "Return bounds of content inside %s." suffix)
+     (when (or (looking-at ,(regexp-quote open))
+               (ignore-errors (backward-up-list 1) t))
+       (let ((start (1+ (point)))
+             (end   (1- (progn (forward-sexp) (point)))))
+         (cons start end)))))
 
-(defun my/inside-braces ()
-  "Return bounds of content inside curly braces."
-  (when (or (looking-at "{")
-            (ignore-errors (backward-up-list 1) t))
-    (let ((start (1+ (point)))
-          (end   (1- (progn (forward-sexp) (point)))))
-      (cons start end))))
+(my/define-inside parens   "(")
+(my/define-inside brackets "[")
+(my/define-inside braces   "{")
+
+;; generic operations
 
 (defun my/delete-thing (thing)
   "Delete THING at point and save to kill ring with visual feedback."
@@ -292,51 +286,42 @@
         (sit-for 0.05)
         (comment-or-uncomment-region start end)))))
 
-(defun my/delete-paragraph ()
-  "Delete paragraph at point."
-  (interactive)
-  (my/delete-thing 'paragraph))
+(defmacro my/define-ops (helper &rest specs)
+  "Define interactive commands from SPECS, each calling HELPER with one argument."
+  `(progn
+     ,@(mapcar
+        (lambda (spec)
+          (pcase-let ((`(,name ,arg ,doc) spec))
+            `(defun ,name ()
+               ,doc
+               (interactive)
+               (,helper ,arg))))
+        specs)))
 
-(defun my/delete-word ()
-  "Delete word at point, cleaning up leftover whitespace."
-  (interactive)
-  (let ((bounds (bounds-of-thing-at-point 'word)))
-    (when bounds
-      (pulse-momentary-highlight-region (car bounds) (cdr bounds))
-      (sit-for 0.15)
-      (let ((preceded-by-space (save-excursion
-                                 (goto-char (car bounds))
-                                 (looking-back "\\s-" 1)))
-            (followed-by-space (save-excursion
-                                 (goto-char (cdr bounds))
-                                 (looking-at "\\s-"))))
-        (delete-region (car bounds) (cdr bounds))
-        (cond
-         (followed-by-space (delete-char 1))
-         (preceded-by-space (delete-char -1)))))))
+(defmacro my/define-delete-cleanup (name thing)
+  "Define command NAME deleting THING at point and clean up whitespace."
+  `(defun ,name ()
+     ,(format "Delete %s at point, cleaning up leftover whitespace." thing)
+     (interactive)
+     (let ((bounds (bounds-of-thing-at-point ',thing)))
+       (when bounds
+         (pulse-momentary-highlight-region (car bounds) (cdr bounds))
+         (sit-for 0.15)
+         (let ((preceded-by-space (save-excursion
+                                    (goto-char (car bounds))
+                                    (looking-back "\\s-" 1)))
+               (followed-by-space (save-excursion
+                                    (goto-char (cdr bounds))
+                                    (looking-at "\\s-"))))
+           (delete-region (car bounds) (cdr bounds))
+           (cond
+            (followed-by-space (delete-char 1))
+            (preceded-by-space (delete-char -1))))))))
 
-(defun my/delete-symbol ()
-  "Delete symbol at point, cleaning up leftover whitespace."
-  (interactive)
-  (let ((bounds (bounds-of-thing-at-point 'symbol)))
-    (when bounds
-      (pulse-momentary-highlight-region (car bounds) (cdr bounds))
-      (sit-for 0.15)
-      (let ((preceded-by-space (save-excursion
-                                 (goto-char (car bounds))
-                                 (looking-back "\\s-" 1)))
-            (followed-by-space (save-excursion
-                                 (goto-char (cdr bounds))
-                                 (looking-at "\\s-"))))
-        (delete-region (car bounds) (cdr bounds))
-        (cond
-         (followed-by-space (delete-char 1))
-         (preceded-by-space (delete-char -1)))))))
+;; delete commands
 
-(defun my/delete-defun ()
-  "Delete defun at point."
-  (interactive)
-  (my/delete-thing 'defun))
+(my/define-delete-cleanup my/delete-word   word)
+(my/define-delete-cleanup my/delete-symbol symbol)
 
 (defun my/delete-line ()
   "Delete line at point, or active region if one exists."
@@ -349,45 +334,16 @@
         (deactivate-mark))
     (my/delete-thing 'line)))
 
-(defun my/delete-in-brackets ()
-  "Delete text inside brackets."
-  (interactive)
-  (my/delete-inside #'my/inside-brackets))
+(my/define-ops my/delete-thing
+  (my/delete-paragraph 'paragraph "Delete paragraph at point.")
+  (my/delete-defun     'defun     "Delete defun at point."))
 
-(defun my/delete-in-parens ()
-  "Delete text inside parentheses."
-  (interactive)
-  (my/delete-inside #'my/inside-parens))
+(my/define-ops my/delete-inside
+  (my/delete-in-parens   #'my/inside-parens   "Delete text inside parentheses.")
+  (my/delete-in-brackets #'my/inside-brackets "Delete text inside brackets.")
+  (my/delete-in-braces   #'my/inside-braces   "Delete text inside braces."))
 
-(defun my/delete-in-braces ()
-  "Delete text inside braces."
-  (interactive)
-  (my/delete-inside #'my/inside-braces))
-
-(defun my/copy-paragraph ()
-  "Copy paragraph at point."
-  (interactive)
-  (my/copy-thing 'paragraph))
-
-(defun my/copy-word ()
-  "Copy word at point."
-  (interactive)
-  (my/copy-thing 'word))
-
-(defun my/copy-symbol ()
-  "Copy symbol at point."
-  (interactive)
-  (my/copy-thing 'symbol))
-
-(defun my/copy-defun ()
-  "Copy defun at point."
-  (interactive)
-  (my/copy-thing 'defun))
-
-(defun my/copy-word ()
-  "Copy word at point."
-  (interactive)
-  (my/copy-thing 'word))
+;; copy commands
 
 (defun my/copy-line ()
   "Copy line at point, or active region if one exists."
@@ -400,35 +356,27 @@
         (message "Copied region"))
     (my/copy-thing 'line)))
 
-(defun my/copy-inside-brackets ()
-  "Copy text inside brackets."
-  (interactive)
-  (my/copy-inside #'my/inside-brackets))
+(my/define-ops my/copy-thing
+  (my/copy-paragraph 'paragraph "Copy paragraph at point.")
+  (my/copy-word      'word      "Copy word at point.")
+  (my/copy-symbol    'symbol    "Copy symbol at point.")
+  (my/copy-defun     'defun     "Copy defun at point."))
 
-(defun my/copy-inside-parens ()
-  "Copy text inside parentheses."
-  (interactive)
-  (my/copy-inside #'my/inside-parens))
+(my/define-ops my/copy-inside
+  (my/copy-inside-parens   #'my/inside-parens   "Copy text inside parentheses.")
+  (my/copy-inside-brackets #'my/inside-brackets "Copy text inside brackets.")
+  (my/copy-inside-braces   #'my/inside-braces   "Copy text inside braces."))
 
-(defun my/copy-inside-braces ()
-  "Copy text inside braces."
-  (interactive)
-  (my/copy-inside #'my/inside-braces))
-
-(defun my/toggle-comment-paragraph ()
-  "Toggle comment on paragraph at point."
-  (interactive)
-  (my/toggle-comment-thing 'paragraph))
-
-(defun my/toggle-comment-defun ()
-  "Toggle comment on defun at point."
-  (interactive)
-  (my/toggle-comment-thing 'defun))
+;; comment commands
 
 (defun my/toggle-comment-line ()
   "Toggle comment on current line."
   (interactive)
   (comment-line 1))
+
+(my/define-ops my/toggle-comment-thing
+  (my/toggle-comment-paragraph 'paragraph "Toggle comment on paragraph at point.")
+  (my/toggle-comment-defun     'defun     "Toggle comment on defun at point."))
 
 ;; ===============================================================
 ;;; KEYBINDINGS
@@ -553,10 +501,10 @@
     "m" '(flush-lines          :wk "remove matching lines"))
 
   (my/cursors
-   "." '(mc/mark-next-like-this     :wk "cursor next")
-   "/" '(mc/mark-previous-like-this :wk "cursor prev")
-   "m" '(mc/mark-all-in-region      :wk "cursor region")
-   "l" '(mc/edit-lines              :wk "cursor lines"))
+    "." '(mc/mark-next-like-this     :wk "cursor next")
+    "/" '(mc/mark-previous-like-this :wk "cursor prev")
+    "m" '(mc/mark-all-in-region      :wk "cursor region")
+    "l" '(mc/edit-lines              :wk "cursor lines"))
 
   (my/search
     "r" '(consult-recent-file :wk "recent files")

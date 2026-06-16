@@ -190,7 +190,58 @@
   ("RET"       . newline-and-indent))
 
 ;; ===============================================================
+;;; THEMES
+
+;; (use-package pixel-themes
+;;   :ensure nil
+;;   :load-path "~/.config/emacs/pixel-themes-local"
+;;   :config
+;;   (pixel-themes-load-theme 'pixel-themes-psygnosia))
+
+(use-package pixel-themes
+  :ensure (:host github :repo "lucasobx/pixel-themes"))
+
+(defvar my/theme nil
+  "Currently active theme.")
+
+(defun my/theme-list ()
+  "Return the available themes, excluding the built-in ones."
+  (let ((builtin (expand-file-name "themes" data-directory)))
+    (cl-remove-if (lambda (theme)
+                    (locate-file (format "%s-theme.el" theme) (list builtin)))
+                  (custom-available-themes))))
+
+(defun my/load-theme (theme)
+  "Disable active themes and load THEME."
+  (mapc #'disable-theme custom-enabled-themes)
+  (load-theme theme :no-confirm)
+  (setq my/theme theme))
+
+(defun my/select-theme ()
+  "Interactively select and load a theme."
+  (interactive)
+  (let ((choice (completing-read "Theme: " (my/theme-list) nil t)))
+    (unless (string-empty-p choice)
+      (my/load-theme (intern choice)))))
+
+(defun my/rotate-theme ()
+  "Load the next theme in `my/theme-list'."
+  (interactive)
+  (let* ((themes (my/theme-list))
+         (current (or (cl-position my/theme themes) -1))
+         (next (mod (1+ current) (length themes))))
+    (my/load-theme (nth next themes))))
+
+;; restore the saved theme after startup, and persist it on exit.
+(add-hook 'elpaca-after-init-hook
+          (lambda () (when my/theme (my/load-theme my/theme))))
+(add-hook 'kill-emacs-hook
+          (lambda () (when my/theme (customize-save-variable 'my/theme my/theme))))
+
+;; ===============================================================
 ;;; CUSTOM
+
+;; movement & editing
 
 (defun my/delete-dont-kill ()
   "Delete word backward without adding to kill ring."
@@ -618,62 +669,6 @@
   :after corfu
   :config
   (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
-
-;; ── THEMES
-
-(use-package pixel-themes
-  :ensure (:host github :repo "lucasobx/pixel-themes"))
-
-(defvar my/theme nil
-  "Currently active theme.")
-
-(defvar my/theme-builtin
-  '(adwaita deeper-blue dichromacy leuven leuven-dark light-blue manoj-dark
-    misterioso newcomers-presets tango tango-dark tsdh-dark tsdh-light
-    wheatgrass whiteboard wombat)
-  "Built-in Emacs themes to exclude from selection.")
-
-(defun my/theme-list ()
-  "Return filtered list of available themes."
-  (cl-remove-if (lambda (theme)
-                  (or (memq theme my/theme-builtin)
-                      (string-prefix-p "modus-" (symbol-name theme))))
-                (custom-available-themes)))
-
-(defun my/load-theme (theme &optional no-save)
-  "Load THEME. Do not save configuration if NO-SAVE is non-nil."
-  (mapc #'disable-theme custom-enabled-themes)
-  (setq my/theme theme)
-  (load-theme theme :no-confirm)
-  (unless no-save
-    (customize-save-variable 'my/theme theme)))
-
-(defun my/select-theme ()
-  "Interactively select and load a theme."
-  (interactive)
-  (let ((choice (completing-read "Theme: " (my/theme-list) nil t)))
-    (when (org-string-nw-p choice)
-      (my/load-theme (intern choice)))))
-
-(defun my/rotate-theme ()
-  "Rotate to the next theme in the filtered list."
-  (interactive)
-  (let* ((filtered (my/theme-list))
-         (curr-idx (or (cl-position (car custom-enabled-themes) filtered) -1))
-         (next-idx (mod (1+ curr-idx) (length filtered))))
-    (my/load-theme (nth next-idx filtered))))
-
-(add-hook 'elpaca-after-init-hook
-          (lambda ()
-            (when my/theme
-              (my/load-theme my/theme :no-save))))
-;; --
-
-;; (use-package pixel-themes
-;;   :ensure nil
-;;   :load-path "~/.config/emacs/pixel-themes-local"
-;;   :config
-;;   (pixel-themes-load-theme 'pixel-themes-psygnosia))
 
 (use-package spacious-padding
   :ensure t

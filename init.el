@@ -597,8 +597,8 @@
   ;;   "d" '(devdocs-lookup   :wk "devdocs"))
 
   (my/tools
+    "t" '(eshell           :wk "terminal")
     "m" '(magit-status     :wk "magit status")
-    "t" '(vterm            :wk "terminal")
     "i" '(ibuffer          :wk "ibuffer")))
 
 ;; ===============================================================
@@ -1019,7 +1019,7 @@
           (append consult-buffer-filter
                   '("\\*Async Shell Command\\*" "Output\\*$" "\\*Help\\*" "\\*Messages\\*"
                     "\\*eldoc\\*" "\\*helpful.*\\*" "annotations.org" "\\*Ibuffer\\*"
-                    "\\*Warnings\\*" "\\*vterm\\*")))
+                    "\\*Warnings\\*" "\\*eshell\\*")))
   ;; prevent dired buffer from surfacing in consult-buffer when hidden by popper.
   (advice-add
    #'consult--buffer-query :filter-return
@@ -1119,9 +1119,16 @@
 ;; ===============================================================
 ;;; TERMINAL
 
-(use-package vterm
-  :ensure t
-  :defer t)
+(use-package eshell
+  :ensure nil
+  :defer t
+  :custom
+  (eshell-banner-message "")
+  (eshell-history-size 100000)
+  (eshell-hist-ignoredups t)
+  :config
+  (with-eval-after-load 'em-alias
+    (eshell/alias "clear" "clear-scrollback")))
 
 ;; ===============================================================
 ;;; DOCS

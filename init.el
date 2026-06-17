@@ -853,6 +853,17 @@
   :ensure nil
   :commands (wdired-change-to-wdired-mode))
 
+(defun my/zoxide-dired (query)
+  "Prompt for QUERY, jump to the best zoxide match and open Dired there."
+  (interactive "szoxide: ")
+  (with-temp-buffer
+    (if (zerop (call-process "zoxide" nil t nil "query" "--" query))
+        (let ((dir (string-trim (buffer-string))))
+          (if (file-directory-p dir)
+              (dired dir)
+            (user-error "Zoxide returned a non-directory: %s" dir)))
+      (user-error "No zoxide match for: %s" query))))
+
 ;; ===============================================================
 ;;; TREESITTER
 

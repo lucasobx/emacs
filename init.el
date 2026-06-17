@@ -64,12 +64,15 @@
 
   :custom
   (display-fill-column-indicator-warning nil)
+  (save-interprogram-paste-before-kill t)
   (uniquify-buffer-name-style 'forward)
   (display-line-numbers-type 'relative)
   (warning-minimum-level :emergency)
+  (frame-inhibit-implied-resize t)
   (ibuffer-human-readable-size t)
   (display-line-numbers-width 4)
   (zone-all-windows-in-frame t)
+  (auto-revert-check-vc-info t)
   (initial-scratch-message "")
   (ring-bell-function 'ignore)
   (split-width-threshold 100)
@@ -619,9 +622,9 @@
 
 ;; tools (C-t)
 (which-key-add-key-based-replacements "C-t" "tools")
-(my/bind "C-t m" #'magit-status "magit status")
 (my/bind "C-t t" #'eshell       "terminal")
 (my/bind "C-t i" #'ibuffer      "ibuffer")
+(my/bind "C-t m" #'magit-status "magit")
 
 ;; LSP/prog-mode (C-l)
 (which-key-add-keymap-based-replacements prog-mode-map "C-l" "lsp")
@@ -663,7 +666,10 @@
       (display-buffer-in-side-window)
       (side . bottom)
       (slot . 0)
-      (window-height . 0.4)))))
+      (window-height . 0.4))
+     ("\\*Diff\\*"
+      (display-buffer-pop-up-frame)
+      (reusable-frames . nil)))))
 
 (use-package popper
   :ensure t
@@ -823,16 +829,9 @@
   (bookmark-fringe-mark nil)
   (bookmark-save-flag 1))
 
-(use-package flash
-  :ensure (:host github :repo "Prgebish/flash")
-  :commands (flash-jump flash-jump-continue flash-treesitter)
-  :custom
-  (flash-char-jump-labels t)
-  (flash-labels "asdfqwe")
-  (flash-multi-window t)
-  (flash-nohlsearch t)
-  (flash-backdrop nil)
-  (flash-autojump t))
+(use-package avy
+  :ensure t
+  :defer t)
 
 (use-package dired
   :ensure nil
@@ -926,9 +925,17 @@
   (global-eldoc-mode)
   :custom
   (eldoc-help-at-pt t)
+  (eldoc-idle-delay 0.5)
   (eldoc-echo-area-display-truncation-message nil)
-  (eldoc-echo-area-prefer-doc-buffer t)
   (eldoc-echo-area-use-multiline-p nil))
+
+(use-package eldoc-box
+  :ensure t
+  :hook
+  (prog-mode . eldoc-box-hover-mode)
+  :custom
+  (eldoc-box-max-pixel-height 200)
+  (eldoc-box-max-pixel-width 400))
 
 (use-package inf-ruby
   :ensure t

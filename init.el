@@ -269,7 +269,7 @@
           (lambda () (when my/theme (customize-save-variable 'my/theme my/theme))))
 
 ;; ===============================================================
-;;; CUSTOM
+;;; CUSTOM-OPS
 
 ;; movement & editing
 
@@ -483,6 +483,8 @@
   (devil-prompt " %t")
   :config
   (global-devil-mode)
+  (assoc-delete-all "%k z" devil-translations)
+  (add-to-list 'devil-translations '("%k z" . "C-z"))
   (add-to-list 'devil-repeatable-keys
                '("%k . ." "%k . /"))
   (add-to-list 'devil-repeatable-keys ;; delete
@@ -660,12 +662,12 @@
   :init
   (popper-mode +1)
   :custom
-  (popper-window-height 12)
+  (popper-window-height 13)
   (popper-mode-line "")
   (popper-reference-buffers
    '("\\*eldoc\\*"
      "\\*marginal notes\\*"
-     "\\*vterm\\*"
+     "\\*eshell\\*"
      compilation-mode
      inf-ruby-mode
      devdocs-mode
@@ -754,9 +756,15 @@
             (lambda (text)
               (string-replace "%" "%%" text))))
 
+;; (use-package emacs-goose
+;;   :ensure nil
+;;   :load-path "~/.config/emacs/emacs-goose"
+;;   :demand t
+;;   :config
+;;   (emacs-goose-mode))
+
 (use-package emacs-goose
-  :ensure nil
-  :load-path "~/.config/emacs/emacs-goose"
+  :ensure (:host github :repo "lucasobx/emacs-goose" :files ("*.el" "sprites"))
   :demand t
   :config
   (emacs-goose-mode))
@@ -1074,7 +1082,8 @@
   :custom
   (mc/list-file (locate-user-emacs-file "mc-lists.el"))
   :config
-  (set-face-attribute 'mc/cursor-bar-face nil :underline t))
+  ;; prevent multiple-cursors from prompting about devil
+  (add-to-list 'mc/cmds-to-run-once 'devil))
 
 (use-package sudo-edit
   :ensure t

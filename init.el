@@ -493,145 +493,154 @@
   (add-to-list 'devil-repeatable-keys ;; comment
                '("%k ; ;" "%k ; p" "%k ; f")))
 
-(use-package general
-  :ensure (:wait t)
-  :demand t
-  :config
-  (general-auto-unbind-keys)
-  (general-unbind "C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z")
-  (general-unbind :keymaps 'emacs-lisp-mode-map "C-c C-b" "C-c C-e" "C-c C-f")
-  (general-unbind :keymaps 'winner-mode-map "C-c <left>" "C-c <right>")
+;; --
+(defvar my/override-map (make-sparse-keymap))
+(define-minor-mode my/override-mode
+  "Global minor mode holding my override keybindings."
+  :global t :keymap my/override-map)
+(add-to-list 'emulation-mode-map-alists `((my/override-mode . ,my/override-map)))
+(my/override-mode 1)
 
-  (general-create-definer my/keys    :keymaps 'override)
-  (general-create-definer my/dired   :keymaps 'dired-mode-map)
-  (general-create-definer my/C-c     :keymaps 'override     :prefix "C-c")
-  (general-create-definer my/copy    :keymaps 'override     :prefix "C-y")
-  (general-create-definer my/delete  :keymaps 'override     :prefix "C-d")
-  (general-create-definer my/comment :keymaps 'override     :prefix "C-;")
-  (general-create-definer my/replace :keymaps 'override     :prefix "C-r")
-  (general-create-definer my/cursors :keymaps 'override     :prefix "C-.")
-  (general-create-definer my/search  :keymaps 'override     :prefix "C-s")
-  (general-create-definer my/file    :keymaps 'override     :prefix "C-f")
-  (general-create-definer my/emacs   :keymaps 'override     :prefix "C-e")
-  (general-create-definer my/lsp     :keymaps 'override     :prefix "C-l")
-  (general-create-definer my/mark    :keymaps 'override     :prefix "C-q")
-  (general-create-definer my/tools   :keymaps 'override     :prefix "C-t")
-  (general-create-definer my/org     :keymaps 'org-mode-map :prefix "C-o")
+(defun my/bind (key command &optional desc)
+  "Bind KEY to COMMAND with override precedence, optionally labeling it DESC."
+  (keymap-set my/override-map key command)
+  (when desc (which-key-add-key-based-replacements key desc)))
 
-  (my/keys
-    "<f1>"          'scratch-buffer
-    "<f5>"          'my/select-theme
-    "<f6>"          'my/rotate-theme
+(defun my/bind-local (keymap key command &optional desc)
+  "Bind KEY to COMMAND in KEYMAP, optionally labeling it DESC in which-key."
+  (keymap-set keymap key command)
+  (when desc (which-key-add-keymap-based-replacements keymap key desc)))
 
-    "C-<backspace>" 'my/backward-delete
-    "C-<tab>"       'other-window
-    "C-k"           'kill-buffer-and-window
-    "C-="           'er/expand-region
-    "C-_"           'text-scale-decrease
-    "C-+"           'text-scale-increase
-    "C-b"           'consult-buffer
-    "C-,"           'popper-toggle
-    "C-<"           'popper-cycle
-    "C-p"           'yank
+;; unbind
+(dolist (key '("C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z"))
+  (keymap-global-unset key t))
+(with-eval-after-load 'elisp-mode
+  (dolist (key '("C-c C-b" "C-c C-e" "C-c C-f"))
+    (keymap-unset emacs-lisp-mode-map key t)))
+(with-eval-after-load 'winner
+  (dolist (key '("C-c <left>" "C-c <right>"))
+    (keymap-unset winner-mode-map key t)))
 
-    "M-o"           'my/open-line-below
-    "M-<down>"      'move-text-down
-    "M-<up>"        'move-text-up
-    "M-j"           'flash-jump
-    "M-k"           'kill-line
-    "M-u"           'upcase-dwim
-    "M-m"           'mark-paragraph
-    "M-l"           'downcase-dwim
-    "M-p"           'duplicate-dwim
-    "M-c"           'capitalize-dwim)
+;; global (override)
+(my/bind "<f1>"          #'scratch-buffer)
+(my/bind "<f5>"          #'my/select-theme)
+(my/bind "<f6>"          #'my/rotate-theme)
+(my/bind "C-<backspace>" #'my/backward-delete)
+(my/bind "C-<tab>"       #'other-window)
+(my/bind "C-k"           #'kill-buffer-and-window)
+(my/bind "C-="           #'er/expand-region)
+(my/bind "C-_"           #'text-scale-decrease)
+(my/bind "C-+"           #'text-scale-increase)
+(my/bind "C-b"           #'consult-buffer)
+(my/bind "C-,"           #'popper-toggle)
+(my/bind "C-<"           #'popper-cycle)
+(my/bind "C-p"           #'yank)
+(my/bind "M-o"           #'my/open-line-below)
+(my/bind "M-<down>"      #'move-text-down)
+(my/bind "M-<up>"        #'move-text-up)
+(my/bind "M-j"           #'avy-goto-char-2)
+(my/bind "M-k"           #'kill-line)
+(my/bind "M-u"           #'upcase-dwim)
+(my/bind "M-m"           #'mark-paragraph)
+(my/bind "M-l"           #'downcase-dwim)
+(my/bind "M-p"           #'duplicate-dwim)
+(my/bind "C-z"           #'my/zoxide-dired)
+(my/bind "M-c"           #'capitalize-dwim)
 
-  (my/org
-    "t" '(org-hide-drawers-toggle :wk "toggle drawers"))
+;; copy (C-y)
+(which-key-add-key-based-replacements "C-y" "copy")
+(my/bind "C-y w" #'my/copy-word            "copy word")
+(my/bind "C-y s" #'my/copy-symbol          "copy symbol")
+(my/bind "C-y y" #'my/copy-line            "copy line")
+(my/bind "C-y p" #'my/copy-paragraph       "copy paragraph")
+(my/bind "C-y (" #'my/copy-inside-parens   "inside ()")
+(my/bind "C-y [" #'my/copy-inside-brackets "inside []")
+(my/bind "C-y {" #'my/copy-inside-braces   "inside {}")
 
-  (my/dired
-    "RET"      'my/dired-find-file
-    "<f2>"     'wdired-change-to-wdired-mode
-    "M-f"      'dired-create-empty-file
-    "M-d"      'dired-create-directory
-    "M-<left>" 'dired-up-directory
-    "M-."      'dired-omit-mode)
+;; delete (C-d)
+(which-key-add-key-based-replacements "C-d" "delete")
+(my/bind "C-d w" #'my/delete-word        "delete word")
+(my/bind "C-d s" #'my/delete-symbol      "delete symbol")
+(my/bind "C-d d" #'my/delete-line        "delete line")
+(my/bind "C-d p" #'my/delete-paragraph   "delete paragraph")
+(my/bind "C-d (" #'my/delete-in-parens   "delete inside ()")
+(my/bind "C-d [" #'my/delete-in-brackets "delete inside []")
+(my/bind "C-d {" #'my/delete-in-braces   "delete inside {}")
 
-  (my/copy
-    "w" '(my/copy-word            :wk "copy word")
-    "s" '(my/copy-symbol          :wk "copy symbol")
-    "y" '(my/copy-line            :wk "copy line")
-    "p" '(my/copy-paragraph       :wk "copy paragraph")
-    "(" '(my/copy-inside-parens   :wk "inside ()")
-    "[" '(my/copy-inside-brackets :wk "inside []")
-    "{" '(my/copy-inside-braces   :wk "inside {}"))
+;; comment (C-;)
+(which-key-add-key-based-replacements "C-;" "comment")
+(my/bind "C-; ;" #'my/toggle-comment-line      "line")
+(my/bind "C-; p" #'my/toggle-comment-paragraph "paragraph")
 
-  (my/delete
-    "w" '(my/delete-word        :wk "delete word")
-    "s" '(my/delete-symbol      :wk "delete symbol")
-    "d" '(my/delete-line        :wk "delete line")
-    "p" '(my/delete-paragraph   :wk "delete paragraph")
-    "(" '(my/delete-in-parens   :wk "delete inside ()")
-    "[" '(my/delete-in-brackets :wk "delete inside []")
-    "{" '(my/delete-in-braces   :wk "delete inside {}"))
+;; replace (C-r)
+(which-key-add-key-based-replacements "C-r" "replace")
+(my/bind "C-r r" #'replace-string "replace string")
+(my/bind "C-r q" #'query-replace  "query replace")
+(my/bind "C-r m" #'flush-lines    "remove matching lines")
 
-  (my/comment
-    "p" '(my/toggle-comment-paragraph :wk "paragraph")
-    ";" '(my/toggle-comment-line      :wk "line"))
+;; cursors (C-.)
+(which-key-add-key-based-replacements "C-." "cursors")
+(my/bind "C-. ." #'mc/mark-next-like-this     "cursor next")
+(my/bind "C-. /" #'mc/mark-previous-like-this "cursor prev")
+(my/bind "C-. m" #'mc/mark-all-in-region      "cursor region")
+(my/bind "C-. l" #'mc/edit-lines              "cursor lines")
 
-  (my/replace
-    "r" '(replace-string       :wk "replace string")
-    "q" '(query-replace        :wk "query replace")
-    "m" '(flush-lines          :wk "remove matching lines"))
+;; search (C-s)
+(which-key-add-key-based-replacements "C-s" "search")
+(my/bind "C-s r" #'consult-recent-file "recent files")
+(my/bind "C-s b" #'consult-bookmark    "bookmarks")
+(my/bind "C-s g" #'consult-ripgrep     "ripgrep")
+(my/bind "C-s t" #'consult-outline     "heading")
+(my/bind "C-s i" #'consult-imenu       "imenu")
+(my/bind "C-s s" #'consult-line        "line")
 
-  (my/cursors
-    "." '(mc/mark-next-like-this     :wk "cursor next")
-    "/" '(mc/mark-previous-like-this :wk "cursor prev")
-    "m" '(mc/mark-all-in-region      :wk "cursor region")
-    "l" '(mc/edit-lines              :wk "cursor lines"))
+;; file (C-f)
+(which-key-add-key-based-replacements "C-f" "file")
+(my/bind "C-f r" #'rename-visited-file "rename file")
+(my/bind "C-f f" #'find-file           "find file")
+(my/bind "C-f d" #'consult-fd          "fd-find")
+(my/bind "C-f s" #'save-buffer         "save")
 
-  (my/search
-    "r" '(consult-recent-file :wk "recent files")
-    "b" '(consult-bookmark    :wk "bookmarks")
-    "g" '(consult-ripgrep     :wk "ripgrep")
-    "t" '(consult-outline     :wk "heading")
-    "i" '(consult-imenu       :wk "imenu")
-    "s" '(consult-line        :wk "line"))
+;; emacs (C-e)
+(which-key-add-key-based-replacements "C-e" "emacs")
+(my/bind "C-e i" (lambda () (interactive)
+                   (find-file (locate-user-emacs-file "init.el")))
+         "open init.el")
+(my/bind "C-e s" #'sudo-edit        "edit with sudo")
+(my/bind "C-e v" #'visual-line-mode "truncate lines")
+(my/bind "C-e r" #'restart-emacs    "restart emacs")
 
-  (my/file
-    "r" '(rename-visited-file :wk "rename file")
-    "f" '(find-file           :wk "find file")
-    "d" '(consult-fd          :wk "fd-find")
-    "s" '(save-buffer         :wk "save"))
+;; remark (C-q)
+(which-key-add-key-based-replacements "C-q" "mark")
+(my/bind "C-q q" #'org-remark-mark   "highlight region")
+(my/bind "C-q d" #'org-remark-delete "highlight delete")
+(my/bind "C-q c" #'org-remark-change "highlight change")
+(my/bind "C-q o" #'org-remark-open   "open notes")
 
-  (my/emacs
-    "i" '((lambda () (interactive)
-            (find-file (locate-user-emacs-file "init.el")))
-          :wk "open init.el")
-    "s" '(sudo-edit        :wk "edit with sudo")
-    "v" '(visual-line-mode :wk "truncate lines")
-    "r" '(restart-emacs    :wk "restart emacs"))
+;; tools (C-t)
+(which-key-add-key-based-replacements "C-t" "tools")
+(my/bind "C-t m" #'magit-status "magit status")
+(my/bind "C-t t" #'eshell       "terminal")
+(my/bind "C-t i" #'ibuffer      "ibuffer")
 
-  (my/lsp
-    :keymaps 'prog-mode-map
-    "d" '(consult-flymake :wk "jump to diagnostic")
-    "n" '(eglot-rename    :wk "rename symbol"))
+;; LSP/prog-mode (C-l)
+(which-key-add-keymap-based-replacements prog-mode-map "C-l" "lsp")
+(my/bind-local prog-mode-map "C-l d" #'consult-flymake "jump to diagnostic")
+(my/bind-local prog-mode-map "C-l n" #'eglot-rename    "rename symbol")
 
-  (my/mark
-    "q" '(org-remark-mark   :wk "highlight region")
-    "d" '(org-remark-delete :wk "highlight delete")
-    "c" '(org-remark-change :wk "highlight change")
-    "o" '(org-remark-open   :wk "open notes"))
+;; dired (M-d)
+(with-eval-after-load 'dired
+  (my/bind-local dired-mode-map "RET"      #'my/dired-find-file)
+  (my/bind-local dired-mode-map "<f2>"     #'wdired-change-to-wdired-mode)
+  (my/bind-local dired-mode-map "M-f"      #'dired-create-empty-file)
+  (my/bind-local dired-mode-map "M-d"      #'dired-create-directory)
+  (my/bind-local dired-mode-map "M-<left>" #'dired-up-directory)
+  (my/bind-local dired-mode-map "M-."      #'dired-omit-mode))
 
-  ;; (my/help
-  ;;   "v" '(helpful-variable :wk "describe variable")
-  ;;   "f" '(helpful-function :wk "describe function")
-  ;;   "h" '(helpful-at-point :wk "help at point")
-  ;;   "d" '(devdocs-lookup   :wk "devdocs"))
-
-  (my/tools
-    "t" '(eshell           :wk "terminal")
-    "m" '(magit-status     :wk "magit status")
-    "i" '(ibuffer          :wk "ibuffer")))
+;; org (C-o)
+(with-eval-after-load 'org
+  (which-key-add-keymap-based-replacements org-mode-map "C-o" "org")
+  (my/bind-local org-mode-map "C-o t" #'org-hide-drawers-toggle "toggle drawers"))
 
 ;; ===============================================================
 ;;; UI

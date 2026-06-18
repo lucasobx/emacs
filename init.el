@@ -471,16 +471,6 @@
   (add-to-list 'treesit-language-source-alist
                '(ruby "https://github.com/tree-sitter/tree-sitter-ruby" "master" "src")))
 
-;; (use-package ruby-ts-mode
-;;   :ensure nil
-;;   :mode ("\\.rb\\'" "Rakefile\\'" "Gemfile\\'")
-;;   :custom
-;;   (ruby-indent-level 2)
-;;   :config
-;;   (setq ruby-ts-mode-map (make-sparse-keymap))
-;;   (add-to-list 'treesit-language-source-alist
-;;                '(ruby "https://github.com/tree-sitter/tree-sitter-ruby" "master" "src")))
-
 ;; ===============================================================
 ;;; PROG-MODE
 

@@ -99,7 +99,7 @@
   (tab-width 2)
 
   ;; treesit
-  (treesit-auto-install-grammar t)
+  (treesit-auto-install-grammar 'always)
   (treesit-font-lock-level 4)
   (treesit-enabled-modes t)
 
@@ -904,14 +904,6 @@
   (setq ruby-ts-mode-map (make-sparse-keymap))
   (add-to-list 'treesit-language-source-alist
                '(ruby "https://github.com/tree-sitter/tree-sitter-ruby" "master" "src")))
-
-(use-package treesit-auto
-  :ensure t
-  :after emacs
-  :custom
-  (treesit-auto-install t)
-  :config
-  (global-treesit-auto-mode t))
 
 ;; ===============================================================
 ;;; PROG-MODE

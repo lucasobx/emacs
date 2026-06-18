@@ -17,3 +17,4 @@ elpaca
 places
 mason/
 tramp
+lisp/*.elc

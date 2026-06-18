@@ -54,43 +54,32 @@
   :ensure nil
   :init
   (defun display-startup-echo-area-message () (message ""))
-  (delete-selection-mode 1)
-  (global-hl-line-mode -1)
-  (save-place-mode 1)
-  (tooltip-mode -1)
-  (savehist-mode 1)
-  (recentf-mode 1)
-  (winner-mode 1)
 
   :custom
+  ;; startup & ui
   (display-fill-column-indicator-warning nil)
-  (save-interprogram-paste-before-kill t)
-  (uniquify-buffer-name-style 'forward)
-  (display-line-numbers-type 'relative)
   (warning-minimum-level :emergency)
-  (frame-inhibit-implied-resize t)
-  (ibuffer-human-readable-size t)
-  (display-line-numbers-width 4)
-  (zone-all-windows-in-frame t)
-  (auto-revert-check-vc-info t)
-  (initial-scratch-message "")
   (ring-bell-function 'ignore)
-  (split-width-threshold 100)
+  (initial-scratch-message "")
   (inhibit-startup-message t)
-  (treesit-font-lock-level 4)
   (echo-keystrokes 0.1)
   (use-short-answers t)
   (use-dialog-box nil)
-  (zone-all-frames t)
-  (truncate-lines t)
-  (undo-no-redo t)
 
-  ;; minibuffer
+  ;; line numbers
+  (display-line-numbers-type 'relative)
+  (display-line-numbers-width 4)
+
+  ;; windows & buffer
+  (uniquify-buffer-name-style 'forward)
+  (ibuffer-show-empty-filter-groups nil)
+  (ibuffer-human-readable-size t)
+
+  ;; minibuffer & completion
   (minibuffer-prompt-properties
    '(read-only t cursor-intangible t face minibuffer-prompt))
   (read-extended-command-predicate
    #'command-completion-default-include-p)
-  (switch-to-buffer-obey-display-actions t)
   (enable-recursive-minibuffers t)
   (lazy-highlight-initial-delay 0)
   (resize-mini-windows 'grow-only)
@@ -99,52 +88,73 @@
   (history-length 25)
 
   ;; editing
-  (treesit-auto-install-grammar t)
+  (save-interprogram-paste-before-kill t)
   (kill-do-not-save-duplicates t)
   (sentence-end-double-space nil)
   (tab-always-indent 'complete)
   (delete-pair-push-mark t)
-  (treesit-enabled-modes t)
   (indent-tabs-mode nil)
+  (truncate-lines t)
+  (undo-no-redo t)
   (tab-width 2)
+
+  ;; treesit
+  (treesit-auto-install-grammar t)
+  (treesit-font-lock-level 4)
+  (treesit-enabled-modes t)
 
   ;; files
   (auto-save-file-name-transforms
    `((".*" ,(expand-file-name "auto-saves/" user-emacs-directory) t)))
   (find-file-suppress-same-file-warnings t)
-  (global-auto-revert-non-file-buffers t)
   (kill-buffer-delete-auto-save-files t)
+  (delete-by-moving-to-trash t)
   (auto-save-no-message t)
   (make-backup-files nil)
   (create-lockfiles nil)
 
+  ;; autorevert
+  (global-auto-revert-non-file-buffers t)
+  (auto-revert-check-vc-info t)
+
   ;; scroll
   (pixel-scroll-precision-use-momentum nil)
-  (scroll-preserve-screen-position t)
   (mouse-wheel-progressive-speed nil)
-  (delete-by-moving-to-trash t)
+  (scroll-preserve-screen-position t)
   (scroll-conservatively 101)
   (scroll-margin 10)
   (scroll-step 1)
 
+  ;; native-comp
+  (native-comp-async-query-on-exit t)
+
   :config
+  ;; custom file and directories
   (make-directory (expand-file-name "auto-saves/" user-emacs-directory) t)
   (setq custom-file (locate-user-emacs-file "custom-vars.el"))
   (load custom-file 'noerror 'nomessage)
 
-  ;; global modes
+  ;; modes
   (minibuffer-electric-default-mode 1)
   (minibuffer-depth-indicate-mode 1)
   (global-auto-revert-mode 1)
+  (delete-selection-mode 1)
   (file-name-shadow-mode 1)
   (electric-indent-mode 1)
+  (global-hl-line-mode -1)
   (electric-pair-mode 1)
+  (save-place-mode 1)
+  (tooltip-mode -1)
+  (savehist-mode 1)
+  (recentf-mode 1)
 
   ;; hooks
   (add-hook 'emacs-startup-hook
-            (lambda () (message "Booted in %s." (emacs-init-time))))
+          (lambda ()
+            (message "Loaded in %s with %d packages."
+                     (emacs-init-time) (length (elpaca--queued)))))
   (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
-  (add-hook 'prog-mode-hook 'display-line-numbers-mode)
+  (add-hook 'prog-mode-hook #'display-line-numbers-mode)
 
   ;; faces
   (set-face-attribute 'tooltip nil :family my/font)
@@ -153,11 +163,10 @@
 
   ;; misc
   (setq redisplay-skip-fontification-on-input t)
-  (setq ibuffer-show-empty-filter-groups nil)
-  (setq native-comp-async-query-on-exit t)
   (put 'narrow-to-region 'disabled nil)
   (setq message-truncate-lines t)
 
+  ;; skip internal buffers in switch-to-prev/next-buffer
   (defun skip-these-buffers (_window buffer _bury-or-kill)
     "Function for `switch-to-prev-buffer-skip'."
     (string-match "\\*[^*]+\\*" (buffer-name buffer)))
@@ -180,12 +189,7 @@
       (unless (or defining-kbd-macro executing-kbd-macro)
         (funcall quit)))))
 
-  ;; add option `d', allowing a quick preview of the diff of what you're asked to save.
-  (add-to-list 'save-some-buffers-action-alist
-               (list "d"
-                     (lambda (buffer) (diff-buffer-with-file (buffer-file-name buffer)))
-                     "show diff between the buffer and its file"))
-
+  ;; ensure emacs uses the same path as the login shell
   (defun my/exec-path-from-shell ()
     "Sync `exec-path' and PATH with the login shell asynchronously."
     (interactive)
@@ -275,7 +279,6 @@
 ;;; CUSTOM-OPS
 
 ;; movement & editing
-
 (defun my/delete-dont-kill ()
   "Delete word backward without adding to kill ring."
   (delete-region (point) (progn (backward-word 1) (point))))
@@ -308,7 +311,6 @@
       (beginning-of-line))))
 
 ;; delimiter bounds
-
 (defmacro my/define-inside (suffix open)
   "Define an inside-bounds function named from SUFFIX for the OPEN delimiter."
   `(defun ,(intern (format "my/inside-%s" suffix)) ()
@@ -324,7 +326,6 @@
 (my/define-inside braces   "{")
 
 ;; generic operations
-
 (defun my/delete-thing (thing)
   "Delete THING at point and save to kill ring with visual feedback."
   (let ((bounds (bounds-of-thing-at-point thing)))
@@ -403,7 +404,6 @@
             (preceded-by-space (delete-char -1))))))))
 
 ;; delete commands
-
 (my/define-delete-cleanup my/delete-word   word)
 (my/define-delete-cleanup my/delete-symbol symbol)
 
@@ -428,7 +428,6 @@
   (my/delete-in-braces   #'my/inside-braces   "Delete text inside braces."))
 
 ;; copy commands
-
 (defun my/copy-line ()
   "Copy line at point, or active region if one exists."
   (interactive)
@@ -452,7 +451,6 @@
   (my/copy-inside-braces   #'my/inside-braces   "Copy text inside braces."))
 
 ;; comment commands
-
 (defun my/toggle-comment-line ()
   "Toggle comment on current line."
   (interactive)
@@ -538,6 +536,7 @@
 (my/bind "C-,"           #'popper-toggle)
 (my/bind "C-<"           #'popper-cycle)
 (my/bind "C-p"           #'yank)
+(my/bind "C-z"           #'my/zoxide-dired)
 (my/bind "M-o"           #'my/open-line-below)
 (my/bind "M-<down>"      #'move-text-down)
 (my/bind "M-<up>"        #'move-text-up)
@@ -547,7 +546,6 @@
 (my/bind "M-m"           #'mark-paragraph)
 (my/bind "M-l"           #'downcase-dwim)
 (my/bind "M-p"           #'duplicate-dwim)
-(my/bind "C-z"           #'my/zoxide-dired)
 (my/bind "M-c"           #'capitalize-dwim)
 
 ;; copy (C-y)
@@ -579,7 +577,6 @@
 (which-key-add-key-based-replacements "C-r" "replace")
 (my/bind "C-r r" #'replace-string "replace string")
 (my/bind "C-r q" #'query-replace  "query replace")
-(my/bind "C-r m" #'flush-lines    "remove matching lines")
 
 ;; cursors (C-.)
 (which-key-add-key-based-replacements "C-." "cursors")

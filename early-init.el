@@ -2,6 +2,10 @@
 ;;; Commentary:
 ;;; Code:
 
+;; emacs 31
+(when (boundp 'load-path-filter-function)
+  (setq load-path-filter-function #'load-path-filter-cache-directory-files))
+
 ;; garbage collection
 (setq gc-cons-threshold most-positive-fixnum
       gc-cons-percentage 1.0)
@@ -28,6 +32,10 @@
 (setq jka-compr-verbose nil)
 
 ;; miscellaneous performance
+(setq-default cursor-in-non-selected-windows nil)
+(setq fast-but-imprecise-scrolling t)
+(setq auto-window-vscroll nil)
+
 (setq read-process-output-max (* 1024 1024 4))
 (setq process-adaptive-read-buffering nil)
 (setq inhibit-compacting-font-caches t)

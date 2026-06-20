@@ -2,7 +2,9 @@
 ;;; Commentary:
 ;;; Code:
 
-;; movement & editing
+;; ===============================================================
+;;; MOVEMENT & EDITING
+
 (defun my/delete-dont-kill ()
   "Delete word backward without adding to kill ring."
   (delete-region (point) (progn (backward-word 1) (point))))
@@ -11,9 +13,8 @@
   "Delete a word, a character, or whitespace."
   (interactive)
   (cond
-   ((looking-back (rx (char word)) 1)
-    (my/delete-dont-kill))
-   ((looking-back (rx (seq (char word) (= 1 blank))) 1)
+   ((or (looking-back (rx (char word)) 1)
+        (looking-back (rx (seq (char word) (= 1 blank))) 1))
     (my/delete-dont-kill))
    ((looking-back (rx (char blank)) 1)
     (delete-horizontal-space t))
@@ -34,7 +35,9 @@
     (when (= origin (point))
       (beginning-of-line))))
 
-;; delimiter bounds
+;; ===============================================================
+;;; DELIMITER BOUNDS
+
 (defmacro my/define-inside (suffix open)
   "Define an inside-bounds function named from SUFFIX for the OPEN delimiter."
   `(defun ,(intern (format "my/inside-%s" suffix)) ()
@@ -48,6 +51,87 @@
 (my/define-inside parens   "(")
 (my/define-inside brackets "[")
 (my/define-inside braces   "{")
+
+;; ===============================================================
+;;; SELECTION
+
+(defun my/select-bounds (bounds)
+  "Activate a region spanning BOUNDS, a cons cell of (START . END)."
+  (when bounds
+    (goto-char (car bounds))
+    (set-mark (cdr bounds))
+    (activate-mark)))
+
+;; select thing at point
+(defmacro my/define-select (name thing)
+  "Define NAME selecting THING at point as an active region."
+  `(defun ,name ()
+     ,(format "Select the %s at point." thing)
+     (interactive)
+     (my/select-bounds (bounds-of-thing-at-point ',thing))))
+
+(my/define-select my/select-word      word)
+(my/define-select my/select-symbol    symbol)
+(my/define-select my/select-line      line)
+(my/define-select my/select-paragraph paragraph)
+(my/define-select my/select-defun     defun)
+(my/define-select my/select-sexp      sexp)
+
+;; select content inside delimiters
+(defmacro my/define-select-inside (name bounds-fn)
+  "Define NAME selecting the region returned by BOUNDS-FN."
+  `(defun ,name ()
+     "Select content inside delimiters at point."
+     (interactive)
+     (my/select-bounds (,bounds-fn))))
+
+(my/define-select-inside my/select-in-parens   my/inside-parens)
+(my/define-select-inside my/select-in-brackets my/inside-brackets)
+(my/define-select-inside my/select-in-braces   my/inside-braces)
+
+;; ===============================================================
+;;; WRAPPING
+
+(defmacro my/define-wrap (suffix open close)
+  "Define a command that wraps text with OPEN and CLOSE, identified by SUFFIX."
+  `(defun ,(intern (format "my/wrap-%s" suffix)) ()
+     ,(format "Wrap the region, or the symbol at point, with %s%s." open close)
+     (interactive)
+     (let ((bounds (if (use-region-p)
+                       (cons (region-beginning) (region-end))
+                     (and (memq (char-syntax (or (char-after) ?\s)) '(?w ?_))
+                          (bounds-of-thing-at-point 'symbol)))))
+       (when bounds
+         (let ((beg (car bounds))
+               (end (cdr bounds)))
+           (save-excursion
+             (goto-char end) (insert ,close)
+             (goto-char beg) (insert ,open))
+           (pulse-momentary-highlight-region beg (+ end (length ,open) (length ,close)))
+           (when (use-region-p) (deactivate-mark)))))))
+
+(my/define-wrap parens   "(" ")")
+(my/define-wrap brackets "[" "]")
+(my/define-wrap braces   "{" "}")
+(my/define-wrap quotes   "\"" "\"")
+
+;; ===============================================================
+;;; OPERATION HELPERS
+
+;; region-aware dispatch
+(defmacro my/region-or (fallback &rest body)
+  "Act on the active region, falling back to FALLBACK when none is active.
+When a region is active it is highlighted, BODY runs with `beg' and `end'
+bound to the region bounds, and the mark is deactivated afterwards.
+Otherwise FALLBACK is evaluated."
+  (declare (indent 1))
+  `(if (use-region-p)
+       (let ((beg (region-beginning))
+             (end (region-end)))
+         (pulse-momentary-highlight-region beg end)
+         ,@body
+         (deactivate-mark))
+     ,fallback))
 
 ;; generic operations
 (defun my/delete-thing (thing)
@@ -95,6 +179,7 @@
         (sit-for 0.05)
         (comment-or-uncomment-region start end)))))
 
+;; command generators
 (defmacro my/define-ops (helper &rest specs)
   "Define interactive commands from SPECS, each calling HELPER with one argument."
   `(progn
@@ -127,20 +212,18 @@
             (followed-by-space (delete-char 1))
             (preceded-by-space (delete-char -1))))))))
 
-;; delete commands
+;; ===============================================================
+;;; DELETE COMMANDS
+
 (my/define-delete-cleanup my/delete-word   word)
 (my/define-delete-cleanup my/delete-symbol symbol)
 
 (defun my/delete-line ()
   "Delete line at point, or active region if one exists."
   (interactive)
-  (if (use-region-p)
-      (progn
-        (pulse-momentary-highlight-region (region-beginning) (region-end))
-        (sit-for 0.15)
-        (kill-region (region-beginning) (region-end))
-        (deactivate-mark))
-    (my/delete-thing 'line)))
+  (my/region-or (my/delete-thing 'line)
+    (sit-for 0.15)
+    (kill-region beg end)))
 
 (my/define-ops my/delete-thing
   (my/delete-paragraph 'paragraph "Delete paragraph at point.")
@@ -151,17 +234,15 @@
   (my/delete-in-brackets #'my/inside-brackets "Delete text inside brackets.")
   (my/delete-in-braces   #'my/inside-braces   "Delete text inside braces."))
 
-;; copy commands
+;; ===============================================================
+;;; COPY COMMANDS
+
 (defun my/copy-line ()
   "Copy line at point, or active region if one exists."
   (interactive)
-  (if (use-region-p)
-      (progn
-        (pulse-momentary-highlight-region (region-beginning) (region-end))
-        (kill-ring-save (region-beginning) (region-end))
-        (deactivate-mark)
-        (message "Copied region"))
-    (my/copy-thing 'line)))
+  (my/region-or (my/copy-thing 'line)
+    (kill-ring-save beg end)
+    (message "Copied region")))
 
 (my/define-ops my/copy-thing
   (my/copy-paragraph 'paragraph "Copy paragraph at point.")
@@ -174,7 +255,9 @@
   (my/copy-inside-brackets #'my/inside-brackets "Copy text inside brackets.")
   (my/copy-inside-braces   #'my/inside-braces   "Copy text inside braces."))
 
-;; comment commands
+;; ===============================================================
+;;; COMMENT COMMANDS
+
 (defun my/toggle-comment-line ()
   "Toggle comment on current line."
   (interactive)

@@ -6,15 +6,16 @@ recentf.eld
 mc-lists.el
 auto-saves/
 places.eld
+lisp/*.elc
 eln-cache/
 transient/
 devdocs/
 history
 recentf
+eshell/
 .cache/
 .tutor/
 elpaca
 places
 mason/
 tramp
-lisp/*.elc

@@ -1,8 +1,10 @@
 ### Requirements
 * emacs 31+
 * nerd icons
+* wl-copy
 * ripgrep
 * fd-find
+* zoxide
 
 ___
-<img width="1268" height="1538" alt="image" src="https://github.com/user-attachments/assets/8061c864-9b76-4975-99fe-4e2f83339795" />
+<img width="1264" height="1536" alt="image" src="https://github.com/user-attachments/assets/acc84669-0eb5-478c-b00e-2e36b1401d2c" />

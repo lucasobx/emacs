@@ -119,6 +119,22 @@
 (my/bind "C-q q" #'my/select-line      "select line")
 (my/bind "C-q a" #'mark-whole-buffer   "select all")
 
+;; line-block counts (1-9): delete / copy / comment / select
+(dotimes (i 9)
+  (let ((n (1+ i)))
+    (my/bind (format "C-d %d" n) (intern (format "my/delete-lines-%d" n)))
+    (my/bind (format "C-y %d" n) (intern (format "my/copy-lines-%d" n)))
+    (my/bind (format "C-; %d" n) (intern (format "my/comment-lines-%d" n)))
+    (my/bind (format "C-q %d" n) (intern (format "my/select-lines-%d" n)))))
+
+;; hide the numbered line-block keys from the which-key popup
+(with-eval-after-load 'which-key
+  (dolist (prefix '("C-d" "C-y" "C-;" "C-q"))
+    (dotimes (i 9)
+      (let ((kd (key-description (kbd (format "%s %d" prefix (1+ i))))))
+        (push (cons (cons (concat "\\`" (regexp-quote kd) "\\'") nil) t)
+              which-key-replacement-alist)))))
+
 (wk-add  "C-t" "tools")
 (my/bind "C-t t" #'eshell       "eshell")
 (my/bind "C-t m" #'magit-status "magit")

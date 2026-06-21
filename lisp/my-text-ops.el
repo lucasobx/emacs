@@ -267,5 +267,55 @@ Otherwise FALLBACK is evaluated."
   (my/toggle-comment-paragraph 'paragraph "Toggle comment on paragraph at point.")
   (my/toggle-comment-defun     'defun     "Toggle comment on defun at point."))
 
+;; ===============================================================
+;;; LINE BLOCKS
+
+(defun my/line-block-bounds (n)
+  "Return bounds (BEG . END) for the current line plus N lines below it."
+  (cons (line-beginning-position)
+        (save-excursion (forward-line (1+ n)) (point))))
+
+(defun my/delete-lines (n)
+  "Delete the current line plus N lines below it, with visual feedback."
+  (let ((bounds (my/line-block-bounds n)))
+    (pulse-momentary-highlight-region (car bounds) (cdr bounds))
+    (sit-for 0.15)
+    (kill-region (car bounds) (cdr bounds))))
+
+(defun my/copy-lines (n)
+  "Copy the current line plus N lines below it, with visual feedback."
+  (let ((bounds (my/line-block-bounds n)))
+    (pulse-momentary-highlight-region (car bounds) (cdr bounds))
+    (kill-ring-save (car bounds) (cdr bounds))
+    (message "Copied %d lines" (1+ n))))
+
+(defun my/comment-lines (n)
+  "Toggle comment on the current line plus N lines below it."
+  (let ((bounds (my/line-block-bounds n)))
+    (pulse-momentary-highlight-region (car bounds) (cdr bounds))
+    (sit-for 0.05)
+    (comment-or-uncomment-region (car bounds) (cdr bounds))))
+
+(defun my/select-lines (n)
+  "Select the current line plus N lines below it."
+  (my/select-bounds (my/line-block-bounds n)))
+
+(defmacro my/define-line-counts (helper)
+  "Define commands HELPER-1 .. HELPER-9 calling HELPER with N (1-9)."
+  `(progn
+     ,@(mapcar
+        (lambda (n)
+          `(defun ,(intern (format "%s-%d" helper n)) ()
+             ,(format "Run `%s' on the current line plus %d line%s below it."
+                      helper n (if (= n 1) "" "s"))
+             (interactive)
+             (,helper ,n)))
+        (number-sequence 1 9))))
+
+(my/define-line-counts my/delete-lines)
+(my/define-line-counts my/copy-lines)
+(my/define-line-counts my/comment-lines)
+(my/define-line-counts my/select-lines)
+
 (provide 'my-text-ops)
 ;;; my-text-ops.el ends here

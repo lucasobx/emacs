@@ -647,23 +647,18 @@
 ;; ==============================================================
 ;;; EDITING
 
-(use-package expand-region
-  :ensure t)
-
 (use-package move-text
-  :ensure t)
+  :ensure t
+  :defer t)
 
 (use-package multiple-cursors
   :ensure t
+  :defer t
   :custom
   (mc/list-file (locate-user-emacs-file "mc-lists.el"))
   :config
   ;; prevent multiple-cursors from prompting about devil
   (add-to-list 'mc/cmds-to-run-once 'devil))
-
-(use-package sudo-edit
-  :ensure t
-  :defer t)
 
 ;; ===============================================================
 ;;; ORG

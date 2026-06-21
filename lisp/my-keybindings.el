@@ -100,8 +100,8 @@
 (wk-add  "C-e" "emacs")
 (my/bind "C-e i" (lambda ()
                    (interactive) (find-file (locate-user-emacs-file "init.el"))) "init.el")
+(my/bind "C-e s" #'tramp-revert-buffer-with-sudo "sudo edit")
 (my/bind "C-e e" #'save-buffer      "save buffer")
-(my/bind "C-e s" #'sudo-edit        "sudo edit")
 (my/bind "C-e t" #'visual-line-mode "truncate")
 (my/bind "C-e r" #'restart-emacs    "restart")
 

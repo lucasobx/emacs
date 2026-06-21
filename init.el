@@ -10,6 +10,7 @@
 (require 'my-bootstrap)
 (require 'my-load-theme)
 (require 'my-keybindings)
+(require 'dired-snacks)
 (require 'my-exec-path)
 (require 'my-text-ops)
 
@@ -35,11 +36,6 @@
   ;; line numbers
   (display-line-numbers-type 'relative)
   (display-line-numbers-width 4)
-
-  ;; windows & buffer
-  (uniquify-buffer-name-style 'forward)
-  (ibuffer-show-empty-filter-groups nil)
-  (ibuffer-human-readable-size t)
 
   ;; minibuffer & completion
   (minibuffer-prompt-properties
@@ -74,6 +70,7 @@
    `((".*" ,(expand-file-name "auto-saves/" user-emacs-directory) t)))
   (find-file-suppress-same-file-warnings t)
   (kill-buffer-delete-auto-save-files t)
+  (uniquify-buffer-name-style 'forward)
   (delete-by-moving-to-trash t)
   (auto-save-no-message t)
   (make-backup-files nil)
@@ -91,8 +88,11 @@
   (scroll-margin 10)
   (scroll-step 1)
 
-  ;; native-comp
+  ;; misc
   (native-comp-async-query-on-exit t)
+  (ibuffer-show-empty-filter-groups nil)
+  (ibuffer-human-readable-size t)
+  (ibuffer-use-other-window t)
 
   :config
   ;; custom file and directories
@@ -108,7 +108,6 @@
   (file-name-shadow-mode 1)
   (electric-indent-mode 1)
   (global-hl-line-mode -1)
-  (electric-pair-mode 1)
   (save-place-mode 1)
   (tooltip-mode -1)
   (savehist-mode 1)
@@ -123,9 +122,11 @@
   (add-hook 'prog-mode-hook #'display-line-numbers-mode)
 
   ;; faces
-  (set-face-attribute 'tooltip nil :family "TX-02")
-  (set-face-attribute 'default nil :family "TX-02" :height 115 :width 'condensed)
+  (defvar my/font "TX-02")
+  (set-face-attribute 'default nil
+                      :font (font-spec :family my/font :size 15 :width 'condensed))
   (set-face-attribute 'minibuffer-nonselected nil :background 'unspecified)
+  (set-face-attribute 'tooltip nil :family my/font)
 
   ;; misc
   (setq redisplay-skip-fontification-on-input t)
@@ -183,7 +184,7 @@
   :config
   (setopt which-key-max-description-length 28
           which-key-add-column-padding 1
-          which-key-min-display-lines 6
+          which-key-min-display-lines 5
           which-key-prefix-prefix ""
           which-key-separator " → "
           which-key-idle-delay 0.3)
@@ -223,7 +224,7 @@
       (display-buffer-in-side-window)
       (side . bottom)
       (slot . 0)
-      (window-height . 0.4))
+      (window-height . 0.3))
      ("\\*Ibuffer\\*"
       (display-buffer-in-side-window)
       (side . bottom)
@@ -244,9 +245,11 @@
   (popper-reference-buffers
    '("\\*eldoc\\*"
      "\\*marginal notes\\*"
+     "\\*Ibuffer\\*"
      "\\*eshell\\*"
      compilation-mode
      inf-ruby-mode
+     ibuffer-mode
      devdocs-mode
      helpful-mode
      help-mode)))
@@ -314,7 +317,7 @@
   (doom-modeline-persp-icon nil)
   (doom-modeline-persp-name nil)
   (doom-modeline-modal-icon t)
-  (doom-modeline-height 25)
+  (doom-modeline-height 23)
   (doom-modeline-time nil)
   (doom-modeline-modal t)
   (doom-modeline-icon t)
@@ -340,19 +343,13 @@
 ;;   :config
 ;;   (emacs-goose-mode))
 
-(use-package emacs-goose
-  :ensure (:host github :repo "lucasobx/emacs-goose" :files ("*.el" "sprites"))
-  :demand t
-  :config
-  (emacs-goose-mode))
-
 (use-package colorful-mode
   :ensure t
   :custom
-  (colorful-use-prefix t)
   (colorful-prefix-string "■ ")
   (colorful-only-strings nil)
   (css-fontify-colors nil)
+  (colorful-use-prefix t)
   :config
   (global-colorful-mode t)
   (add-to-list 'global-colorful-modes 'helpful-mode))
@@ -391,15 +388,10 @@
   (bookmark-fringe-mark nil)
   (bookmark-save-flag 1))
 
-(use-package avy
-  :ensure t
-  :defer t)
-
 (use-package dired
   :ensure nil
   :custom
   (dired-listing-switches "-lah --almost-all --group-directories-first --sort=extension")
-  (dired-hide-details-hide-absolute-location t)
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-recursive-deletes 'always)
   (dired-recursive-copies 'always)
@@ -412,6 +404,7 @@
   (dired-mode . dired-omit-mode)
   (dired-mode . hl-line-mode)
   :config
+  (add-hook 'dired-mode-hook (lambda () (setq line-spacing '(0.03 . 0.03))))
   (defun my/dired-find-file ()
     "Open file from dired in full window, closing dired."
     (interactive)
@@ -423,38 +416,12 @@
   :ensure nil
   :commands (wdired-change-to-wdired-mode))
 
-(defun my/zoxide-dired (query)
-  "Prompt for QUERY, jump to the best zoxide match and open Dired there."
-  (interactive "szoxide: ")
-  (with-temp-buffer
-    (if (zerop (call-process "zoxide" nil t nil "query" "--" query))
-        (let ((dir (string-trim (buffer-string))))
-          (if (file-directory-p dir)
-              (dired dir)
-            (user-error "Zoxide returned a non-directory: %s" dir)))
-      (user-error "No zoxide match for: %s" query))))
-
 ;; ===============================================================
 ;;; TREESITTER
 
-(use-package json-ts-mode
-  :ensure nil
-  :mode "\\.json\\'")
-
-(use-package yaml-ts-mode
-  :ensure nil
-  :mode "\\.ya?ml\\'")
-
-(use-package markdown-mode
-  :ensure t
-  :mode ("README\\.md\\'" . gfm-mode)
-  :init (setq markdown-command "multimarkdown")
-  :bind (:map markdown-mode-map
-         ("C-c C-e" . markdown-do)))
-
 (use-package lua-ts-mode
   :ensure nil
-  :mode "\\.lua\\'"
+  :defer t
   :custom
   (lua-ts-indent-offset 2)
   :config
@@ -467,9 +434,11 @@
   (ruby-indent-level 2)
   :config
   (setq ruby-ts-mode-map (make-sparse-keymap))
-  (set-keymap-parent ruby-ts-mode-map prog-mode-map)
-  (add-to-list 'treesit-language-source-alist
-               '(ruby "https://github.com/tree-sitter/tree-sitter-ruby" "master" "src")))
+  (set-keymap-parent ruby-ts-mode-map prog-mode-map))
+
+(use-package markdown-mode
+  :ensure t
+  :mode ("README\\.md\\'" . gfm-mode))
 
 ;; ===============================================================
 ;;; PROG-MODE
@@ -481,7 +450,6 @@
   :custom
   (eldoc-help-at-pt t)
   (eldoc-idle-delay 0.5)
-  (eldoc-echo-area-display-truncation-message nil)
   (eldoc-echo-area-use-multiline-p nil))
 
 (use-package eldoc-box
@@ -718,12 +686,14 @@
   :ensure nil
   :defer t
   :custom
-  (eshell-banner-message "")
+  (eshell-scroll-to-bottom-on-input 'this)
   (eshell-history-size 100000)
   (eshell-hist-ignoredups t)
+  (eshell-banner-message "")
   :config
   (with-eval-after-load 'em-alias
-    (eshell/alias "clear" "clear-scrollback")))
+    (eshell/alias "clear" "clear-scrollback")
+    (eshell/alias "git" "*git -c color.ui=always $*")))
 
 ;; ===============================================================
 ;;; DOCS

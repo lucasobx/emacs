@@ -522,11 +522,30 @@
   (corfu-max-width 40)
   (corfu-bar-width 0)
   (corfu-auto nil)
-  (corfu-count 7)
+  (corfu-count 5)
   :config
   (global-corfu-mode)
   (advice-add #'lsp-completion-at-point
               :around #'cape-wrap-noninterruptible))
+
+(use-package completion-preview
+  :ensure nil
+  :hook (after-init . global-completion-preview-mode)
+  :bind
+  ( :map completion-preview-active-mode-map
+    ("M-n" . completion-preview-next-candidate))
+  :custom
+  (completion-preview-minimum-symbol-length 1)
+  (completion-preview-exact-match-only nil)
+  (completion-preview-idle-delay 0.3)
+  :config
+  (with-eval-after-load 'org
+    (push 'org-self-insert-command completion-preview-commands))
+  (defun my/detect-org-table ()
+    "Return true if point in Org table."
+    (and (derived-mode-p 'org-mode) (org-at-table-p)))
+  (add-hook 'completion-preview-inhibit-functions
+            #'my/detect-org-table))
 
 (use-package cape
   :ensure t

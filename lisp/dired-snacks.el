@@ -25,6 +25,15 @@
   (when (and dir (executable-find "zoxide"))
     (call-process "zoxide" nil 0 nil "add" "--" (expand-file-name dir))))
 
+(defun my/zoxide--add-default-directory ()
+  "Register `default-directory' in zoxide for `find-file' and Dired visits."
+  (when (and (not (file-remote-p default-directory))
+             (file-directory-p default-directory))
+    (my/zoxide--add default-directory)))
+
+(add-hook 'find-file-hook  #'my/zoxide--add-default-directory)
+(add-hook 'dired-mode-hook #'my/zoxide--add-default-directory)
+
 (defun my/zoxide--update-ghost (&rest _)
   "Refresh the inline ghost preview of the best zoxide match."
   (when (overlayp my/zoxide--ghost-ov)

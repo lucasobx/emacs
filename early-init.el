@@ -76,6 +76,11 @@
               bidi-paragraph-direction 'left-to-right)
 (setq bidi-inhibit-bpa t)
 
+;; trusted content
+(when (boundp 'trusted-content)
+  (add-to-list 'trusted-content
+               (file-name-as-directory (locate-user-emacs-file "lisp"))))
+
 ;; misc
 (setq command-line-ns-option-alist nil)
 (setq command-line-x-option-alist nil)

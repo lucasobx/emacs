@@ -614,10 +614,6 @@
 ;; ==============================================================
 ;;; EDITING
 
-(use-package move-text
-  :ensure t
-  :defer t)
-
 (use-package multiple-cursors
   :ensure t
   :defer t

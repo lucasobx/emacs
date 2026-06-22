@@ -55,5 +55,35 @@ The whole prompt is read-only; input typed after it stays editable."
                          prompt)
     prompt))
 
+;; ===============================================================
+;;; ALIASES
+
+(defvar eshell-command-aliases-list)
+(declare-function eshell-write-aliases-list "em-alias")
+
+(defvar my/eshell-aliases
+  '(("git"   "*git -c color.ui=always $*")
+    ("clear" "clear-scrollback")
+    ("gg"    "magit-status")
+    ("f"     "find-file $1")
+    ("l"     "ls -lh $*")
+    ("d"     "dired $1")
+    ("q"     "exit"))
+  "Eshell command aliases.")
+
+(defun my/eshell-set-aliases ()
+  "Install `my/eshell-aliases', overriding any matching existing alias."
+  (dolist (alias my/eshell-aliases)
+    (setq eshell-command-aliases-list
+          (cons alias (assoc-delete-all (car alias)
+                                        eshell-command-aliases-list)))))
+
+;; never persist aliases to disk
+(with-eval-after-load 'em-alias
+  (advice-add #'eshell-write-aliases-list :override #'ignore))
+
+;; run after `eshell-read-aliases-list', so these take precedence
+(add-hook 'eshell-mode-hook #'my/eshell-set-aliases)
+
 (provide 'my-eshell)
 ;;; my-eshell.el ends here

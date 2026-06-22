@@ -701,17 +701,13 @@
   :ensure nil
   :defer t
   :custom
-  (eshell-scroll-to-bottom-on-input 'this)
-  (eshell-history-size 100000)
-  (eshell-hist-ignoredups t)
-  (eshell-banner-message "")
-  (eshell-highlight-prompt nil)
   (eshell-prompt-regexp my/eshell-prompt-regexp)
   (eshell-prompt-function #'my/eshell-prompt)
-  :config
-  (with-eval-after-load 'em-alias
-    (eshell/alias "clear" "clear-scrollback")
-    (eshell/alias "git" "*git -c color.ui=always $*")))
+  (eshell-scroll-to-bottom-on-input 'this)
+  (eshell-highlight-prompt nil)
+  (eshell-history-size 100000)
+  (eshell-hist-ignoredups t)
+  (eshell-banner-message ""))
 
 ;; ===============================================================
 ;;; DOCS

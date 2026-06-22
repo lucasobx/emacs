@@ -12,6 +12,7 @@
 (require 'my-keybindings)
 (require 'dired-snacks)
 (require 'my-exec-path)
+(require 'my-move-text)
 (require 'my-text-ops)
 (require 'my-eshell)
 (require 'my-cache)

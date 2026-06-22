@@ -13,6 +13,7 @@
 (require 'dired-snacks)
 (require 'my-exec-path)
 (require 'my-text-ops)
+(require 'my-cache)
 
 ;; ===============================================================
 ;;; EMACS
@@ -66,8 +67,6 @@
   (treesit-enabled-modes t)
 
   ;; files
-  (auto-save-file-name-transforms
-   `((".*" ,(expand-file-name "auto-saves/" user-emacs-directory) t)))
   (find-file-suppress-same-file-warnings t)
   (kill-buffer-delete-auto-save-files t)
   (uniquify-buffer-name-style 'forward)
@@ -96,7 +95,6 @@
 
   :config
   ;; custom file and directories
-  (make-directory (expand-file-name "auto-saves/" user-emacs-directory) t)
   (setq custom-file (locate-user-emacs-file "custom-vars.el"))
   (load custom-file 'noerror 'nomessage)
 

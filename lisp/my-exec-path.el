@@ -2,15 +2,19 @@
 ;;; Commentary:
 ;;; Code:
 
+(defun my/exec-path--command (shell)
+  "Return the (PROGRAM . ARGS) list that prints PATH for SHELL, or nil."
+  (pcase shell
+    ("fish" (list "fish" "-c" "string join : $PATH"))
+    ("bash" (list "bash" "-l" "-i" "-c" "printenv PATH"))
+    ("zsh"  (list "zsh"  "-l" "-i" "-c" "printenv PATH"))
+    (_ nil)))
+
 (defun my/exec-path-from-shell ()
   "Sync `exec-path' and PATH with the login shell asynchronously."
   (interactive)
   (let* ((shell (file-name-nondirectory (or (getenv "SHELL") "")))
-         (command (pcase shell
-                    ("fish" "fish -c 'string join : $PATH'")
-                    ("bash" "bash --login -c 'printenv PATH'")
-                    ("zsh"  "zsh -i -c 'printenv PATH'")
-                    (_ nil))))
+         (command (my/exec-path--command shell)))
     (if (not command)
         (message ">>> exec-path: unsupported shell `%s'" shell)
       (let ((output ""))
@@ -19,17 +23,23 @@
          :buffer nil
          :noquery t
          :connection-type 'pipe
-         :command (list shell-file-name shell-command-switch command)
+         :command command
          :filter (lambda (_proc chunk) (setq output (concat output chunk)))
          :sentinel
          (lambda (_proc event)
-           (when (string-prefix-p "finished" event)
+           (cond
+            ((string-prefix-p "finished" event)
              (let ((path (string-trim output)))
-               (unless (string-empty-p path)
+               (if (string-empty-p path)
+                   (lwarn 'my/exec-path :warning "empty PATH from `%s'" shell)
                  (setenv "PATH" path)
                  (setq exec-path (append (parse-colon-path path)
                                          (list exec-directory)))
-                 (setq-default eshell-path-env path))))))))))
+                 (setq-default eshell-path-env path))))
+            ((string-match-p "\\`\\(?:exited abnormally\\|failed\\)" event)
+             (lwarn 'my/exec-path :warning
+                    "`%s' failed to report PATH: %s" shell (string-trim event))))))))))
+
 (add-hook 'after-init-hook #'my/exec-path-from-shell)
 
 (provide 'my-exec-path)

@@ -1,4 +1,5 @@
 ### Requirements
+* linux
 * emacs 31+
 * nerd icons
 * wl-copy

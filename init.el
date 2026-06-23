@@ -2,12 +2,20 @@
 ;;; Commentary:
 ;;; Code:
 
+(require 'package)
+(setq package-archives
+      '(("gnu"    . "https://elpa.gnu.org/packages/")
+        ("nongnu" . "https://elpa.nongnu.org/nongnu/")
+        ("melpa"  . "https://melpa.org/packages/")))
+(setq use-package-vc-prefer-newest t)
+(require 'use-package)
+(provide 'my-bootstrap)
+
 ;; ===============================================================
 ;;; MODULES
 
 (add-to-list 'load-path (locate-user-emacs-file "lisp"))
 (byte-recompile-directory (expand-file-name "lisp" user-emacs-directory) 0)
-(require 'my-bootstrap)
 (require 'my-load-theme)
 (require 'my-keybindings)
 (require 'dired-snacks)
@@ -117,7 +125,7 @@
   (add-hook 'emacs-startup-hook
           (lambda ()
             (message "Loaded in %s with %d packages."
-                     (emacs-init-time) (length (elpaca--queued)))))
+                     (emacs-init-time) (length package-activated-list))))
   (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
   (add-hook 'prog-mode-hook #'display-line-numbers-mode)
 
@@ -172,7 +180,7 @@
 ;;   (pixel-themes-load-theme 'pixel-themes-psygnosia))
 
 (use-package pixel-themes
-  :ensure (:host github :repo "lucasobx/pixel-themes"))
+  :vc (:url "https://github.com/lucasobx/pixel-themes"))
 
 ;; ===============================================================
 ;;; KEYBINDINGS
@@ -192,20 +200,20 @@
   (setopt which-key-sort-order 'which-key-local-then-key-order))
 
 (use-package devil
-  :ensure (:host github :repo "fbrosda/devil" :branch "dev")
+  :vc (:url "https://github.com/fbrosda/devil" :branch "dev")
   :custom
   (devil-highlight-repeatable t)
-  (devil-prompt " %t")
+  (devil-prompt " %t")
   :config
   (global-devil-mode)
   (assoc-delete-all "%k z" devil-translations)
   (add-to-list 'devil-translations '("%k z" . "C-z"))
   (add-to-list 'devil-repeatable-keys
                '("%k . ." "%k . /"))
-  (add-to-list 'devil-repeatable-keys ;; delete
+  (add-to-list 'devil-repeatable-keys
                '("%k d s" "%k d d" "%k d p" "%k d f"
                  "%k d w" "%k d (" "%k d [" "%k d {"))
-  (add-to-list 'devil-repeatable-keys ;; comment
+  (add-to-list 'devil-repeatable-keys
                '("%k ; ;" "%k ; p" "%k ; f")))
 
 ;; ===============================================================
@@ -384,6 +392,7 @@
 
 (use-package bookmark
   :ensure nil
+  :defer t
   :custom
   (bookmark-fringe-mark nil)
   (bookmark-save-flag 1))
@@ -397,6 +406,7 @@
   (dired-recursive-copies 'always)
   (dired-auto-revert-buffer t)
   (dired-omit-files "^\\.")
+  (dired-omit-verbose nil)
   (dired-free-space nil)
   (dired-dwim-target t)
   :hook
@@ -671,7 +681,7 @@
   (set-face-attribute 'org-ellipsis nil :underline nil))
 
 (use-package org-appear
-  :ensure (:host github :repo "awth13/org-appear")
+  :vc (:url "https://github.com/awth13/org-appear")
   :custom
   (org-appear-autoemphasis t)
   :hook
@@ -724,8 +734,9 @@
 
 (use-package shr
   :ensure nil
-  :config
-  (setopt shr-use-fonts nil))
+  :defer t
+  :custom
+  (shr-use-fonts nil))
 
 ;; ===============================================================
 ;;; VERSION CONTROL

@@ -34,7 +34,7 @@
     (my/load-theme (nth next themes))))
 
 ;; restore the saved theme after startup, and persist it on exit.
-(add-hook 'elpaca-after-init-hook
+(add-hook 'after-init-hook
           (lambda () (when my/theme (my/load-theme my/theme))))
 (add-hook 'kill-emacs-hook
           (lambda () (when my/theme (customize-save-variable 'my/theme my/theme))))

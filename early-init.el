@@ -60,8 +60,11 @@
         (menu-bar-lines . 0)
         (tool-bar-lines . 0)))
 
+;; package.el + quickstart
+(setq package-enable-at-startup t
+      package-quickstart t)
+
 ;; disable UI elements early
-(setq package-enable-at-startup nil)
 (setq-default mode-line-format nil)
 (setq scroll-bar-mode nil)
 (setq menu-bar-mode nil)

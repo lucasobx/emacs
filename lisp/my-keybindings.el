@@ -13,10 +13,19 @@
 (add-to-list 'emulation-mode-map-alists `((my/override-mode . ,my/override-map)))
 (my/override-mode 1)
 
+(defun my/wk-hide (&rest keys)
+  "Hide each of KEYS from the which-key popup."
+  (dolist (key keys)
+    (let ((kd (key-description (kbd key))))
+      (push (cons (cons (concat "\\`" (regexp-quote kd) "\\'") nil) t)
+            which-key-replacement-alist))))
+
 (defun my/bind (key command &optional desc)
-  "Bind KEY to COMMAND with override precedence, optionally labeling it DESC."
+  "Bind KEY to COMMAND with override precedence.
+DESC labels it in which-key. DESC t hides KEY from which-key."
   (keymap-set my/override-map key command)
-  (when desc (wk-add key desc)))
+  (cond ((eq desc t) (my/wk-hide key))
+        (desc          (wk-add key desc))))
 
 (defun my/bind-local (keymap key command &optional desc)
   "Bind KEY to COMMAND in KEYMAP, optionally labeling it DESC in which-key."
@@ -26,9 +35,12 @@
 ;; unbind
 (dolist (key '("C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z" "C-h" "C-x"))
   (keymap-global-unset key t))
+
 (with-eval-after-load 'elisp-mode
-  (dolist (key '("C-c C-b" "C-c C-e" "C-c C-f"))
-    (keymap-unset emacs-lisp-mode-map key t)))
+  (dolist (map (list emacs-lisp-mode-map lisp-interaction-mode-map))
+    (dolist (key '("C-c C-b" "C-c C-e" "C-c C-f"))
+      (keymap-unset map key t))))
+
 (with-eval-after-load 'winner
   (dolist (key '("C-c <left>" "C-c <right>"))
     (keymap-unset winner-mode-map key t)))
@@ -47,6 +59,7 @@
 (my/bind "C-<"           #'popper-cycle)
 (my/bind "C-p"           #'yank)
 (my/bind "C-z"           #'my/zoxide-dired)
+(my/bind "C-f"           #'my/dired-find-name)
 (my/bind "C-o"           #'my/open-line-below)
 (my/bind "M-<down>"      #'my/move-text-down)
 (my/bind "M-<up>"        #'my/move-text-up)
@@ -122,18 +135,10 @@
 ;; line-block counts (1-9): delete / copy / comment / select
 (dotimes (i 9)
   (let ((n (1+ i)))
-    (my/bind (format "C-d %d" n) (intern (format "my/delete-lines-%d" n)))
-    (my/bind (format "C-y %d" n) (intern (format "my/copy-lines-%d" n)))
-    (my/bind (format "C-; %d" n) (intern (format "my/comment-lines-%d" n)))
-    (my/bind (format "C-q %d" n) (intern (format "my/select-lines-%d" n)))))
-
-;; hide the numbered line-block keys from the which-key popup
-(with-eval-after-load 'which-key
-  (dolist (prefix '("C-d" "C-y" "C-;" "C-q"))
-    (dotimes (i 9)
-      (let ((kd (key-description (kbd (format "%s %d" prefix (1+ i))))))
-        (push (cons (cons (concat "\\`" (regexp-quote kd) "\\'") nil) t)
-              which-key-replacement-alist)))))
+    (my/bind (format "C-; %d" n) (intern (format "my/comment-lines-%d" n)) t)
+    (my/bind (format "C-q %d" n) (intern (format "my/select-lines-%d" n))  t)
+    (my/bind (format "C-d %d" n) (intern (format "my/delete-lines-%d" n))  t)
+    (my/bind (format "C-y %d" n) (intern (format "my/copy-lines-%d" n))    t)))
 
 (wk-add  "C-t" "tools")
 (my/bind "C-t t" #'eshell       "eshell")
@@ -144,13 +149,13 @@
 (my/bind "C-b k" #'kill-buffer    "kill buffer")
 
 (wk-add  "C-x" "")
-(my/bind "C-x <right>" #'next-buffer         "next-buffer")
-(my/bind "C-x <left>"  #'previous-buffer     "prev buffer")
-(my/bind "C-x 0"       #'delete-window       "delete window")
+(my/bind "C-x <right>" #'next-buffer     t)
+(my/bind "C-x <left>"  #'previous-buffer t)
+(my/bind "C-x m"       #'rectangle-mark-mode "rectangle mark")
+(my/bind "C-x b"       #'switch-to-buffer    "switch to buffer")
 (my/bind "C-x 1"       #'split-window-below  "split window ↓")
 (my/bind "C-x 2"       #'split-window-right  "split window →")
-(my/bind "C-x b"       #'switch-to-buffer    "switch to buffer")
-(my/bind "C-x m"       #'rectangle-mark-mode "rectangle mark")
+(my/bind "C-x 0"       #'delete-window       "delete window")
 (my/bind "C-x e"       #'eval-last-sexp      "eval sexp")
 
 (wk-add-map

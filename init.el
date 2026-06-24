@@ -447,6 +447,12 @@
   (setq ruby-ts-mode-map (make-sparse-keymap))
   (set-keymap-parent ruby-ts-mode-map prog-mode-map))
 
+(use-package python-ts-mode
+  :ensure nil
+  :mode ("\\.py\\'" . python-ts-mode)
+  :custom
+  (python-indent-offset 4))
+
 ;; (use-package markdown-ts-mode
 ;;   :ensure nil)
 
@@ -501,8 +507,7 @@
   :init
   (fset #'jsonrpc--log-event #'ignore)
   :hook
-  (ruby-ts-mode . eglot-ensure)
-  (lua-ts-mode  . eglot-ensure))
+  ((lua-ts-mode ruby-ts-mode python-ts-mode) . eglot-ensure))
 
 (use-package flymake
   :ensure nil

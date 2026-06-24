@@ -447,6 +447,9 @@
   (setq ruby-ts-mode-map (make-sparse-keymap))
   (set-keymap-parent ruby-ts-mode-map prog-mode-map))
 
+;; (use-package markdown-ts-mode
+;;   :ensure nil)
+
 (use-package markdown-mode
   :ensure t
   :mode ("README\\.md\\'" . gfm-mode))
@@ -511,17 +514,22 @@
   (flymake-margin-indicators-string
    '((error "" compilation-error)
      (warning "" compilation-warning)
-     (note "" compilation-info))))
+     (note "" compilation-info)))
+  :config
+  (add-hook 'lisp-interaction-mode-hook (lambda () (flymake-mode -1))))
+
+;; ===============================================================
+;;; COMPLETION
 
 (use-package corfu
   :ensure t
-  :defer t
+  :init
+  (global-corfu-mode)
   :custom
   (corfu-popupinfo-margin-width 0)
   (corfu-right-margin-width 0)
   (corfu-left-margin-width 0)
   (corfu-popupinfo-delay 1.0)
-  (corfu-popupinfo-mode t)
   (corfu-quit-no-match t)
   (corfu-scroll-margin 0)
   (corfu-auto-prefix 1)
@@ -531,9 +539,12 @@
   (corfu-auto nil)
   (corfu-count 5)
   :config
-  (global-corfu-mode)
   (advice-add #'lsp-completion-at-point
-              :around #'cape-wrap-noninterruptible))
+              :around #'cape-wrap-noninterruptible)
+  (defun my/corfu-popupinfo-once (&rest _)
+    (corfu-popupinfo-mode 1)
+    (advice-remove 'corfu--exhibit #'my/corfu-popupinfo-once))
+  (advice-add 'corfu--exhibit :before #'my/corfu-popupinfo-once))
 
 (use-package completion-preview
   :ensure nil
@@ -565,9 +576,6 @@
                 (list #'eglot-completion-at-point
                       #'cape-file
                       #'cape-dabbrev)))))
-
-;; ===============================================================
-;;; COMPLETION
 
 (use-package vertico
   :ensure t

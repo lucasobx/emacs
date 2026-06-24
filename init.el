@@ -233,7 +233,7 @@
       (display-buffer-in-side-window)
       (side . bottom)
       (slot . 0)
-      (window-height . 0.3))
+      (window-height . 0.4))
      ("\\*Ibuffer\\*"
       (display-buffer-in-side-window)
       (side . bottom)
@@ -360,8 +360,9 @@
   (css-fontify-colors nil)
   (colorful-use-prefix t)
   :config
-  (global-colorful-mode t)
-  (add-to-list 'global-colorful-modes 'helpful-mode))
+  (add-to-list 'global-colorful-modes 'helpful-mode)
+  (keymap-clear colorful-mode-map)
+  (global-colorful-mode t))
 
 (use-package ansi-color
   :ensure nil
@@ -432,7 +433,7 @@
 
 (use-package lua-ts-mode
   :ensure nil
-  :defer t
+  :mode ("\\.lua\\'")
   :custom
   (lua-ts-indent-offset 2)
   :config
@@ -683,10 +684,10 @@
   (org-tags-column 0)
   (org-ellipsis " ∷")
   :hook
-  ((org-mode . turn-off-auto-fill)
-   (org-mode . visual-line-mode)
-   (org-mode . org-indent-mode)
-   (org-mode . hl-line-mode))
+  (org-mode . turn-off-auto-fill)
+  (org-mode . visual-line-mode)
+  (org-mode . org-indent-mode)
+  (org-mode . hl-line-mode)
   :config
   (set-face-attribute 'org-ellipsis nil :underline nil))
 
@@ -754,8 +755,8 @@
 (use-package magit
   :ensure t
   :defer t
-  :bind
-  ("C-c M-g" . nil)
+  :init
+  (setq magit-define-global-key-bindings nil)
   :preface
   (defun my/magit-kill-buffers ()
     "Restore window configuration and kill all Magit buffers."

@@ -499,11 +499,7 @@
   (fset #'jsonrpc--log-event #'ignore)
   :hook
   (ruby-ts-mode . eglot-ensure)
-  (lua-ts-mode  . eglot-ensure)
-  :config
-  (add-to-list 'eglot-server-programs
-               '((ruby-mode lua-ts-mode) "sumneko")
-               '((ruby-mode ruby-ts-mode) "solargraph")))
+  (lua-ts-mode  . eglot-ensure))
 
 (use-package flymake
   :ensure nil

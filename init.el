@@ -641,8 +641,9 @@
   (setopt consult-buffer-filter
           (append consult-buffer-filter
                   '("\\*Async Shell Command\\*" "Output\\*$" "\\*Help\\*" "\\*Messages\\*"
-                    "\\*eldoc\\*" "\\*helpful.*\\*" "annotations.org" "\\*Ibuffer\\*"
-                    "\\*Warnings\\*" "\\*eshell\\*" "\\*Compile-Log\\*")))
+                    "\\*eldoc\\*" "\\*helpful.*\\*" "\\*Ibuffer\\*" "\\*Warnings\\*"
+                    "\\*eshell\\*" "\\*Compile-Log\\*" "*scratch*"
+                    "\\*Async-native-compile-log\\*")))
   ;; prevent dired buffer from surfacing in consult-buffer when hidden by popper.
   (advice-add
    #'consult--buffer-query :filter-return

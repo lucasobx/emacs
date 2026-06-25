@@ -219,11 +219,9 @@ Otherwise FALLBACK is evaluated."
 (my/define-delete-cleanup my/delete-symbol symbol)
 
 (defun my/delete-line ()
-  "Delete line at point, or active region if one exists."
+  "Delete line at point with visual feedback."
   (interactive)
-  (my/region-or (my/delete-thing 'line)
-    (sit-for 0.15)
-    (kill-region beg end)))
+  (my/delete-thing 'line))
 
 (my/define-ops my/delete-thing
   (my/delete-paragraph 'paragraph "Delete paragraph at point.")
@@ -238,11 +236,9 @@ Otherwise FALLBACK is evaluated."
 ;;; COPY COMMANDS
 
 (defun my/copy-line ()
-  "Copy line at point, or active region if one exists."
+  "Copy line at point with visual feedback."
   (interactive)
-  (my/region-or (my/copy-thing 'line)
-    (kill-ring-save beg end)
-    (message "Copied region")))
+  (my/copy-thing 'line))
 
 (my/define-ops my/copy-thing
   (my/copy-paragraph 'paragraph "Copy paragraph at point.")

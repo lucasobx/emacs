@@ -33,7 +33,9 @@ DESC labels it in which-key. DESC t hides KEY from which-key."
   (when desc (wk-add-map keymap key desc)))
 
 ;; unbind
-(dolist (key '("C-<wheel-down>" "C-<wheel-up>" "C-x C-z" "C-c ^" "C-z" "C-h" "C-x"))
+(define-key key-translation-map (kbd "C-x 8") nil)
+
+(dolist (key '("C-<wheel-down>" "C-<wheel-up>" "C-c ^" "C-z" "C-h" "C-x"))
   (keymap-global-unset key t))
 
 (with-eval-after-load 'elisp-mode
@@ -70,25 +72,67 @@ DESC labels it in which-key. DESC t hides KEY from which-key."
 (my/bind "M-p"           #'duplicate-dwim)
 (my/bind "M-c"           #'capitalize-dwim)
 
-(wk-add  "C-y" "copy")
-(my/bind "C-y p" #'my/copy-paragraph       "copy paragraph")
-(my/bind "C-y s" #'my/copy-symbol          "copy symbol")
-(my/bind "C-y w" #'my/copy-word            "copy word")
-(my/bind "C-y y" #'my/copy-line            "copy line")
-(my/bind "C-y 0" #'my/copy-inside-parens   "inside ()")
-(my/bind "C-y ]" #'my/copy-inside-brackets "inside []")
+;; ===============================================================
+;; region-aware prefixes
+;;
+;; with an active region, bare C-d/C-y act as kill-region/kill-ring-save.
+;; with no region they behave as ordinary prefix maps.
 
-(wk-add  "C-d" "delete")
-(my/bind "C-d p" #'my/delete-paragraph   "delete paragraph")
-(my/bind "C-d 0" #'my/delete-in-parens   "delete inside ()")
-(my/bind "C-d ]" #'my/delete-in-brackets "delete inside []")
-(my/bind "C-d s" #'my/delete-symbol      "delete symbol")
-(my/bind "C-d d" #'my/delete-line        "delete line")
-(my/bind "C-d w" #'my/delete-word        "delete word")
+(defvar my/delete-map (make-sparse-keymap)
+  "Prefix map for `C-d' delete operations.")
+
+(defvar my/copy-map (make-sparse-keymap)
+  "Prefix map for `C-y' copy operations.")
+
+(defun my/region-aware-prefix (map command)
+  "Return a binding giving COMMAND on an active region, else prefix MAP."
+  `(menu-item "" ,map
+              :filter ,(lambda (real) (if (use-region-p) command real))))
+
+(defun my/bind-sub (map prefix key command &optional desc)
+  "Bind KEY to COMMAND in prefix MAP, labeling PREFIX+KEY in which-key.
+DESC t hides the binding from which-key."
+  (keymap-set map key command)
+  (let ((full (concat prefix " " key)))
+    (cond ((eq desc t) (my/wk-hide full))
+          (desc         (wk-add full desc)))))
+
+(keymap-set my/override-map "C-d"
+            (my/region-aware-prefix my/delete-map #'kill-region))
+(keymap-set my/override-map "C-y"
+            (my/region-aware-prefix my/copy-map #'kill-ring-save))
+
+(wk-add "C-d" "delete")
+(my/bind-sub my/delete-map "C-d" "p" #'my/delete-paragraph   "delete paragraph")
+(my/bind-sub my/delete-map "C-d" "0" #'my/delete-in-parens   "delete inside ()")
+(my/bind-sub my/delete-map "C-d" "]" #'my/delete-in-brackets "delete inside []")
+(my/bind-sub my/delete-map "C-d" "s" #'my/delete-symbol      "delete symbol")
+(my/bind-sub my/delete-map "C-d" "d" #'my/delete-line        "delete line")
+(my/bind-sub my/delete-map "C-d" "w" #'my/delete-word        "delete word")
+
+(wk-add "C-y" "copy")
+(my/bind-sub my/copy-map "C-y" "p" #'my/copy-paragraph       "copy paragraph")
+(my/bind-sub my/copy-map "C-y" "s" #'my/copy-symbol          "copy symbol")
+(my/bind-sub my/copy-map "C-y" "w" #'my/copy-word            "copy word")
+(my/bind-sub my/copy-map "C-y" "y" #'my/copy-line            "copy line")
+(my/bind-sub my/copy-map "C-y" "0" #'my/copy-inside-parens   "inside ()")
+(my/bind-sub my/copy-map "C-y" "]" #'my/copy-inside-brackets "inside []")
+
+;; ===
 
 (wk-add  "C-;" "comment")
 (my/bind "C-; p" #'my/toggle-comment-paragraph "paragraph")
 (my/bind "C-; ;" #'my/toggle-comment-line      "line")
+
+;; line-block counts (1-9): delete/copy/comment/select
+(dotimes (i 9)
+  (let ((n (1+ i)))
+    (my/bind (format "C-; %d" n) (intern (format "my/comment-lines-%d" n)) t)
+    (my/bind (format "C-q %d" n) (intern (format "my/select-lines-%d" n))  t)
+    (my/bind-sub my/delete-map "C-d" (number-to-string n)
+                 (intern (format "my/delete-lines-%d" n)) t)
+    (my/bind-sub my/copy-map "C-y" (number-to-string n)
+                 (intern (format "my/copy-lines-%d" n)) t)))
 
 (wk-add  "C-r" "replace")
 (my/bind "C-r r" #'replace-string "replace string")
@@ -132,14 +176,6 @@ DESC labels it in which-key. DESC t hides KEY from which-key."
 (my/bind "C-q q" #'my/select-line      "select line")
 (my/bind "C-q a" #'mark-whole-buffer   "select all")
 
-;; line-block counts (1-9): delete / copy / comment / select
-(dotimes (i 9)
-  (let ((n (1+ i)))
-    (my/bind (format "C-; %d" n) (intern (format "my/comment-lines-%d" n)) t)
-    (my/bind (format "C-q %d" n) (intern (format "my/select-lines-%d" n))  t)
-    (my/bind (format "C-d %d" n) (intern (format "my/delete-lines-%d" n))  t)
-    (my/bind (format "C-y %d" n) (intern (format "my/copy-lines-%d" n))    t)))
-
 (wk-add  "C-t" "tools")
 (my/bind "C-t t" #'eshell       "eshell")
 (my/bind "C-t m" #'magit-status "magit")
@@ -151,11 +187,11 @@ DESC labels it in which-key. DESC t hides KEY from which-key."
 (wk-add  "C-x" "")
 (my/bind "C-x <right>" #'next-buffer     t)
 (my/bind "C-x <left>"  #'previous-buffer t)
-(my/bind "C-x m"       #'rectangle-mark-mode "rectangle mark")
 (my/bind "C-x b"       #'switch-to-buffer    "switch to buffer")
+(my/bind "C-x m"       #'rectangle-mark-mode "rectangle mark")
 (my/bind "C-x 1"       #'split-window-below  "split window ↓")
 (my/bind "C-x 2"       #'split-window-right  "split window →")
-(my/bind "C-x 0"       #'delete-window       "delete window")
+(my/bind "C-x 0"       #'delete-window       "close window")
 (my/bind "C-x e"       #'eval-last-sexp      "eval sexp")
 
 (wk-add-map

@@ -360,9 +360,10 @@
   (css-fontify-colors nil)
   (colorful-use-prefix t)
   :config
-  (add-to-list 'global-colorful-modes 'helpful-mode)
-  (keymap-clear colorful-mode-map)
-  (global-colorful-mode t))
+  (setcdr (assq 'colorful-mode minor-mode-map-alist)
+          (make-sparse-keymap))
+  (global-colorful-mode t)
+  (add-to-list 'global-colorful-modes 'helpful-mode))
 
 (use-package ansi-color
   :ensure nil

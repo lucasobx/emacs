@@ -15,25 +15,27 @@
   :group 'my)
 
 (defvar my/cache-paths
-  '(;; Files:
-    (bookmark-default-file       . "bookmarks")
-    (recentf-save-file           . "recentf.eld")
-    (savehist-file               . "history")
-    (save-place-file             . "saveplace")
-    (project-list-file           . "projects")
-    (transient-history-file      . "transient/history.el")
+  '((transient-history-file      . "transient/history.el")
     (transient-levels-file       . "transient/levels.el")
     (transient-values-file       . "transient/values.el")
-    (tramp-persistency-file-name . "tramp")
     (multisession-directory      . "multisession/")
+    (recentf-save-file           . "recentf.eld")
+    (save-place-file             . "saveplace")
+    (bookmark-default-file       . "bookmarks")
+    (project-list-file           . "projects")
+    (savehist-file               . "history")
+    (eshell-directory-name .       "eshell/")
+    (tramp-persistency-file-name . "tramp")
     (url-configuration-directory . "url/")
-    ;; Directories (resolution-only; not variables):
-    (auto-saves                  . "auto-saves/")
-    (auto-saves-sessions         . "auto-saves/sessions/"))
+    ;; directories (resolution-only, not variables):
+    (auto-saves-sessions         . "auto-saves/sessions/")
+    (tree-sitter                 . "tree-sitter/")
+    (auto-saves                  . "auto-saves/"))
   "Alist of (KEY . RELATIVE-PATH) under `my/cache-directory'.
 A trailing slash marks a directory.")
 
-(defconst my/cache--non-variable-keys '(auto-saves auto-saves-sessions)
+(defconst my/cache--non-variable-keys
+  '(auto-saves auto-saves-sessions tree-sitter)
   "Keys in `my/cache-paths' used only for path resolution, not as variables.")
 
 (defun my/cache--path (key)
@@ -59,7 +61,9 @@ A trailing slash marks a directory.")
   ;; auto-save uses transforms/prefix, not single-value vars:
   (setq auto-save-list-file-prefix (my/cache--path 'auto-saves-sessions)
         auto-save-file-name-transforms
-        `((".*" ,(my/cache--path 'auto-saves) t))))
+        `((".*" ,(my/cache--path 'auto-saves) t)))
+  ;; tree-sitter grammars: search and install under cache
+  (setq treesit-extra-load-path (list (my/cache--path 'tree-sitter))))
 
 (my/cache--ensure-dirs)
 (my/cache-wire)

@@ -18,19 +18,26 @@ Uses `process-file' so it works over TRAMP and spawns no shell."
   (or (my/eshell--git-call "symbolic-ref" "--short" "HEAD")
       (my/eshell--git-call "rev-parse" "--short" "HEAD")))
 
-(defun my/eshell--git-dirty-p ()
-  "Return non-nil when the worktree has uncommitted changes."
-  (and (my/eshell--git-call "status" "--porcelain") t))
+(defun my/eshell--git-status-lines ()
+  "Return porcelain status lines for the worktree, or nil when clean."
+  (when-let* ((out (my/eshell--git-call "status" "--porcelain")))
+    (split-string out "\n" t)))
+
+(defun my/eshell--git-tracked-dirty-p (lines)
+  "Return non-nil when LINES show changes to tracked files.
+Untracked entries are ignored so they color the branch as clean."
+  (seq-some (lambda (line) (not (string-prefix-p "??" line))) lines))
 
 (defun my/eshell--git-segment ()
   "Return a propertized git segment for the prompt, or nil outside a repo."
   (when (and (executable-find "git")
              (locate-dominating-file default-directory ".git"))
     (when-let* ((branch (my/eshell--git-branch)))
-      (let ((dirty (my/eshell--git-dirty-p)))
+      (let* ((lines (my/eshell--git-status-lines))
+             (dirty (my/eshell--git-tracked-dirty-p lines)))
         (concat " "
                 (propertize branch 'face (if dirty 'warning 'success))
-                (and dirty (propertize "*" 'face 'error)))))))
+                (and lines (propertize "*" 'face 'error)))))))
 
 ;; ===============================================================
 ;;; PROMPT

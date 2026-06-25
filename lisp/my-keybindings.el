@@ -37,6 +37,17 @@ DESC labels it in which-key. DESC t hides KEY from which-key."
   (interactive)
   (find-file (locate-user-emacs-file "init.el")))
 
+(defun my/system-buffers ()
+  "Switch to a system buffer (name wrapped in *…*)."
+  (interactive)
+  (let ((bufs (seq-filter
+               (lambda (b) (string-match-p "\\`\\*" (buffer-name b)))
+               (buffer-list))))
+    (switch-to-buffer
+     (completing-read "System buffer: "
+                      (mapcar #'buffer-name bufs)
+                      nil t))))
+
 ;; unbind
 (define-key key-translation-map (kbd "C-x 8") nil)
 
@@ -185,8 +196,9 @@ DESC t hides the binding from which-key."
 (my/bind "C-t m" #'magit-status "magit")
 
 (wk-add  "C-b" "buffer")
-(my/bind "C-b b" #'consult-buffer "switch to buffer")
-(my/bind "C-b k" #'kill-buffer    "kill buffer")
+(my/bind "C-b b" #'consult-buffer    "switch to buffer")
+(my/bind "C-b s" #'my/system-buffers "system buffers")
+(my/bind "C-b k" #'kill-buffer       "kill buffer")
 
 (wk-add  "C-w" "window")
 (my/bind "C-w w" #'split-window-below "split window ↓")
@@ -196,7 +208,6 @@ DESC t hides the binding from which-key."
 (wk-add  "C-x" "")
 (my/bind "C-x <right>" #'next-buffer     t)
 (my/bind "C-x <left>"  #'previous-buffer t)
-(my/bind "C-x b"       #'switch-to-buffer    "switch to buffer")
 (my/bind "C-x m"       #'rectangle-mark-mode "rectangle mark")
 (my/bind "C-x e"       #'eval-last-sexp      "eval sexp")
 

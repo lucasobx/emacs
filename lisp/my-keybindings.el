@@ -32,6 +32,11 @@ DESC labels it in which-key. DESC t hides KEY from which-key."
   (keymap-set keymap key command)
   (when desc (wk-add-map keymap key desc)))
 
+(defun my/find-init-file ()
+  "Open the user init file."
+  (interactive)
+  (find-file (locate-user-emacs-file "init.el")))
+
 ;; unbind
 (define-key key-translation-map (kbd "C-x 8") nil)
 
@@ -155,12 +160,11 @@ DESC t hides the binding from which-key."
 (my/bind "C-s s" #'consult-line        "line")
 
 (wk-add  "C-e" "emacs")
-(my/bind "C-e i" (lambda ()
-                   (interactive) (find-file (locate-user-emacs-file "init.el"))) "init.el")
 (my/bind "C-e s" #'tramp-revert-buffer-with-sudo "sudo edit")
-(my/bind "C-e e" #'save-buffer      "save buffer")
-(my/bind "C-e t" #'visual-line-mode "truncate")
-(my/bind "C-e r" #'restart-emacs    "restart")
+(my/bind "C-e e" #'save-buffer       "save buffer")
+(my/bind "C-e t" #'visual-line-mode  "truncate")
+(my/bind "C-e i" #'my/find-init-file "init.el")
+(my/bind "C-e r" #'restart-emacs     "restart")
 
 (wk-add  "C-h" "help")
 (my/bind "C-h f" #'helpful-function   "describe function")
@@ -184,14 +188,16 @@ DESC t hides the binding from which-key."
 (my/bind "C-b b" #'consult-buffer "switch to buffer")
 (my/bind "C-b k" #'kill-buffer    "kill buffer")
 
+(wk-add  "C-w" "window")
+(my/bind "C-w w" #'split-window-below "split window ↓")
+(my/bind "C-w v" #'split-window-right "split window →")
+(my/bind "C-w d" #'delete-window      "close window")
+
 (wk-add  "C-x" "")
 (my/bind "C-x <right>" #'next-buffer     t)
 (my/bind "C-x <left>"  #'previous-buffer t)
 (my/bind "C-x b"       #'switch-to-buffer    "switch to buffer")
 (my/bind "C-x m"       #'rectangle-mark-mode "rectangle mark")
-(my/bind "C-x 1"       #'split-window-below  "split window ↓")
-(my/bind "C-x 2"       #'split-window-right  "split window →")
-(my/bind "C-x 0"       #'delete-window       "close window")
 (my/bind "C-x e"       #'eval-last-sexp      "eval sexp")
 
 (wk-add-map

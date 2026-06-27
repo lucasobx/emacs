@@ -509,19 +509,27 @@
   :hook
   ((lua-ts-mode ruby-ts-mode python-ts-mode) . eglot-ensure))
 
-(use-package flymake
-  :ensure nil
+(use-package flycheck
+  :ensure t
   :hook
-  (prog-mode . flymake-mode)
+  (prog-mode . flycheck-mode)
   :custom
-  (flymake-show-diagnostics-at-end-of-line nil)
-  (flymake-indicator-type 'margins)
-  (flymake-margin-indicators-string
-   '((error "" compilation-error)
-     (warning "" compilation-warning)
-     (note "" compilation-info)))
+  (flycheck-indication-mode nil)
+  (flycheck-check-syntax-automatically '(save mode-enabled idle-change))
+  (flycheck-idle-change-delay 0.5)
+  (flycheck-display-errors-function #'flycheck-display-error-messages)
   :config
-  (add-hook 'lisp-interaction-mode-hook (lambda () (flymake-mode -1))))
+  (add-hook 'lisp-interaction-mode-hook (lambda () (flycheck-mode -1))))
+
+(use-package flycheck-eglot
+  :ensure t
+  :after (flycheck eglot)
+  :config
+  (global-flycheck-eglot-mode 1))
+
+(use-package consult-flycheck
+  :ensure t
+  :after (flycheck eglot))
 
 ;; ===============================================================
 ;;; COMPLETION

@@ -201,10 +201,10 @@
   (setopt which-key-sort-order 'which-key-local-then-key-order))
 
 (use-package devil
-  :vc (:url "https://github.com/fbrosda/devil" :branch "dev")
+  :vc (:url "https://github.com/lucasobx/devil" :branch "dev")
   :custom
   (devil-highlight-repeatable t)
-  (devil-prompt " %t")
+  (devil-prompt " %t")
   :config
   (global-devil-mode)
   (assoc-delete-all "%k z" devil-translations)

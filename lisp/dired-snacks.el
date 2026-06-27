@@ -237,7 +237,8 @@ into a Dired subdir listing."
           (skip-chars-forward " \t")
           (let* ((pos  (point))
                  (icon (funcall nerd-icons-dired-dir-icon-function
-                                dir :height nerd-icons-dired-icon-size))
+                                dir :height nerd-icons-dired-icon-size
+                                :face 'dired-directory))
                  (str  (concat icon nerd-icons-dired-infix-string))
                  (ov   (make-overlay pos (1+ pos)))
                  (inhibit-read-only t))

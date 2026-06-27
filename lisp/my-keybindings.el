@@ -134,7 +134,7 @@ DESC t hides the binding from which-key."
 (my/bind-sub my/copy-map "C-y" "0" #'my/copy-inside-parens   "inside ()")
 (my/bind-sub my/copy-map "C-y" "]" #'my/copy-inside-brackets "inside []")
 
-;; ===
+;; ===============================================================
 
 (wk-add  "C-;" "comment")
 (my/bind "C-; p" #'my/toggle-comment-paragraph "paragraph")
@@ -201,8 +201,9 @@ DESC t hides the binding from which-key."
 (my/bind "C-b k" #'kill-buffer       "kill buffer")
 
 (wk-add  "C-w" "window")
-(my/bind "C-w w" #'split-window-below "split window ↓")
-(my/bind "C-w v" #'split-window-right "split window →")
+(my/bind "C-w f" #'window-layout-flip-topdown "flip window ↑↓")
+(my/bind "C-w w" #'split-window-below "new window ↓")
+(my/bind "C-w v" #'split-window-right "new window →")
 (my/bind "C-w d" #'delete-window      "close window")
 
 (wk-add  "C-x" "")
@@ -213,8 +214,8 @@ DESC t hides the binding from which-key."
 
 (wk-add-map
   prog-mode-map "C-l" "lsp")
-(my/bind-local prog-mode-map "C-l d" #'consult-flymake "jump to diagnostic")
-(my/bind-local prog-mode-map "C-l n" #'eglot-rename    "rename symbol")
+(my/bind-local prog-mode-map "C-l n" #'eglot-rename     "rename symbol")
+(my/bind-local prog-mode-map "C-l e" #'consult-flycheck "list errors")
 
 (with-eval-after-load 'inf-ruby
   (my/bind-local ruby-ts-mode-map "C-l b" #'ruby-send-buffer "send buffer")

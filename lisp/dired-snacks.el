@@ -178,86 +178,56 @@ Fuzzy queries expand to the best zoxide match."
 (defvar nerd-icons-dired-dir-icon-function)
 (defvar nerd-icons-dired-infix-string)
 (defvar nerd-icons-dired-icon-size)
+(defvar nerd-icons-dired-mode)
+
+(defvar dired-listing-switches)
 (defvar dired-actual-switches)
 (defvar dired-mode-map)
 (defvar dired-buffers)
 
 (defvar my/dired-find-name-prune-dirs '(".git" ".hg" ".svn" ".jj")
-  "Directory names never descended into when searching for files.")
+  "Directory names excluded from searches.")
 
-(defvar my/dired-find-name--ghost-ov nil
-  "Overlay showing the live match count in the minibuffer.")
+(defcustom my/dired-find-name-debounce 0.15
+  "Seconds of idle input before refreshing the live search.
+Lower values feel more responsive, higher values spawn fewer `fd' processes."
+  :type 'number
+  :group 'dired)
 
-(defvar my/dired-find-name--ghost-timer nil
-  "Debounce timer for the match-count ghost.")
+(defvar my/dired-find-name--proc nil
+  "Current live-search `fd' process, or nil.")
 
-(defun my/dired-find-name--matches (dir query)
-  "Return absolute paths of files under DIR whose name contains QUERY.
-Case-insensitive on the file name, skips `my/dired-find-name-prune-dirs'."
-  (cond
-   ((string-empty-p query) nil)
-   ((executable-find "fd")
-    (with-temp-buffer
-      (when (zerop (apply #'call-process "fd" nil t nil
-                          (append
-                           '("--hidden" "--no-ignore" "--type" "f"
-                             "--fixed-strings" "--ignore-case" "--absolute-path")
-                           (mapcan (lambda (d) (list "--exclude" d))
-                                   my/dired-find-name-prune-dirs)
-                           (list "--" query (expand-file-name dir)))))
-        (split-string (buffer-string) "\n" t))))
-   (t
-    (let ((case-fold-search t))
-      (directory-files-recursively
-       dir (regexp-quote query) nil
-       (lambda (d)
-         (not (member (file-name-nondirectory (directory-file-name d))
-                      my/dired-find-name-prune-dirs))))))))
+(defvar my/dired-find-name--timer nil
+  "Timer used to debounce live search updates.")
 
-(defun my/dired-find-name--ghost (mb)
-  "Refresh the match-count ghost for the prompt in minibuffer MB."
-  (when (buffer-live-p mb)
-    (with-current-buffer mb
-      (when (overlayp my/dired-find-name--ghost-ov)
-        (delete-overlay my/dired-find-name--ghost-ov))
-      (let ((query (minibuffer-contents)))
-        (unless (string-empty-p query)
-          (let* ((matches (my/dired-find-name--matches default-directory query))
-                 (n (length matches))
-                 (label (cond ((= n 0) "no matches")
-                              ((= n 1) (concat "→ " (file-name-nondirectory
-                                                     (car matches))))
-                              (t (format "→ %d matches" n)))))
-            (setq my/dired-find-name--ghost-ov
-                  (make-overlay (point-max) (point-max) nil t t))
-            (overlay-put my/dired-find-name--ghost-ov 'after-string
-                         (propertize (concat "  " label)
-                                     'face 'shadow 'cursor t))))))))
+(defvar my/dired-find-name--buffer nil
+  "Live search results buffer, or nil.")
 
-(defun my/dired-find-name--update-ghost (&rest _)
-  "Schedule a debounced refresh of the match-count ghost."
-  (when (timerp my/dired-find-name--ghost-timer)
-    (cancel-timer my/dired-find-name--ghost-timer))
-  (setq my/dired-find-name--ghost-timer
-        (run-with-timer 0.2 nil #'my/dired-find-name--ghost (current-buffer))))
+(defvar my/dired-find-name--root nil
+  "Root directory of the current search.")
 
-(defun my/dired-find-name--insert-matches (dir files)
-  "Insert a subdir listing of DIR showing only FILES, relative to DIR.
-Like `dired-insert-subdir' but avoids scanning DIR in full."
-  (let ((dirname (file-name-as-directory (expand-file-name dir)))
-        (inhibit-read-only t))
-    (dired-insert-subdir-validate dirname dired-actual-switches)
-    (dired-insert-subdir-newpos dirname)
-    (dired-insert-subdir-doupdate
-     dirname nil
-     (save-excursion
-       (let ((begin (point))
-             (default-directory dirname))
-         (dired-insert-directory dirname dired-actual-switches files nil t)
-         (list begin (point)))))))
+(defun my/dired-find-name--fd-args (query dir)
+  "Return `fd' arguments for searching QUERY under DIR.
+Uses `--list-details' so a single process emits Dired-ready output."
+  (append '("--color=never" "--list-details" "--hidden" "--no-ignore"
+            "--type" "f" "--fixed-strings" "--ignore-case")
+          (mapcan (lambda (d) (list "--exclude" d))
+                  my/dired-find-name-prune-dirs)
+          (list "--" query (expand-file-name dir))))
+
+(defun my/dired-find-name--parse (line)
+  "Parse an `fd --list-details' LINE.
+Return (DIR BASENAME LISTING), where LISTING is ready for insertion
+into a Dired subdir listing."
+  (when (string-match "\\(/.*\\)\\'" line)
+    (let ((path (match-string 1 line))
+          (prefix (substring line 0 (match-beginning 1))))
+      (list (file-name-directory path)
+            (file-name-nondirectory path)
+            (concat prefix (file-name-nondirectory path))))))
 
 (defun my/dired-find-name--icon-subdirs ()
-  "Give each subdir header a folder icon, matching `nerd-icons-dired'."
+  "Add folder icons to Dired subdir headers."
   (when (bound-and-true-p nerd-icons-dired-mode)
     (save-excursion
       (goto-char (point-min))
@@ -276,92 +246,199 @@ Like `dired-insert-subdir' but avoids scanning DIR in full."
             (overlay-put ov 'before-string (propertize str 'display str))))
         (forward-line 1)))))
 
-(defun my/dired-find-name--drop-root-header ()
-  "Remove the root's empty header and rebuild the subdir alist.
-Used when no match lives directly in the searched directory."
-  (let ((inhibit-read-only t))
-    (save-excursion
-      (goto-char (point-min))
-      (forward-line 1)
-      (while (and (not (eobp)) (not (dired-get-subdir)))
-        (forward-line 1))
-      (unless (eobp)
-        (delete-region (point-min) (point))
-        (dired-build-subdir-alist)))))
+(defun my/dired-find-name--goto (file)
+  "Move point to FILE by scanning file names.
+More reliable than `dired-goto-file' for this buffer."
+  (goto-char (point-min))
+  (let ((found nil))
+    (while (and (not found) (not (eobp)))
+      (when (dired-move-to-filename nil)
+        (let ((this (dired-get-filename nil t)))
+          (when (and this (file-equal-p this file))
+            (setq found t))))
+      (unless found (forward-line 1)))
+    (when found (dired-move-to-filename))
+    found))
 
-(defun my/dired-find-name--tree (root matches)
-  "Show only MATCHES under ROOT in a transient Dired tree.
-The buffer is independent of normal Dired navigation and `q' kills it."
-  (require 'dired)
-  (let ((bufname (format "*find-name: %s*" (abbreviate-file-name root)))
-        (groups  (seq-group-by #'file-name-directory matches)))
-    (when (get-buffer bufname)
-      (kill-buffer bufname))
-    (let ((buf (let ((dired-buffers nil))
-                 (dired-noselect root))))
-      (with-current-buffer buf
-        (rename-buffer bufname)
-        ;; never hide a matched file, also silences omit's size-limit notice
-        (when (bound-and-true-p dired-omit-mode)
-          (dired-omit-mode -1)
-          (revert-buffer))
-        ;; one subdir listing per directory that holds matches
-        (dolist (group groups)
-          (unless (file-equal-p (car group) root)
-            (my/dired-find-name--insert-matches
-             (car group) (mapcar #'file-name-nondirectory (cdr group)))))
-        ;; keep only the matched files
-        (let ((keep (mapcar #'file-truename matches))
-              (inhibit-read-only t))
-          (save-excursion
-            (goto-char (point-min))
-            (while (not (eobp))
-              (let ((f (dired-get-filename nil t)))
-                (if (and f (not (member (file-truename f) keep)))
-                    (delete-region (line-beginning-position)
-                                   (progn (forward-line 1) (point)))
-                  (forward-line 1))))))
-        ;; drop the root's own header when it holds no matches itself
-        (unless (seq-find (lambda (g) (file-equal-p (car g) root)) groups)
-          (my/dired-find-name--drop-root-header))
+(defun my/dired-find-name--insert-groups (groups)
+  "Insert GROUPS as Dired subdir listings.
+Each entry must be a (DIR BASENAME LISTING) triple."
+  (let ((first t))
+    (dolist (group groups)
+      (if first (setq first nil) (insert "\n"))
+      (insert "  " (directory-file-name (car group)) ":\n")
+      (insert (format "  total used in directory %d\n" (length (cdr group))))
+      (dolist (entry (cdr group))
+        (insert "  " (nth 2 entry) "\n")))))
+
+(defun my/dired-find-name--render (root details)
+  "Render DETAILS under ROOT as a Dired buffer.
+The buffer is assumed to already be in `dired-mode'."
+  (when (buffer-live-p my/dired-find-name--buffer)
+    (with-current-buffer my/dired-find-name--buffer
+      (let* ((inhibit-read-only t)
+             (parsed (delq nil (mapcar #'my/dired-find-name--parse details)))
+             (groups (seq-group-by #'car parsed)))
+        (widen)
+        (remove-overlays nil nil 'my/find-name-icon t)
+        (erase-buffer)
+        (setq-local default-directory (file-name-as-directory root))
+        (if (null parsed)
+            (insert "  " (directory-file-name root) ":\n"
+                    "  total used in directory 0\n\n"
+                    "  (no matches)\n")
+          (my/dired-find-name--insert-groups groups))
+        (dired-build-subdir-alist)
+        (dired-insert-set-properties (point-min) (point-max))
+        (when (bound-and-true-p nerd-icons-dired-mode)
+          (run-hooks 'dired-after-readin-hook))
         (my/dired-find-name--icon-subdirs)
-        ;; q kills this transient buffer instead of burying it
-        (let ((map (make-sparse-keymap)))
-          (set-keymap-parent map dired-mode-map)
-          (keymap-set map "q" #'kill-current-buffer)
-          (use-local-map map))
         (goto-char (point-min))
-        (when (dired-goto-file (car matches))
-          (dired-move-to-filename)))
-      (pop-to-buffer-same-window buf))))
+        (when (and parsed (null (cdr parsed)))
+          (let ((target (expand-file-name (nth 1 (car parsed))
+                                          (nth 0 (car parsed)))))
+            (my/dired-find-name--goto target)))))))
+
+(defun my/dired-find-name--sentinel (proc event)
+  "Render PROC's results when EVENT indicates completion, then clean up."
+  (when (string-prefix-p "finished" event)
+    (when-let* ((buf (process-buffer proc)) ((buffer-live-p buf)))
+      (let ((details (with-current-buffer buf
+                       (split-string (buffer-string) "\n" t))))
+        (condition-case err
+            (my/dired-find-name--render my/dired-find-name--root details)
+          (error (message "find-name render error: %S" err))))
+      (kill-buffer buf))))
+
+(defun my/dired-find-name--dispatch (query)
+  "Kill any running search and start an async `fd' for QUERY."
+  (when (and my/dired-find-name--proc
+             (process-live-p my/dired-find-name--proc))
+    (delete-process my/dired-find-name--proc))
+  (cond
+   ((string-empty-p query)
+    (my/dired-find-name--render my/dired-find-name--root nil))
+   ((not (executable-find "fd"))
+    (message "find-name: the `fd' program is required for live search"))
+   (t
+    (let ((proc (make-process
+                 :name "find-name-fd"
+                 :buffer (generate-new-buffer " *find-name-fd*")
+                 :noquery t
+                 :connection-type 'pipe
+                 :command (cons "fd" (my/dired-find-name--fd-args
+                                      query my/dired-find-name--root))
+                 :sentinel #'my/dired-find-name--sentinel)))
+      (setq my/dired-find-name--proc proc)))))
+
+(defun my/dired-find-name--schedule (&rest _)
+  "Schedule a search after minibuffer input settles."
+  (let ((query (minibuffer-contents-no-properties)))
+    (when (timerp my/dired-find-name--timer)
+      (cancel-timer my/dired-find-name--timer))
+    (setq my/dired-find-name--timer
+          (run-with-timer my/dired-find-name-debounce nil
+                          #'my/dired-find-name--dispatch query))))
+
+(defun my/dired-find-name--cleanup ()
+  "Tear down the live-search timer and process."
+  (when (timerp my/dired-find-name--timer)
+    (cancel-timer my/dired-find-name--timer))
+  (when (and my/dired-find-name--proc
+             (process-live-p my/dired-find-name--proc))
+    (delete-process my/dired-find-name--proc))
+  (setq my/dired-find-name--timer nil
+        my/dired-find-name--proc nil))
 
 (defun my/dired-find-name ()
-  "Find files under `default-directory' whose name contains a query.
-A ghost shows the match count while typing. One match jumps to its
-directory, several are shown as a Dired tree of just the matches."
+  "Find files under `default-directory' whose names contain a query.
+Display live results in a Dired buffer as you type."
   (interactive)
+  (require 'dired)
   (let* ((root (expand-file-name default-directory))
-         (query (minibuffer-with-setup-hook
-                    (lambda ()
-                      (setq my/dired-find-name--ghost-ov nil
-                            my/dired-find-name--ghost-timer nil)
-                      (add-hook 'after-change-functions
-                                #'my/dired-find-name--update-ghost nil t)
-                      (add-hook 'minibuffer-exit-hook
-                                (lambda ()
-                                  (when (timerp my/dired-find-name--ghost-timer)
-                                    (cancel-timer my/dired-find-name--ghost-timer)))
-                                nil t))
-                  (read-from-minibuffer
-                   (format "Find name under %s: " (abbreviate-file-name root)))))
-         (matches (my/dired-find-name--matches root query)))
+         (bufname (format "*find-name: %s*" (abbreviate-file-name root)))
+         (buf (progn (when (get-buffer bufname) (kill-buffer bufname))
+                     (get-buffer-create bufname))))
+    (setq my/dired-find-name--buffer buf
+          my/dired-find-name--root root)
+    (with-current-buffer buf
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (setq-local default-directory (file-name-as-directory root))
+        (let ((dired-buffers nil)) (dired-mode root)))
+      (when (bound-and-true-p dired-omit-mode) (dired-omit-mode -1))
+      (let ((map (make-sparse-keymap)))
+        (set-keymap-parent map dired-mode-map)
+        (keymap-set map "q" #'kill-current-buffer)
+        (use-local-map map)))
+    (display-buffer buf)
+    (let ((confirmed nil))
+      (unwind-protect
+          (progn
+            (condition-case nil
+                (progn
+                  (minibuffer-with-setup-hook
+                      (lambda ()
+                        (add-hook 'after-change-functions
+                                  #'my/dired-find-name--schedule nil t)
+                        (add-hook 'minibuffer-exit-hook
+                                  #'my/dired-find-name--cleanup nil t))
+                    (read-from-minibuffer
+                     (format "Find name under %s: "
+                             (abbreviate-file-name root))))
+                  (setq confirmed t))
+              (quit nil))
+            (if confirmed
+                (when (buffer-live-p buf)
+                  (if-let* ((win (get-buffer-window buf)))
+                      (select-window win)
+                    (pop-to-buffer buf)))
+              (when (buffer-live-p buf) (kill-buffer buf))))
+        (my/dired-find-name--cleanup)))))
+
+;; ===============================================================
+;;; dired-find-file (smart RET)
+
+(declare-function dired-get-file-for-visit "dired")
+(declare-function dired-do-open "dired-aux")
+(declare-function dired-find-file "dired")
+
+(defcustom my/dired-external-extensions
+  '("png" "jpg" "jpeg" "gif" "bmp" "webp" "tiff" "tif" "svg" "ico" "avif"
+    "mp4" "mkv" "avi" "mov" "webm" "flv" "wmv" "mpg" "mpeg" "m4v"
+    "mp3" "flac" "wav" "ogg" "opus" "m4a" "aac"
+    "xcf" "kra" "psd" "blend"
+    "cbz" "cbr")
+  "File extensions to open in an external application."
+  :type '(repeat string)
+  :group 'dired)
+
+(defcustom my/dired-find-file-full-window nil
+  "Whether `my/dired-find-file' opens files in a full window.
+When non-nil, the Dired buffer is killed after opening the file."
+  :type 'boolean
+  :group 'dired)
+
+(defun my/dired-external-file-p (file)
+  "Return non-nil if FILE should be opened externally."
+  (when-let* ((ext (file-name-extension file)))
+    (member (downcase ext) my/dired-external-extensions)))
+
+(defun my/dired-find-file ()
+  "Visit the file on this line in Emacs or an external application."
+  (interactive)
+  (let ((file (dired-get-file-for-visit)))
     (cond
-     ((string-empty-p query) (user-error "Empty query"))
-     ((null matches)
-      (user-error "No file matching %S under %s" query
-                  (abbreviate-file-name root)))
-     ((null (cdr matches)) (dired-jump nil (car matches)))
-     (t (my/dired-find-name--tree root matches)))))
+     ((and (not (file-directory-p file))
+           (my/dired-external-file-p file)
+           (fboundp 'dired-do-open))
+      (dired-do-open))
+     ((and my/dired-find-file-full-window
+           (not (file-directory-p file)))
+      (kill-buffer (current-buffer))
+      (find-file file))
+     (t
+      (dired-find-file)))))
 
 (provide 'dired-snacks)
 ;;; dired-snacks.el ends here

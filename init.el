@@ -405,6 +405,9 @@
   :custom
   (dired-listing-switches "-lah --almost-all --group-directories-first --sort=extension")
   (dired-kill-when-opening-new-dired-buffer t)
+  (dired-hide-details-preserved-columns '(5))
+  (dired-movement-style 'bounded-files)
+  (my/dired-find-file-full-window t)
   (dired-recursive-deletes 'always)
   (dired-recursive-copies 'always)
   (dired-auto-revert-buffer t)
@@ -417,13 +420,8 @@
   (dired-mode . dired-omit-mode)
   (dired-mode . hl-line-mode)
   :config
-  (add-hook 'dired-mode-hook (lambda () (setq line-spacing '(0.03 . 0.03))))
-  (defun my/dired-find-file ()
-    "Open file from dired in full window, closing dired."
-    (interactive)
-    (let ((file (dired-get-file-for-visit)))
-      (kill-buffer (current-buffer))
-      (find-file file))))
+  (keymap-set dired-mode-map "RET" #'my/dired-find-file)
+  (add-hook 'dired-mode-hook (lambda () (setq line-spacing '(0.03 . 0.03)))))
 
 (use-package wdired
   :ensure nil
@@ -659,7 +657,6 @@
 
 (use-package multiple-cursors
   :ensure t
-  :defer t
   :custom
   (mc/list-file (locate-user-emacs-file "mc-lists.el"))
   :config

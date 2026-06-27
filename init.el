@@ -138,7 +138,7 @@
   (set-face-attribute 'tooltip nil :family my/font)
 
   ;; misc
-  (setq redisplay-skip-fontification-on-input t)
+  (setq redisplay-skip-fontification-on-input nil)
   (put 'narrow-to-region 'disabled nil)
   (setq message-truncate-lines t)
 
@@ -405,7 +405,7 @@
   :custom
   (dired-listing-switches "-lah --almost-all --group-directories-first --sort=extension")
   (dired-kill-when-opening-new-dired-buffer t)
-  (dired-hide-details-preserved-columns '(5))
+  ;; (dired-hide-details-preserved-columns '(5))
   (dired-movement-style 'bounded-files)
   (my/dired-find-file-full-window t)
   (dired-recursive-deletes 'always)

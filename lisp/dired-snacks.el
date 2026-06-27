@@ -142,33 +142,38 @@ Fuzzy queries show the best match inline. Literal paths get a preview."
       (user-error "No zoxide match for: %s" input))))
 
 ;; ===============================================================
-;;; dired-copy-file-uri
+;;; dired-copy-file
 
 (defun my/dired-copy-file-uri ()
   "Copy the marked files as file:// URIs to the Wayland clipboard."
   (interactive)
   (unless (executable-find "wl-copy")
     (user-error "wl-copy not found; install wl-clipboard"))
+  (require 'browse-url)
   (let* ((files (dired-get-marked-files))
-         (uris (mapconcat (lambda (f) (concat "file://" f)) files "\n")))
-    (let ((p (make-process :name "wl-copy"
-                           :command '("wl-copy" "--type" "text/uri-list")
-                           :connection-type 'pipe)))
-      (process-send-string p uris)
-      (process-send-eof p))
+         (uris (mapconcat (lambda (file)
+                            (concat (browse-url-file-url file) "\r\n"))
+                          files "")))
+    (let ((proc (make-process
+                 :name "wl-copy"
+                 :command '("wl-copy" "--type" "text/uri-list")
+                 :connection-type 'pipe
+                 :noquery t)))
+      (process-send-string proc uris)
+      (process-send-eof proc)
+      (while (accept-process-output proc 0.1)))
     (dired-unmark-all-marks)
     (message "Copied %d file URI%s to clipboard"
              (length files)
-             (if (= (length files) 1) "" "s"))))
+             (if (length= files 1) "" "s"))))
 
 ;; ===============================================================
 ;;; dired-find-name
 
-(declare-function dired-insert-subdir-doupdate "dired-aux")
-(declare-function dired-insert-subdir-validate "dired-aux")
-(declare-function dired-insert-subdir-newpos "dired-aux")
+(declare-function nerd-icons-dired-mode "nerd-icons-dired")
+(declare-function dired-insert-set-properties "dired")
 (declare-function dired-build-subdir-alist "dired")
-(declare-function dired-insert-directory "dired")
+(declare-function dired-hide-details-mode "dired")
 (declare-function dired-move-to-filename "dired")
 (declare-function dired-get-filename "dired")
 (declare-function dired-omit-mode "dired-x")

@@ -1,4 +1,4 @@
-;;; dired-snacks.el --- dired snacks  -*- lexical-binding: t; -*-
+;;; dired-snacks.el --- Dired utilities  -*- lexical-binding: t; -*-
 ;;; Commentary:
 ;;; Code:
 
@@ -13,7 +13,7 @@
 (defvar completion-preview-idle-delay)
 
 (defvar my/zoxide--ghost-ov nil
-  "Overlay showing the inline zoxide best-match in the minibuffer.")
+  "Overlay showing the best zoxide match in the minibuffer.")
 
 (defun my/zoxide--query (input)
   "Return the directory for INPUT: a literal path, else zoxide's best match."
@@ -28,12 +28,12 @@
                 (and (file-directory-p dir) dir)))))))))
 
 (defun my/zoxide--add (dir)
-  "Register DIR in the zoxide database (fire-and-forget)."
+  "Register DIR in the zoxide database."
   (when (and dir (executable-find "zoxide"))
     (call-process "zoxide" nil 0 nil "add" "--" (expand-file-name dir))))
 
 (defun my/zoxide--add-default-directory ()
-  "Register `default-directory' in zoxide for `find-file' and Dired visits."
+  "Register `default-directory' in the zoxide database."
   (when (and (not (file-remote-p default-directory))
              (file-directory-p default-directory))
     (my/zoxide--add default-directory)))
@@ -42,12 +42,11 @@
 (add-hook 'dired-mode-hook #'my/zoxide--add-default-directory)
 
 (defun my/zoxide--path-like-p (input)
-  "Return non-nil when INPUT looks like a literal file-system path."
+  "Return non-nil if INPUT looks like a literal filesystem path."
   (and (string-match-p "[/~]" input) t))
 
 (defun my/zoxide--update-ghost (&rest _)
-  "Refresh the inline ghost of the best zoxide match.
-Fuzzy queries only. Literal paths use `completion-preview'."
+  "Refresh the inline zoxide suggestion for fuzzy queries."
   (when (overlayp my/zoxide--ghost-ov)
     (delete-overlay my/zoxide--ghost-ov))
   (let ((input (minibuffer-contents)))
@@ -59,8 +58,8 @@ Fuzzy queries only. Literal paths use `completion-preview'."
                                  'face 'shadow 'cursor t))))))
 
 (defun my/zoxide--path-capf ()
-  "Completion-at-point function for file-system paths.
-Drives the `completion-preview' ghost for literal paths."
+  "Completion-at-point function for filesystem paths.
+Used by `completion-preview' for literal paths."
   (list (minibuffer-prompt-end) (point) #'completion-file-name-table))
 
 (defun my/zoxide--inhibit-preview ()
@@ -68,7 +67,7 @@ Drives the `completion-preview' ghost for literal paths."
   (not (my/zoxide--path-like-p (minibuffer-contents))))
 
 (defun my/zoxide-complete-path ()
-  "Complete the minibuffer input as a directory path, in place."
+  "Complete the minibuffer input as a directory path."
   (interactive)
   (let* ((beg (minibuffer-prompt-end))
          (input (buffer-substring-no-properties beg (point-max)))
@@ -91,9 +90,8 @@ Drives the `completion-preview' ghost for literal paths."
       (insert (concat (or (file-name-directory input) "") comp))))))
 
 (defun my/zoxide-complete ()
-  "Complete the minibuffer input on TAB.
-Literal paths complete in place; fuzzy queries expand to the best zoxide
-match. A visible `completion-preview' ghost overrides this on TAB."
+  "Complete the minibuffer input. Literal paths use filename completion.
+Fuzzy queries expand to the best zoxide match."
   (interactive)
   (let ((input (minibuffer-contents)))
     (if (my/zoxide--path-like-p input)
@@ -108,19 +106,16 @@ match. A visible `completion-preview' ghost overrides this on TAB."
     (set-keymap-parent map minibuffer-local-map)
     (keymap-set map "TAB" #'my/zoxide-complete)
     map)
-  "Keymap for `my/zoxide-dired' with TAB path completion.")
+  "Minibuffer keymap for `my/zoxide-dired'.")
 
 (defun my/zoxide-dired ()
-  "Prompt for a zoxide query and open the chosen directory in Dired.
-Fuzzy queries show the best match inline. Literal paths get a preview."
+  "Prompt for a zoxide query and open the chosen directory in Dired."
   (interactive)
   (let* ((orig (current-buffer))
          (input (minibuffer-with-setup-hook
                     (lambda ()
                       (setq my/zoxide--ghost-ov nil)
-                      ;; fuzzy best-match ghost
                       (add-hook 'after-change-functions #'my/zoxide--update-ghost nil t)
-                      ;; literal-path ghost via completion-preview
                       (add-hook 'completion-at-point-functions #'my/zoxide--path-capf nil t)
                       (add-hook 'completion-preview-inhibit-functions
                                 #'my/zoxide--inhibit-preview nil t)

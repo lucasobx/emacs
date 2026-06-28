@@ -49,7 +49,7 @@ DESC labels it in which-key. DESC t hides KEY from which-key."
                       nil t))))
 
 ;; unbind
-(define-key key-translation-map (kbd "C-x 8") nil)
+(keymap-unset key-translation-map "C-x 8" t)
 
 (dolist (key '("C-<wheel-down>" "C-<wheel-up>" "C-c ^" "C-z" "C-h" "C-x"))
   (keymap-global-unset key t))

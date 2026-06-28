@@ -149,7 +149,7 @@
   (setq switch-to-prev-buffer-skip 'skip-these-buffers)
 
   ;; smart context clearing and quit handler
-  (define-key key-translation-map (kbd "ESC") (kbd "C-g"))
+  (keymap-set key-translation-map "ESC" "C-g")
   (define-advice keyboard-quit (:around (quit) quit-context-dwim)
     (cond
      ((and (region-active-p)
@@ -233,7 +233,7 @@
       (display-buffer-in-side-window)
       (side . bottom)
       (slot . 0)
-      (window-height . 0.4))
+      (window-height . 0.3))
      ("\\*Ibuffer\\*"
       (display-buffer-in-side-window)
       (side . bottom)

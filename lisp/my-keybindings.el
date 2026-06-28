@@ -2,6 +2,9 @@
 ;;; Commentary:
 ;;; Code:
 
+;; ===============================================================
+;;; SETUP
+
 (require 'which-key)
 (defalias 'wk-add #'which-key-add-key-based-replacements)
 (defalias 'wk-add-map #'which-key-add-keymap-based-replacements)
@@ -12,6 +15,9 @@
   :global t :group 'convenience :keymap my/override-map)
 (add-to-list 'emulation-mode-map-alists `((my/override-mode . ,my/override-map)))
 (my/override-mode 1)
+
+;; ===============================================================
+;;; HELPERS
 
 (defun my/wk-hide (&rest keys)
   "Hide each of KEYS from the which-key popup."
@@ -32,6 +38,17 @@ DESC labels it in which-key. DESC t hides KEY from which-key."
   (keymap-set keymap key command)
   (when desc (wk-add-map keymap key desc)))
 
+(defun my/bind-sub (map prefix key command &optional desc)
+  "Bind KEY to COMMAND in prefix MAP, labeling PREFIX+KEY in which-key.
+DESC t hides the binding from which-key."
+  (keymap-set map key command)
+  (let ((full (concat prefix " " key)))
+    (cond ((eq desc t) (my/wk-hide full))
+          (desc         (wk-add full desc)))))
+
+;; ===============================================================
+;;; COMMANDS
+
 (defun my/find-init-file ()
   "Open the user init file."
   (interactive)
@@ -48,7 +65,9 @@ DESC labels it in which-key. DESC t hides KEY from which-key."
                       (mapcar #'buffer-name bufs)
                       nil t))))
 
-;; unbind
+;; ===============================================================
+;;; UNBINDINGS
+
 (keymap-unset key-translation-map "C-x 8" t)
 
 (dolist (key '("C-<wheel-down>" "C-<wheel-up>" "C-c ^" "C-z" "C-h" "C-x"))
@@ -63,7 +82,9 @@ DESC labels it in which-key. DESC t hides KEY from which-key."
   (dolist (key '("C-c <left>" "C-c <right>"))
     (keymap-unset winner-mode-map key t)))
 
-;; global
+;; ===============================================================
+;;; GLOBAL
+
 (my/bind "<f1>"          #'scratch-buffer)
 (my/bind "<f2>"          #'my/rotate-theme)
 (my/bind "C-<backspace>" #'my/backward-delete)
@@ -89,7 +110,7 @@ DESC labels it in which-key. DESC t hides KEY from which-key."
 (my/bind "M-c"           #'capitalize-dwim)
 
 ;; ===============================================================
-;; region-aware prefixes
+;;; REGION-AWARE PREFIXES (C-d / C-y)
 ;;
 ;; with an active region, bare C-d/C-y act as kill-region/kill-ring-save.
 ;; with no region they behave as ordinary prefix maps.
@@ -104,14 +125,6 @@ DESC labels it in which-key. DESC t hides KEY from which-key."
   "Return a binding giving COMMAND on an active region, else prefix MAP."
   `(menu-item "" ,map
               :filter ,(lambda (real) (if (use-region-p) command real))))
-
-(defun my/bind-sub (map prefix key command &optional desc)
-  "Bind KEY to COMMAND in prefix MAP, labeling PREFIX+KEY in which-key.
-DESC t hides the binding from which-key."
-  (keymap-set map key command)
-  (let ((full (concat prefix " " key)))
-    (cond ((eq desc t) (my/wk-hide full))
-          (desc         (wk-add full desc)))))
 
 (keymap-set my/override-map "C-d"
             (my/region-aware-prefix my/delete-map #'kill-region))
@@ -135,6 +148,7 @@ DESC t hides the binding from which-key."
 (my/bind-sub my/copy-map "C-y" "]" #'my/copy-inside-brackets "inside []")
 
 ;; ===============================================================
+;;; PREFIX GROUPS
 
 (wk-add  "C-;" "comment")
 (my/bind "C-; p" #'my/toggle-comment-paragraph "paragraph")
@@ -211,6 +225,9 @@ DESC t hides the binding from which-key."
 (my/bind "C-x <left>"  #'previous-buffer t)
 (my/bind "C-x m"       #'rectangle-mark-mode "rectangle mark")
 (my/bind "C-x e"       #'eval-last-sexp      "eval sexp")
+
+;; ===============================================================
+;;; MODE-LOCAL
 
 (wk-add-map
   prog-mode-map "C-l" "lsp")

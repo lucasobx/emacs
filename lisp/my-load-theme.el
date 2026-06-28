@@ -8,9 +8,9 @@
 (defun my/theme-list ()
   "Return the available themes, excluding the built-in ones."
   (let ((builtin (expand-file-name "themes" data-directory)))
-    (cl-remove-if (lambda (theme)
-                    (locate-file (format "%s-theme.el" theme) (list builtin)))
-                  (custom-available-themes))))
+    (seq-remove (lambda (theme)
+                  (locate-file (format "%s-theme.el" theme) (list builtin)))
+                (custom-available-themes))))
 
 (defun my/load-theme (theme)
   "Disable active themes and load THEME."
@@ -29,7 +29,7 @@
   "Load the next theme in `my/theme-list'."
   (interactive)
   (let* ((themes (my/theme-list))
-         (current (or (cl-position my/theme themes) -1))
+         (current (or (seq-position themes my/theme) -1))
          (next (mod (1+ current) (length themes))))
     (my/load-theme (nth next themes))))
 

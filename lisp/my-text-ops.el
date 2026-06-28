@@ -171,10 +171,10 @@ Otherwise FALLBACK is evaluated."
     (when bounds
       (let ((start (save-excursion
                      (goto-char (car bounds))
-                     (line-beginning-position)))
+                     (pos-bol)))
             (end (save-excursion
                    (goto-char (cdr bounds))
-                   (line-end-position))))
+                   (pos-eol))))
         (pulse-momentary-highlight-region start end)
         (sit-for 0.05)
         (comment-or-uncomment-region start end)))))
@@ -224,13 +224,13 @@ Otherwise FALLBACK is evaluated."
   (my/delete-thing 'line))
 
 (my/define-ops my/delete-thing
-  (my/delete-paragraph 'paragraph "Delete paragraph at point.")
-  (my/delete-defun     'defun     "Delete defun at point."))
+               (my/delete-paragraph 'paragraph "Delete paragraph at point.")
+               (my/delete-defun     'defun     "Delete defun at point."))
 
 (my/define-ops my/delete-inside
-  (my/delete-in-parens   #'my/inside-parens   "Delete text inside parentheses.")
-  (my/delete-in-brackets #'my/inside-brackets "Delete text inside brackets.")
-  (my/delete-in-braces   #'my/inside-braces   "Delete text inside braces."))
+               (my/delete-in-parens   #'my/inside-parens   "Delete text inside parentheses.")
+               (my/delete-in-brackets #'my/inside-brackets "Delete text inside brackets.")
+               (my/delete-in-braces   #'my/inside-braces   "Delete text inside braces."))
 
 ;; ===============================================================
 ;;; COPY COMMANDS
@@ -241,15 +241,15 @@ Otherwise FALLBACK is evaluated."
   (my/copy-thing 'line))
 
 (my/define-ops my/copy-thing
-  (my/copy-paragraph 'paragraph "Copy paragraph at point.")
-  (my/copy-word      'word      "Copy word at point.")
-  (my/copy-symbol    'symbol    "Copy symbol at point.")
-  (my/copy-defun     'defun     "Copy defun at point."))
+               (my/copy-paragraph 'paragraph "Copy paragraph at point.")
+               (my/copy-word      'word      "Copy word at point.")
+               (my/copy-symbol    'symbol    "Copy symbol at point.")
+               (my/copy-defun     'defun     "Copy defun at point."))
 
 (my/define-ops my/copy-inside
-  (my/copy-inside-parens   #'my/inside-parens   "Copy text inside parentheses.")
-  (my/copy-inside-brackets #'my/inside-brackets "Copy text inside brackets.")
-  (my/copy-inside-braces   #'my/inside-braces   "Copy text inside braces."))
+               (my/copy-inside-parens   #'my/inside-parens   "Copy text inside parentheses.")
+               (my/copy-inside-brackets #'my/inside-brackets "Copy text inside brackets.")
+               (my/copy-inside-braces   #'my/inside-braces   "Copy text inside braces."))
 
 ;; ===============================================================
 ;;; COMMENT COMMANDS
@@ -260,15 +260,15 @@ Otherwise FALLBACK is evaluated."
   (comment-line 1))
 
 (my/define-ops my/toggle-comment-thing
-  (my/toggle-comment-paragraph 'paragraph "Toggle comment on paragraph at point.")
-  (my/toggle-comment-defun     'defun     "Toggle comment on defun at point."))
+               (my/toggle-comment-paragraph 'paragraph "Toggle comment on paragraph at point.")
+               (my/toggle-comment-defun     'defun     "Toggle comment on defun at point."))
 
 ;; ===============================================================
 ;;; LINE BLOCKS
 
 (defun my/line-block-bounds (n)
   "Return bounds (BEG . END) for the current line plus N lines below it."
-  (cons (line-beginning-position)
+  (cons (pos-bol)
         (save-excursion (forward-line (1+ n)) (point))))
 
 (defun my/delete-lines (n)

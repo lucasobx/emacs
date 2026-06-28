@@ -75,8 +75,7 @@
 (set-language-environment "UTF-8")
 
 ;; disable bidi processing
-(setq-default bidi-display-reordering 'left-to-right
-              bidi-paragraph-direction 'left-to-right)
+(setq-default bidi-paragraph-direction 'left-to-right)
 (setq bidi-inhibit-bpa t)
 
 ;; trusted content

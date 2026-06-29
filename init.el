@@ -233,7 +233,7 @@
       (display-buffer-in-side-window)
       (side . bottom)
       (slot . 0)
-      (window-height . 0.3))
+      (window-height . 0.35))
      ("\\*Ibuffer\\*"
       (display-buffer-in-side-window)
       (side . bottom)
@@ -403,10 +403,11 @@
 (use-package dired
   :ensure nil
   :custom
+  ;; (dired-hide-details-preserved-columns '(5))
   (dired-listing-switches "-lah --almost-all --group-directories-first --sort=extension")
   (dired-kill-when-opening-new-dired-buffer t)
-  ;; (dired-hide-details-preserved-columns '(5))
   (dired-movement-style 'bounded-files)
+  (my/dired-subtree-line-prefix "  ")
   (my/dired-find-file-full-window t)
   (dired-recursive-deletes 'always)
   (dired-recursive-copies 'always)

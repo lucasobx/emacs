@@ -437,5 +437,135 @@ When non-nil, the Dired buffer is killed after opening the file."
      (t
       (dired-find-file)))))
 
+;; ===============================================================
+;;; dired-subtree
+
+(declare-function nerd-icons-dired--refresh "nerd-icons-dired")
+(declare-function dired-build-subdir-alist "dired")
+(declare-function dired-insert-directory "dired")
+(declare-function dired-move-to-filename "dired")
+(declare-function dired-kill-subdir "dired-aux")
+(declare-function dired-get-filename "dired")
+(declare-function dired-goto-subdir "dired")
+
+(defvar dired-actual-switches)
+(defvar dired-subdir-alist)
+
+(defcustom my/dired-subtree-line-prefix "  "
+  "Indentation added per nesting level in a subtree."
+  :type 'string
+  :group 'dired)
+
+(defcustom my/dired-subtree-after-change-hook nil
+  "Hook run after a subtree is expanded or collapsed.
+Icons are refreshed automatically when `nerd-icons-dired' is present."
+  :type 'hook
+  :group 'dired)
+
+(defvar-local my/dired-subtree--overlays nil
+  "Subtree overlays in this buffer.")
+
+(defvar-local my/dired-subtree--dirs nil
+  "Directories currently expanded as subtrees, used for revert cleanup.")
+
+(defun my/dired-subtree--depth-at (pos)
+  "Return the depth of the innermost subtree covering POS, or 0 if none."
+  (let ((depth 0))
+    (dolist (ov (overlays-at pos) depth)
+      (let ((d (overlay-get ov 'my/dired-subtree)))
+        (when (and d (> d depth)) (setq depth d))))))
+
+(defun my/dired-subtree--child-overlay ()
+  "Return the subtree expanded directly under the current line, or nil."
+  (let ((start (save-excursion (forward-line 1) (line-beginning-position))))
+    (seq-find (lambda (ov)
+                (and (overlay-buffer ov)
+                     (overlay-get ov 'my/dired-subtree)
+                     (= (overlay-start ov) start)))
+              my/dired-subtree--overlays)))
+
+(defun my/dired-subtree--insert ()
+  "Insert the directory on this line as an inline subtree."
+  (let* ((dir (file-name-as-directory (dired-get-filename nil t)))
+         (depth (1+ (my/dired-subtree--depth-at (point))))
+         (prefix (apply #'concat (make-list depth my/dired-subtree-line-prefix)))
+         (inhibit-read-only t))
+    (save-excursion
+      (forward-line 1)
+      (let ((beg (point)) end header-end)
+        (dired-insert-directory dir dired-actual-switches nil nil t)
+        (setq end (point))
+        (dired-build-subdir-alist)
+        (save-excursion (goto-char beg) (forward-line 1) (setq header-end (point)))
+        (let ((header (make-overlay beg header-end)))
+          (overlay-put header 'invisible 'my/dired-subtree-header)
+          (overlay-put header 'evaporate t)
+          (push header my/dired-subtree--overlays))
+        (let ((ov (make-overlay beg end)))
+          (overlay-put ov 'my/dired-subtree depth)
+          (overlay-put ov 'line-prefix prefix)
+          (overlay-put ov 'evaporate t)
+          (push ov my/dired-subtree--overlays))
+        (unless (member dir my/dired-subtree--dirs)
+          (push dir my/dired-subtree--dirs))))
+    (run-hooks 'my/dired-subtree-after-change-hook)
+    (dired-move-to-filename)))
+
+(defun my/dired-subtree--remove (ov)
+  "Collapse the subtree tracked by overlay OV."
+  (let ((beg (overlay-start ov))
+        (end (overlay-end ov))
+        (inhibit-read-only t))
+    (dolist (o (overlays-in beg end))
+      (when (and (memq o my/dired-subtree--overlays)
+                 (>= (overlay-start o) beg)
+                 (<= (overlay-end o) end))
+        (setq my/dired-subtree--overlays (delq o my/dired-subtree--overlays))
+        (delete-overlay o)))
+    (delete-region beg end)
+    (dired-build-subdir-alist)
+    (setq my/dired-subtree--dirs
+          (seq-filter (lambda (d) (assoc d dired-subdir-alist))
+                      my/dired-subtree--dirs)))
+  (run-hooks 'my/dired-subtree-after-change-hook)
+  (dired-move-to-filename))
+
+(defun my/dired-subtree-toggle ()
+  "Expand the directory at point as an inline subtree, or collapse it."
+  (interactive)
+  (let ((dir (dired-get-filename nil t)))
+    (cond
+     ((not (and dir (file-directory-p dir)))
+      (user-error "Point is not on a directory"))
+     ((my/dired-subtree--child-overlay)
+      (my/dired-subtree--remove (my/dired-subtree--child-overlay)))
+     (t (my/dired-subtree--insert)))))
+
+(defun my/dired-subtree--reset ()
+  "Collapse every tracked subtree, e.g. after the buffer is reverted."
+  (when my/dired-subtree--dirs
+    (let ((inhibit-read-only t))
+      ;; deepest first, so a parent is removed only after its children
+      (dolist (dir (sort (copy-sequence my/dired-subtree--dirs)
+                         (lambda (a b) (> (length a) (length b)))))
+        (when (assoc dir dired-subdir-alist)
+          (save-excursion
+            (when (dired-goto-subdir dir)
+              (dired-kill-subdir)))))
+      (mapc #'delete-overlay my/dired-subtree--overlays)
+      (setq my/dired-subtree--overlays nil
+            my/dired-subtree--dirs nil))))
+
+(defun my/dired-subtree--setup ()
+  "Enable inline subtrees in the current Dired buffer."
+  (add-to-invisibility-spec 'my/dired-subtree-header)
+  (add-hook 'dired-after-readin-hook #'my/dired-subtree--reset nil t))
+
+(add-hook 'dired-mode-hook #'my/dired-subtree--setup)
+
+;; redraw file icons after a subtree changes, when nerd-icons is in use.
+(with-eval-after-load 'nerd-icons-dired
+  (add-hook 'my/dired-subtree-after-change-hook #'nerd-icons-dired--refresh))
+
 (provide 'dired-snacks)
 ;;; dired-snacks.el ends here

@@ -58,8 +58,7 @@
                                  'face 'shadow 'cursor t))))))
 
 (defun my/zoxide--path-capf ()
-  "Completion-at-point function for filesystem paths.
-Used by `completion-preview' for literal paths."
+  "Completion-at-point function for literal paths, used by `completion-preview'."
   (list (minibuffer-prompt-end) (point) #'completion-file-name-table))
 
 (defun my/zoxide--inhibit-preview ()
@@ -90,8 +89,8 @@ Used by `completion-preview' for literal paths."
       (insert (concat (or (file-name-directory input) "") comp))))))
 
 (defun my/zoxide-complete ()
-  "Complete the minibuffer input. Literal paths use filename completion.
-Fuzzy queries expand to the best zoxide match."
+  "Complete the minibuffer input.
+Literal paths use filename completion. Fuzzy queries expand to the zoxide match."
   (interactive)
   (let ((input (minibuffer-contents)))
     (if (my/zoxide--path-like-p input)
@@ -170,6 +169,7 @@ Fuzzy queries expand to the best zoxide match."
 (declare-function dired-build-subdir-alist "dired")
 (declare-function dired-hide-details-mode "dired")
 (declare-function dired-move-to-filename "dired")
+(declare-function dired-hide-subdir "dired-aux")
 (declare-function dired-get-filename "dired")
 (declare-function dired-omit-mode "dired-x")
 (declare-function dired-get-subdir "dired")
@@ -207,8 +207,7 @@ Lower values feel more responsive, higher values spawn fewer `fd' processes."
   "Root directory of the current search.")
 
 (defun my/dired-find-name--fd-args (query dir)
-  "Return `fd' arguments for searching QUERY under DIR.
-Uses `--list-details' so a single process emits Dired-ready output."
+  "Return the `fd' arguments to search for QUERY under DIR."
   (append '("--color=never" "--list-details" "--hidden" "--no-ignore"
             "--type" "f" "--fixed-strings" "--ignore-case")
           (mapcan (lambda (d) (list "--exclude" d))
@@ -216,9 +215,7 @@ Uses `--list-details' so a single process emits Dired-ready output."
           (list "--" query (expand-file-name dir))))
 
 (defun my/dired-find-name--parse (line)
-  "Parse an `fd --list-details' LINE.
-Return (DIR BASENAME LISTING), where LISTING is ready for insertion
-into a Dired subdir listing."
+  "Parse an `fd --list-details' LINE into (DIR BASENAME LISTING)."
   (when (string-match "\\(/.*\\)\\'" line)
     (let ((path (match-string 1 line))
           (prefix (substring line 0 (match-beginning 1))))
@@ -248,8 +245,7 @@ into a Dired subdir listing."
         (forward-line 1)))))
 
 (defun my/dired-find-name--goto (file)
-  "Move point to FILE by scanning file names.
-More reliable than `dired-goto-file' for this buffer."
+  "Move point to FILE by scanning file names."
   (goto-char (point-min))
   (let ((found nil))
     (while (and (not found) (not (eobp)))
@@ -273,8 +269,7 @@ Each entry must be a (DIR BASENAME LISTING) triple."
         (insert "  " (nth 2 entry) "\n")))))
 
 (defun my/dired-find-name--render (root details)
-  "Render DETAILS under ROOT as a Dired buffer.
-The buffer is assumed to already be in `dired-mode'."
+  "Render DETAILS under ROOT as a Dired buffer."
   (when (buffer-live-p my/dired-find-name--buffer)
     (with-current-buffer my/dired-find-name--buffer
       (let* ((inhibit-read-only t)
@@ -371,6 +366,7 @@ Display live results in a Dired buffer as you type."
       (let ((map (make-sparse-keymap)))
         (set-keymap-parent map dired-mode-map)
         (keymap-set map "q" #'kill-current-buffer)
+        (keymap-set map "TAB" #'dired-hide-subdir)
         (use-local-map map)))
     (display-buffer buf)
     (let ((confirmed nil))

@@ -38,6 +38,7 @@
   ;; startup & ui
   (display-fill-column-indicator-warning nil)
   (warning-minimum-level :emergency)
+  (mode-line-percent-position nil)
   (ring-bell-function 'ignore)
   (initial-scratch-message "")
   (inhibit-startup-message t)
@@ -310,40 +311,6 @@
   :ensure t
   :hook
   (prog-mode . rainbow-delimiters-mode))
-
-(use-package doom-modeline
-  :ensure t
-  :custom
-  (doom-modeline-buffer-file-name-style 'buffer-name)
-  (doom-modeline-project-detection 'project)
-  (mode-line-right-align-edge 'right-fringe)
-  (doom-modeline-window-width-limit 0)
-  (doom-modeline-percent-position nil)
-  (doom-modeline-total-line-number t)
-  (doom-modeline-buffer-encoding nil)
-  (doom-modeline-major-mode-icon t)
-  (doom-modeline-check-icon nil)
-  (doom-modeline-persp-icon nil)
-  (doom-modeline-persp-name nil)
-  (doom-modeline-modal-icon t)
-  (doom-modeline-height 23)
-  (doom-modeline-time nil)
-  (doom-modeline-modal t)
-  (doom-modeline-icon t)
-  :config
-  (defun doom-modeline-check-icon (_icon _unicode _text &optional _face) "")
-  (setopt doom-modeline-always-show-macro-register t)
-  (setopt doom-modeline-buffer-modification-icon nil)
-  (add-hook 'doom-modeline-mode-hook
-            (lambda ()
-              (dolist (face (face-list))
-                (when (string-prefix-p "doom-modeline" (symbol-name face))
-                  (set-face-attribute face nil :weight 'normal :slant 'normal)))))
-  (doom-modeline-mode 1)
-  ;; fix doom-modeline leaking mode-line-inactive background into active window.
-  (advice-add 'doom-modeline-display-text :override
-            (lambda (text)
-              (string-replace "%" "%%" text))))
 
 ;; (use-package emacs-goose
 ;;   :ensure nil

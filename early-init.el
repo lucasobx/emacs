@@ -65,11 +65,10 @@
       package-quickstart t)
 
 ;; disable UI elements early
-(setq-default mode-line-format nil)
+(advice-add 'display-startup-screen :override #'ignore)
 (setq scroll-bar-mode nil)
 (setq menu-bar-mode nil)
 (setq tool-bar-mode nil)
-(advice-add 'display-startup-screen :override #'ignore)
 
 ;; utf-8
 (set-language-environment "UTF-8")

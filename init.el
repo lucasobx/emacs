@@ -221,6 +221,14 @@
 ;; ===============================================================
 ;;; UI
 
+(use-package my-modeline
+  :ensure nil
+  :load-path "~/.config/emacs/lisp"
+  :custom
+  (my/dired-show-file-time nil)
+  (my/dired-show-file-size t)
+  (my/dired-show-omit nil))
+
 (use-package window
   :ensure nil
   :custom
@@ -388,8 +396,8 @@
   (dired-mode . dired-omit-mode)
   (dired-mode . hl-line-mode)
   :config
-  (keymap-set dired-mode-map "RET" #'my/dired-find-file)
-  (add-hook 'dired-mode-hook (lambda () (setq line-spacing '(0.03 . 0.03)))))
+  ;; (add-hook 'dired-mode-hook (lambda () (setq line-spacing '(0.03 . 0.03))))
+  (keymap-set dired-mode-map "RET" #'my/dired-find-file))
 
 (use-package wdired
   :ensure nil
@@ -482,11 +490,13 @@
   :hook
   (prog-mode . flycheck-mode)
   :custom
-  (flycheck-indication-mode nil)
   (flycheck-check-syntax-automatically '(save mode-enabled idle-change))
-  (flycheck-idle-change-delay 0.5)
   (flycheck-display-errors-function #'flycheck-display-error-messages)
+  (flycheck-idle-change-delay 0.5)
+  (flycheck-indication-mode nil)
   :config
+  (setcdr (assq 'flycheck-mode minor-mode-map-alist)
+          (make-sparse-keymap))
   (add-hook 'lisp-interaction-mode-hook (lambda () (flycheck-mode -1))))
 
 (use-package flycheck-eglot
@@ -604,11 +614,6 @@
   :after vertico
   :defer t
   :init
-  (advice-add #'register-preview :override #'consult-register-window)
-  (setopt xref-show-xrefs-function #'consult-xref
-          xref-show-definitions-function #'consult-xref)
-  (setopt completion-in-region-function #'consult-completion-in-region)
-  :config
   (setopt consult-fd-args
           '("fd" "--color=auto" "--full-path" "--hidden"))
   (setopt consult-buffer-sources '(consult-source-buffer))

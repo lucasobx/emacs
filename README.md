@@ -1,11 +1,10 @@
 ### Requirements
-* linux
 * emacs 31+
-* nerd icons
+* linux + wayland
 * wl-copy
 * ripgrep
 * fd-find
 * zoxide
 
 ___
-<img width="1265" height="1536" alt="image" src="https://github.com/user-attachments/assets/5b9d6026-155a-4a4b-9cca-dc8e502a8269" />
+<img width="1255" height="1525" alt="image" src="https://github.com/user-attachments/assets/5a1a3a33-9a07-4650-b3d8-8401b8f99ca4" />

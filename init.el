@@ -303,11 +303,6 @@
 (use-package spacious-padding
   :ensure t
   :config
-  (advice-add
-   'spacious-padding-set-faces :after
-   (lambda (&rest _)
-     (set-face-attribute 'mode-line-active nil
-                         :inherit 'mode-line)))
   (setopt spacious-padding-widths
           '(:internal-border-width 10
             :right-divider-width 1
@@ -402,112 +397,6 @@
 (use-package wdired
   :ensure nil
   :commands (wdired-change-to-wdired-mode))
-
-;; ===============================================================
-;;; TREESITTER
-
-(use-package lua-ts-mode
-  :ensure nil
-  :mode ("\\.lua\\'")
-  :custom
-  (lua-ts-indent-offset 2)
-  :config
-  (setq lua-ts-mode-map (make-sparse-keymap)))
-
-(use-package ruby-ts-mode
-  :ensure nil
-  :mode ("\\.rb\\'" "Rakefile\\'" "Gemfile\\'")
-  :custom
-  (ruby-indent-level 2)
-  :config
-  (setq ruby-ts-mode-map (make-sparse-keymap))
-  (set-keymap-parent ruby-ts-mode-map prog-mode-map))
-
-(use-package python-ts-mode
-  :ensure nil
-  :mode ("\\.py\\'" . python-ts-mode)
-  :custom
-  (python-indent-offset 4))
-
-;; (use-package markdown-ts-mode
-;;   :ensure nil)
-
-(use-package markdown-mode
-  :ensure t
-  :mode ("README\\.md\\'" . gfm-mode))
-
-;; ===============================================================
-;;; PROG-MODE
-
-(use-package eldoc
-  :ensure nil
-  :init
-  (global-eldoc-mode)
-  :custom
-  (eldoc-help-at-pt t)
-  (eldoc-idle-delay 0.5)
-  (eldoc-echo-area-use-multiline-p nil))
-
-(use-package eldoc-box
-  :ensure t
-  :hook
-  (prog-mode . eldoc-box-hover-mode)
-  :custom
-  (eldoc-box-max-pixel-height 200)
-  (eldoc-box-max-pixel-width 400))
-
-(use-package inf-ruby
-  :ensure t
-  :hook
-  (ruby-ts-mode . inf-ruby-minor-mode)
-  :config
-  (setcdr (assq 'inf-ruby-minor-mode minor-mode-map-alist)
-          (make-sparse-keymap))
-  (when (executable-find "pry")
-    (add-to-list 'inf-ruby-implementations '("pry" . "pry"))
-    (setopt inf-ruby-default-implementation "pry"))
-  (add-hook 'inf-ruby-mode-hook
-            (lambda ()
-              (set-process-query-on-exit-flag
-               (get-buffer-process (current-buffer)) nil))))
-
-(use-package eglot
-  :ensure nil
-  :custom
-  (eglot-ignored-server-capabilities '(:inlayHintProvider))
-  (eglot-events-buffer-config '(:size 0 :format full))
-  (eglot-code-action-indications nil)
-  (eglot-prefer-plaintext nil)
-  (jsonrpc-event-hook nil)
-  (eglot-autoshutdown t)
-  :init
-  (fset #'jsonrpc--log-event #'ignore)
-  :hook
-  ((lua-ts-mode ruby-ts-mode python-ts-mode) . eglot-ensure))
-
-(use-package flycheck
-  :ensure t
-  :hook
-  (prog-mode . flycheck-mode)
-  :custom
-  (flycheck-check-syntax-automatically '(save mode-enabled idle-change))
-  (flycheck-display-errors-function #'flycheck-display-error-messages)
-  (flycheck-idle-change-delay 0.5)
-  (flycheck-indication-mode nil)
-  :config
-  (setcdr (assq 'flycheck-mode minor-mode-map-alist)
-          (make-sparse-keymap))
-  (add-hook 'lisp-interaction-mode-hook (lambda () (flycheck-mode -1))))
-
-(use-package flycheck-eglot
-  :ensure t
-  :after (flycheck eglot)
-  :config
-  (global-flycheck-eglot-mode 1))
-
-(use-package consult-flycheck
-  :ensure t
-  :after (flycheck eglot))
 
 ;; ===============================================================
 ;;; COMPLETION
@@ -633,6 +522,143 @@
           (derived-mode-p 'dired-mode)))
       buffers))))
 
+;; ===============================================================
+;;; LANGUAGES
+
+(use-package lua-ts-mode
+  :ensure nil
+  :mode ("\\.lua\\'")
+  :custom
+  (lua-ts-indent-offset 2)
+  :config
+  (setq lua-ts-mode-map (make-sparse-keymap)))
+
+(use-package ruby-ts-mode
+  :ensure nil
+  :mode ("\\.rb\\'" "Rakefile\\'" "Gemfile\\'")
+  :custom
+  (ruby-indent-level 2)
+  :config
+  (setq ruby-ts-mode-map (make-sparse-keymap))
+  (set-keymap-parent ruby-ts-mode-map prog-mode-map))
+
+(use-package python-ts-mode
+  :ensure nil
+  :mode ("\\.py\\'" . python-ts-mode)
+  :custom
+  (python-indent-offset 4))
+
+(use-package markdown-mode
+  :ensure t
+  :mode ("README\\.md\\'" . gfm-mode))
+
+;; (use-package markdown-ts-mode
+;;   :ensure nil)
+
+;; ===============================================================
+;;; IDE
+
+(use-package eglot
+  :ensure nil
+  :custom
+  (eglot-ignored-server-capabilities '(:inlayHintProvider))
+  (eglot-events-buffer-config '(:size 0 :format full))
+  (eglot-code-action-indications nil)
+  (eglot-prefer-plaintext nil)
+  (jsonrpc-event-hook nil)
+  (eglot-autoshutdown t)
+  :init
+  (fset #'jsonrpc--log-event #'ignore)
+  :hook
+  ((lua-ts-mode ruby-ts-mode python-ts-mode) . eglot-ensure))
+
+(use-package flycheck
+  :ensure t
+  :hook
+  (prog-mode . flycheck-mode)
+  :custom
+  (flycheck-check-syntax-automatically '(save mode-enabled idle-change))
+  (flycheck-display-errors-function #'flycheck-display-error-messages)
+  (flycheck-idle-change-delay 0.5)
+  (flycheck-indication-mode nil)
+  :config
+  (setcdr (assq 'flycheck-mode minor-mode-map-alist)
+          (make-sparse-keymap))
+  (add-hook 'lisp-interaction-mode-hook (lambda () (flycheck-mode -1))))
+
+(use-package flycheck-eglot
+  :ensure t
+  :after (flycheck eglot)
+  :config
+  (global-flycheck-eglot-mode 1))
+
+(use-package consult-flycheck
+  :ensure t
+  :after (flycheck eglot))
+
+(use-package eldoc
+  :ensure nil
+  :init
+  (global-eldoc-mode)
+  :custom
+  (eldoc-help-at-pt t)
+  (eldoc-idle-delay 0.5)
+  (eldoc-echo-area-use-multiline-p nil))
+
+(use-package eldoc-box
+  :ensure t
+  :hook
+  (prog-mode . eldoc-box-hover-mode)
+  :custom
+  (eldoc-box-max-pixel-height 200)
+  (eldoc-box-max-pixel-width 400))
+
+(use-package inf-ruby
+  :ensure t
+  :hook
+  (ruby-ts-mode . inf-ruby-minor-mode)
+  :config
+  (setcdr (assq 'inf-ruby-minor-mode minor-mode-map-alist)
+          (make-sparse-keymap))
+  (when (executable-find "pry")
+    (add-to-list 'inf-ruby-implementations '("pry" . "pry"))
+    (setopt inf-ruby-default-implementation "pry"))
+  (add-hook 'inf-ruby-mode-hook
+            (lambda ()
+              (set-process-query-on-exit-flag
+               (get-buffer-process (current-buffer)) nil))))
+
+;; ===============================================================
+;;; GAMEDEV
+
+(use-package livelove
+  :ensure nil
+  :load-path "~/.config/emacs/lisp"
+  :hook (lua-ts-mode . global-livelove-mode)
+  :custom
+  (livelove-align-max-width 8)
+  (livelove-align-values 'decimal)
+  (livelove-auto-start-server t))
+
+;; ===============================================================
+;;; DOCS
+
+(use-package helpful
+  :ensure t
+  :defer t)
+
+(use-package devdocs
+  :ensure t
+  :defer t
+  :config
+  (setopt devdocs-header-line nil))
+
+(use-package shr
+  :ensure nil
+  :defer t
+  :custom
+  (shr-use-fonts nil))
+
 ;; ==============================================================
 ;;; EDITING
 
@@ -709,25 +735,6 @@
   (eshell-history-size 100000)
   (eshell-hist-ignoredups t)
   (eshell-banner-message ""))
-
-;; ===============================================================
-;;; DOCS
-
-(use-package helpful
-  :ensure t
-  :defer t)
-
-(use-package devdocs
-  :ensure t
-  :defer t
-  :config
-  (setopt devdocs-header-line nil))
-
-(use-package shr
-  :ensure nil
-  :defer t
-  :custom
-  (shr-use-fonts nil))
 
 ;; ===============================================================
 ;;; VERSION CONTROL

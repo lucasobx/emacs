@@ -2,16 +2,12 @@
 ;;; Commentary:
 ;;; Code:
 
-(declare-function flycheck-count-errors "flycheck")
 (declare-function flycheck-error-level-compilation-level "flycheck")
-(defvar flycheck-current-errors)
-(defvar flycheck-mode-line)
-
+(declare-function flycheck-count-errors "flycheck")
 (declare-function vc-backend "vc-hooks")
 (declare-function vc-state "vc-hooks")
-
-(declare-function dired-get-filename "dired")
-(defvar dired-re-dir)
+(defvar flycheck-current-errors)
+(defvar flycheck-mode-line)
 
 (defun my/shorten-vc-mode (vc)
   "Return a shortened VC mode string."
@@ -106,131 +102,30 @@
   (when (and (eq status 'finished) (bound-and-true-p flycheck-mode))
     (pcase-let ((`(,error ,warning ,info) (my/flycheck-count-errors)))
       (setq my/flycheck-mode-line
-            `(" ["
+            `(" "
               (:propertize ,(number-to-string error)   face flycheck-error-list-error)
-              " "
+              (:propertize " " display (space :width 0.3))
               (:propertize ,(number-to-string warning) face flycheck-error-list-warning)
-              " "
+              (:propertize " " display (space :width 0.3))
               (:propertize ,(number-to-string info)    face flycheck-error-list-info)
-              "]")))))
+              "")))))
 
 (with-eval-after-load 'flycheck
   (add-hook 'flycheck-status-changed-functions #'my/flycheck-update-mode-line)
   (setq flycheck-mode-line '(:eval my/flycheck-mode-line)))
 
-(defgroup my-modeline nil
-  "Personal mode line."
-  :group 'mode-line)
-
-(defcustom my/dired-show-file-size t
-  "When non-nil, show the size of the Dired entry at point."
-  :type 'boolean :group 'my-modeline)
-
-(defcustom my/dired-show-file-time t
-  "When non-nil, show the modification time of the Dired entry at point."
-  :type 'boolean :group 'my-modeline)
-
-(defcustom my/dired-show-omit t
-  "When non-nil, show the `dired-omit-mode' indicator."
-  :type 'boolean :group 'my-modeline)
-
-(defvar-local my/dired--mode-line nil
-  "Cached file/directory count segment for a Dired buffer.")
-
-(defvar-local my/dired--last-file nil
-  "File at point after the last command, used to detect movement.")
-
-(defvar-local my/dired--attr-cache nil
-  "Cons of (FILENAME . ATTRIBUTES) for the Dired line at point.")
-
-(defun my/dired-count ()
-  "Return the number of files and directories."
-  (let ((files 0) (dirs 0))
-    (save-excursion
-      (goto-char (point-min))
-      (while (not (eobp))
-        (when-let* ((name (dired-get-filename 'no-dir t)))
-          (unless (member name '("." ".."))
-            (if (save-excursion (beginning-of-line) (looking-at-p dired-re-dir))
-                (setq dirs (1+ dirs))
-              (setq files (1+ files)))))
-        (forward-line 1)))
-    (cons files dirs)))
-
-(defun my/dired-update-mode-line ()
-  "Update the cached Dired mode-line segment."
-  (let ((count (my/dired-count)))
-    (setq my/dired--mode-line
-          (concat " " (number-to-string (car count)) "f "
-                  (propertize (concat (number-to-string (cdr count)) "d")
-                              'face 'dired-directory)))))
-
-(with-eval-after-load 'dired
-  (add-hook 'dired-after-readin-hook #'my/dired-update-mode-line))
-
-(defvar my/dired-time-format "%Y-%m-%d %H:%M"
-  "Time format for the Dired file timestamp.")
-
-(defun my/dired-file-attrs ()
-  "Return cached file attributes for the Dired entry at point, or nil."
-  (when-let* ((name (and (derived-mode-p 'dired-mode)
-                         (not (file-remote-p default-directory))
-                         (dired-get-filename nil t))))
-    (unless (equal name (car my/dired--attr-cache))
-      (setq my/dired--attr-cache (cons name (file-attributes name))))
-    (cdr my/dired--attr-cache)))
-
-(defun my/dired-file-size ()
-  "When non-nil, return the file size."
-  (when my/dired-show-file-size
-    (when-let* ((attrs (my/dired-file-attrs)))
-      (concat "  " (propertize (file-size-human-readable (file-attribute-size attrs))
-                               'face 'shadow)))))
-
-(defun my/dired-file-time ()
-  "When non-nill, return the file modification time."
-  (when my/dired-show-file-time
-    (when-let* ((attrs (my/dired-file-attrs)))
-      (concat "  " (propertize (format-time-string my/dired-time-format
-                                                   (file-attribute-modification-time attrs))
-                               'face 'shadow)))))
-
-(defun my/dired-omit-indicator ()
-  "When non-nil, return the omit indicator."
-  (when (and my/dired-show-omit (bound-and-true-p dired-omit-mode))
-    (propertize "  omit" 'face 'shadow)))
-
-(defun my/dired--refresh-mode-line ()
-  "Refresh the mode-line when point moves to another Dired entry."
-  (let ((name (dired-get-filename nil t)))
-    (unless (equal name my/dired--last-file)
-      (setq my/dired--last-file name)
-      (force-mode-line-update))))
-
-(defun my/dired-mode-line-setup ()
-  "Set up the Dired mode-line for the current buffer."
-  (kill-local-variable 'mode-line-buffer-identification)
-  (add-hook 'post-command-hook #'my/dired--refresh-mode-line nil t))
-
-(add-hook 'dired-mode-hook #'my/dired-mode-line-setup)
-
 (setq-default mode-line-format
               '("%e" "  "
-                ;; (:propertize " " display (raise +0.1)) ;; top padding
-                ;; (:propertize " " display (raise -0.1)) ;; bottom padding
+                (:propertize " " display (raise +0.1)) ;; top padding
+                (:propertize " " display (raise -0.1)) ;; bottom padding
                 (:propertize
                  (:eval (if (char-displayable-p ?λ) "λ " " ") face font-lock-keyword-face))
                 (:propertize
                  ("" mode-line-client mode-line-modified))
                 mode-line-frame-identification
                 mode-line-buffer-identification
-                "   "
-                (:eval (if (derived-mode-p 'dired-mode)
-                           my/dired--mode-line
-                         mode-line-position))
-                (:eval (my/dired-omit-indicator))
-                (:eval (my/dired-file-size))
-                (:eval (my/dired-file-time))
+                "  "
+                mode-line-position
                 mode-line-format-right-align
                 "  "
                 (project-mode-line project-mode-line-format)

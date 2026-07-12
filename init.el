@@ -19,7 +19,6 @@
 (byte-recompile-directory (expand-file-name "lisp" user-emacs-directory) 0)
 (require 'my-load-theme)
 (require 'my-keybindings)
-(require 'dired-snacks)
 (require 'my-exec-path)
 (require 'my-move-text)
 (require 'my-text-ops)
@@ -132,11 +131,10 @@
   (add-hook 'prog-mode-hook #'display-line-numbers-mode)
 
   ;; faces
-  (defvar my/font "TX-02")
-  (set-face-attribute 'default nil
-                      :font (font-spec :family my/font :size 15 :width 'condensed))
+  (defvar my/font "TX-02 Condensed")
+  (set-face-attribute 'tooltip nil :font my/font)
+  (set-face-attribute 'default nil :font my/font :height 115)
   (set-face-attribute 'minibuffer-nonselected nil :background 'unspecified)
-  (set-face-attribute 'tooltip nil :family my/font)
 
   ;; misc
   (setq redisplay-skip-fontification-on-input nil)
@@ -177,7 +175,7 @@
 
 ;; (use-package pixel-themes
 ;;   :ensure nil
-;;   :load-path "~/.config/emacs/pixel-themes-local"
+;;   :load-path "~/.config/emacs/lisp/pixel-themes"
 ;;   :config
 ;;   (pixel-themes-load-theme 'pixel-themes-psygnosia))
 
@@ -223,11 +221,7 @@
 
 (use-package my-modeline
   :ensure nil
-  :load-path "~/.config/emacs/lisp"
-  :custom
-  (my/dired-show-file-time nil)
-  (my/dired-show-file-size t)
-  (my/dired-show-omit nil))
+  :load-path "~/.config/emacs/lisp")
 
 (use-package window
   :ensure nil
@@ -315,13 +309,6 @@
   :hook
   (prog-mode . rainbow-delimiters-mode))
 
-;; (use-package emacs-goose
-;;   :ensure nil
-;;   :load-path "~/.config/emacs/emacs-goose"
-;;   :demand t
-;;   :config
-;;   (emacs-goose-mode))
-
 (use-package colorful-mode
   :ensure t
   :custom
@@ -373,12 +360,9 @@
 (use-package dired
   :ensure nil
   :custom
-  ;; (dired-hide-details-preserved-columns '(5))
   (dired-listing-switches "-lah --almost-all --group-directories-first --sort=extension")
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-movement-style 'bounded-files)
-  (my/dired-subtree-line-prefix "  ")
-  (my/dired-find-file-full-window t)
   (dired-recursive-deletes 'always)
   (dired-recursive-copies 'always)
   (dired-auto-revert-buffer t)
@@ -389,14 +373,23 @@
   :hook
   (dired-mode . dired-hide-details-mode)
   (dired-mode . dired-omit-mode)
-  (dired-mode . hl-line-mode)
-  :config
-  ;; (add-hook 'dired-mode-hook (lambda () (setq line-spacing '(0.03 . 0.03))))
-  (keymap-set dired-mode-map "RET" #'my/dired-find-file))
+  (dired-mode . hl-line-mode))
 
 (use-package wdired
   :ensure nil
   :commands (wdired-change-to-wdired-mode))
+
+(use-package dired-snacks
+  :ensure nil
+  :load-path "~/.config/emacs/lisp"
+  :custom
+  (dired-snacks-subtree-line-prefix "  ")
+  (dired-snacks-find-file-full-window t)
+  (dired-snacks-mode-line-show-time nil)
+  (dired-snacks-mode-line-show-omit nil)
+  (dired-snacks-mode-line-show-size t)
+  :config
+  (dired-snacks-mode 1))
 
 ;; ===============================================================
 ;;; COMPLETION

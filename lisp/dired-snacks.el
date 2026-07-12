@@ -1,21 +1,69 @@
-;;; dired-snacks.el --- Dired utilities  -*- lexical-binding: t; -*-
+;;; dired-snacks.el --- Dired utilities -*- lexical-binding: t; -*-
+
+;; Author: Lucas
+;; Version: 0.1.0
+;; Package-Requires: ((emacs "31.0"))
+;; Keywords: files, convenience
+
 ;;; Commentary:
+
+;; A bundle of small Dired enhancements:
+;; - zoxide     jump to a directory by frecency, with inline preview
+;; - find-name  live, as-you-type file-name search rendered as Dired
+;; - find-file  smart RET that opens some files in an external app
+;; - subtree    expand a directory inline, without leaving the buffer
+;; - breadcrumb a header-line path for the directory at point
+;; - split      a second Dired pane, with independent navigation
+;; - copy-uri   copy files as file:// URIs to the clipboard
+
 ;;; Code:
 
+(eval-when-compile
+  (require 'dired)
+  (require 'dired-aux)
+  (require 'dired-x)
+  (require 'wdired)
+  (require 'hl-line)
+  (require 'browse-url)
+  (require 'completion-preview))
+
+(declare-function dired-get-filename "dired")
+(declare-function dired-get-marked-files "dired")
+(declare-function dired-get-file-for-visit "dired")
+(declare-function dired-get-subdir "dired")
+(declare-function dired-current-directory "dired")
+(declare-function dired-move-to-filename "dired")
+(declare-function dired-goto-subdir "dired")
+(declare-function dired-build-subdir-alist "dired")
+(declare-function dired-insert-directory "dired")
+(declare-function dired-insert-set-properties "dired")
+(declare-function dired-unmark-all-marks "dired")
+(declare-function dired-find-file "dired")
+(declare-function dired--find-file "dired")
+(declare-function dired-kill-subdir "dired-aux")
+(declare-function dired-hide-subdir "dired-aux")
+(declare-function dired-omit-mode "dired-x")
+(declare-function browse-url-file-url "browse-url")
+
+(declare-function nerd-icons-dired--refresh "nerd-icons-dired")
+(declare-function nerd-icons-dired-mode "nerd-icons-dired")
+(defvar nerd-icons-dired-dir-icon-function)
+(defvar nerd-icons-dired-infix-string)
+(defvar nerd-icons-dired-icon-size)
+(defvar nerd-icons-dired-mode)
+
+(defgroup dired-snacks nil
+  "Small Dired enhancements."
+  :group 'dired
+  :prefix "dired-snacks-")
+
 ;; ===============================================================
-;;; zoxide-dired
+;;; zoxide
 
-(declare-function completion-preview-mode "completion-preview")
-(defvar completion-preview-minimum-symbol-length)
-(defvar completion-preview-completion-styles)
-(defvar completion-preview-inhibit-functions)
-(defvar completion-preview-overlay-priority)
-(defvar completion-preview-idle-delay)
-
-(defvar my/zoxide--ghost-ov nil
+(defvar dired-snacks--zoxide-ghost-ov nil
   "Overlay showing the best zoxide match in the minibuffer.")
 
-(defun my/zoxide--query (input)
+(defun dired-snacks--zoxide-query (input)
   "Return the directory for INPUT: a literal path, else zoxide's best match."
   (when (and input (not (string-empty-p input)))
     (let ((expanded (expand-file-name input)))
@@ -27,45 +75,42 @@
               (let ((dir (string-trim (buffer-string))))
                 (and (file-directory-p dir) dir)))))))))
 
-(defun my/zoxide--add (dir)
+(defun dired-snacks--zoxide-add (dir)
   "Register DIR in the zoxide database."
   (when (and dir (executable-find "zoxide"))
     (call-process "zoxide" nil 0 nil "add" "--" (expand-file-name dir))))
 
-(defun my/zoxide--add-default-directory ()
+(defun dired-snacks--zoxide-add-default-directory ()
   "Register `default-directory' in the zoxide database."
   (when (and (not (file-remote-p default-directory))
              (file-directory-p default-directory))
-    (my/zoxide--add default-directory)))
+    (dired-snacks--zoxide-add default-directory)))
 
-(add-hook 'find-file-hook  #'my/zoxide--add-default-directory)
-(add-hook 'dired-mode-hook #'my/zoxide--add-default-directory)
-
-(defun my/zoxide--path-like-p (input)
+(defun dired-snacks--zoxide-path-like-p (input)
   "Return non-nil if INPUT looks like a literal filesystem path."
   (and (string-match-p "[/~]" input) t))
 
-(defun my/zoxide--update-ghost (&rest _)
+(defun dired-snacks--zoxide-update-ghost (&rest _)
   "Refresh the inline zoxide suggestion for fuzzy queries."
-  (when (overlayp my/zoxide--ghost-ov)
-    (delete-overlay my/zoxide--ghost-ov))
+  (when (overlayp dired-snacks--zoxide-ghost-ov)
+    (delete-overlay dired-snacks--zoxide-ghost-ov))
   (let ((input (minibuffer-contents)))
-    (unless (my/zoxide--path-like-p input)
-      (when-let* ((dir (my/zoxide--query input)))
-        (setq my/zoxide--ghost-ov (make-overlay (point-max) (point-max) nil t t))
-        (overlay-put my/zoxide--ghost-ov 'after-string
+    (unless (dired-snacks--zoxide-path-like-p input)
+      (when-let* ((dir (dired-snacks--zoxide-query input)))
+        (setq dired-snacks--zoxide-ghost-ov (make-overlay (point-max) (point-max) nil t t))
+        (overlay-put dired-snacks--zoxide-ghost-ov 'after-string
                      (propertize (concat "  → " (abbreviate-file-name dir))
                                  'face 'shadow 'cursor t))))))
 
-(defun my/zoxide--path-capf ()
-  "Completion-at-point function for literal paths, used by `completion-preview'."
+(defun dired-snacks--zoxide-path-capf ()
+  "Completion-at-point function for literal paths."
   (list (minibuffer-prompt-end) (point) #'completion-file-name-table))
 
-(defun my/zoxide--inhibit-preview ()
+(defun dired-snacks--zoxide-inhibit-preview ()
   "Inhibit `completion-preview' unless the input looks like a literal path."
-  (not (my/zoxide--path-like-p (minibuffer-contents))))
+  (not (dired-snacks--zoxide-path-like-p (minibuffer-contents))))
 
-(defun my/zoxide-complete-path ()
+(defun dired-snacks--zoxide-complete-path ()
   "Complete the minibuffer input as a directory path."
   (interactive)
   (let* ((beg (minibuffer-prompt-end))
@@ -88,46 +133,46 @@
       (delete-region beg (point-max))
       (insert (concat (or (file-name-directory input) "") comp))))))
 
-(defun my/zoxide-complete ()
-  "Complete the minibuffer input.
-Literal paths use filename completion. Fuzzy queries expand to the zoxide match."
+(defun dired-snacks-zoxide-complete ()
+  "Complete the minibuffer input, as a path or as a zoxide match."
   (interactive)
   (let ((input (minibuffer-contents)))
-    (if (my/zoxide--path-like-p input)
-        (my/zoxide-complete-path)
-      (if-let* ((dir (my/zoxide--query input)))
+    (if (dired-snacks--zoxide-path-like-p input)
+        (dired-snacks--zoxide-complete-path)
+      (if-let* ((dir (dired-snacks--zoxide-query input)))
           (progn (delete-minibuffer-contents)
                  (insert (abbreviate-file-name dir)))
         (minibuffer-message "No zoxide match")))))
 
-(defvar my/zoxide-minibuffer-map
+(defvar dired-snacks--zoxide-minibuffer-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map minibuffer-local-map)
-    (keymap-set map "TAB" #'my/zoxide-complete)
+    (keymap-set map "TAB" #'dired-snacks-zoxide-complete)
     map)
-  "Minibuffer keymap for `my/zoxide-dired'.")
+  "Minibuffer keymap for `dired-snacks-zoxide'.")
 
-(defun my/zoxide-dired ()
+;;;###autoload
+(defun dired-snacks-zoxide ()
   "Prompt for a zoxide query and open the chosen directory in Dired."
   (interactive)
   (let* ((orig (current-buffer))
          (input (minibuffer-with-setup-hook
                     (lambda ()
-                      (setq my/zoxide--ghost-ov nil)
-                      (add-hook 'after-change-functions #'my/zoxide--update-ghost nil t)
-                      (add-hook 'completion-at-point-functions #'my/zoxide--path-capf nil t)
+                      (setq dired-snacks--zoxide-ghost-ov nil)
+                      (add-hook 'after-change-functions #'dired-snacks--zoxide-update-ghost nil t)
+                      (add-hook 'completion-at-point-functions #'dired-snacks--zoxide-path-capf nil t)
                       (add-hook 'completion-preview-inhibit-functions
-                                #'my/zoxide--inhibit-preview nil t)
+                                #'dired-snacks--zoxide-inhibit-preview nil t)
                       (setq-local completion-preview-completion-styles '(basic)
                                   completion-preview-minimum-symbol-length nil
                                   completion-preview-idle-delay nil
                                   completion-preview-overlay-priority 1200)
                       (completion-preview-mode 1))
-                  (read-from-minibuffer "zoxide: " nil my/zoxide-minibuffer-map)))
-         (dir (my/zoxide--query input)))
+                  (read-from-minibuffer "zoxide: " nil dired-snacks--zoxide-minibuffer-map)))
+         (dir (dired-snacks--zoxide-query input)))
     (if dir
         (progn
-          (my/zoxide--add dir)
+          (dired-snacks--zoxide-add dir)
           (if (and (buffer-live-p orig)
                    (eq orig (window-buffer (selected-window)))
                    (with-current-buffer orig (derived-mode-p 'dired-mode)))
@@ -136,9 +181,10 @@ Literal paths use filename completion. Fuzzy queries expand to the zoxide match.
       (user-error "No zoxide match for: %s" input))))
 
 ;; ===============================================================
-;;; dired-copy-file
+;;; copy-uri
 
-(defun my/dired-copy-file-uri ()
+;;;###autoload
+(defun dired-snacks-copy-file-uri ()
   "Copy the marked files as file:// URIs to the Wayland clipboard."
   (interactive)
   (unless (executable-find "wl-copy")
@@ -162,59 +208,37 @@ Literal paths use filename completion. Fuzzy queries expand to the zoxide match.
              (if (length= files 1) "" "s"))))
 
 ;; ===============================================================
-;;; dired-find-name
+;;; find-name
 
-(declare-function nerd-icons-dired-mode "nerd-icons-dired")
-(declare-function dired-insert-set-properties "dired")
-(declare-function dired-build-subdir-alist "dired")
-(declare-function dired-hide-details-mode "dired")
-(declare-function dired-move-to-filename "dired")
-(declare-function dired-hide-subdir "dired-aux")
-(declare-function dired-get-filename "dired")
-(declare-function dired-omit-mode "dired-x")
-(declare-function dired-get-subdir "dired")
-(declare-function dired-goto-file "dired")
-
-(defvar nerd-icons-dired-dir-icon-function)
-(defvar nerd-icons-dired-infix-string)
-(defvar nerd-icons-dired-icon-size)
-(defvar nerd-icons-dired-mode)
-
-(defvar dired-listing-switches)
-(defvar dired-actual-switches)
-(defvar dired-mode-map)
-(defvar dired-buffers)
-
-(defvar my/dired-find-name-prune-dirs '(".git" ".hg" ".svn" ".jj")
+(defvar dired-snacks-find-name-prune-dirs '(".git" ".hg" ".svn" ".jj")
   "Directory names excluded from searches.")
 
-(defcustom my/dired-find-name-debounce 0.15
-  "Seconds of idle input before refreshing the live search.
-Lower values feel more responsive, higher values spawn fewer `fd' processes."
+(defcustom dired-snacks-find-name-debounce 0.15
+  "Seconds of idle input before the live search refreshes."
   :type 'number
-  :group 'dired)
+  :group 'dired-snacks)
 
-(defvar my/dired-find-name--proc nil
+(defvar dired-snacks--find-name-proc nil
   "Current live-search `fd' process, or nil.")
 
-(defvar my/dired-find-name--timer nil
+(defvar dired-snacks--find-name-timer nil
   "Timer used to debounce live search updates.")
 
-(defvar my/dired-find-name--buffer nil
+(defvar dired-snacks--find-name-buffer nil
   "Live search results buffer, or nil.")
 
-(defvar my/dired-find-name--root nil
+(defvar dired-snacks--find-name-root nil
   "Root directory of the current search.")
 
-(defun my/dired-find-name--fd-args (query dir)
+(defun dired-snacks--find-name-fd-args (query dir)
   "Return the `fd' arguments to search for QUERY under DIR."
   (append '("--color=never" "--list-details" "--hidden" "--no-ignore"
             "--type" "f" "--fixed-strings" "--ignore-case")
           (mapcan (lambda (d) (list "--exclude" d))
-                  my/dired-find-name-prune-dirs)
+                  dired-snacks-find-name-prune-dirs)
           (list "--" query (expand-file-name dir))))
 
-(defun my/dired-find-name--parse (line)
+(defun dired-snacks--find-name-parse (line)
   "Parse an `fd --list-details' LINE into (DIR BASENAME LISTING)."
   (when (string-match "\\(/.*\\)\\'" line)
     (let ((path (match-string 1 line))
@@ -223,7 +247,7 @@ Lower values feel more responsive, higher values spawn fewer `fd' processes."
             (file-name-nondirectory path)
             (concat prefix (file-name-nondirectory path))))))
 
-(defun my/dired-find-name--icon-subdirs ()
+(defun dired-snacks--find-name-icon-subdirs ()
   "Add folder icons to Dired subdir headers."
   (when (bound-and-true-p nerd-icons-dired-mode)
     (save-excursion
@@ -239,13 +263,13 @@ Lower values feel more responsive, higher values spawn fewer `fd' processes."
                  (str  (concat icon nerd-icons-dired-infix-string))
                  (ov   (make-overlay pos (1+ pos)))
                  (inhibit-read-only t))
-            (overlay-put ov 'my/find-name-icon t)
+            (overlay-put ov 'dired-snacks--find-name-icon t)
             (overlay-put ov 'evaporate t)
             (overlay-put ov 'before-string (propertize str 'display str))))
         (forward-line 1)))))
 
-(defun my/dired-find-name--goto (file)
-  "Move point to FILE by scanning file names."
+(defun dired-snacks--find-name-goto (file)
+  "Move point to FILE."
   (goto-char (point-min))
   (let ((found nil))
     (while (and (not found) (not (eobp)))
@@ -257,9 +281,8 @@ Lower values feel more responsive, higher values spawn fewer `fd' processes."
     (when found (dired-move-to-filename))
     found))
 
-(defun my/dired-find-name--insert-groups (groups)
-  "Insert GROUPS as Dired subdir listings.
-Each entry must be a (DIR BASENAME LISTING) triple."
+(defun dired-snacks--find-name-insert-groups (groups)
+  "Insert GROUPS as Dired subdir listings."
   (let ((first t))
     (dolist (group groups)
       (if first (setq first nil) (insert "\n"))
@@ -268,52 +291,52 @@ Each entry must be a (DIR BASENAME LISTING) triple."
       (dolist (entry (cdr group))
         (insert "  " (nth 2 entry) "\n")))))
 
-(defun my/dired-find-name--render (root details)
+(defun dired-snacks--find-name-render (root details)
   "Render DETAILS under ROOT as a Dired buffer."
-  (when (buffer-live-p my/dired-find-name--buffer)
-    (with-current-buffer my/dired-find-name--buffer
+  (when (buffer-live-p dired-snacks--find-name-buffer)
+    (with-current-buffer dired-snacks--find-name-buffer
       (let* ((inhibit-read-only t)
-             (parsed (delq nil (mapcar #'my/dired-find-name--parse details)))
+             (parsed (delq nil (mapcar #'dired-snacks--find-name-parse details)))
              (groups (seq-group-by #'car parsed)))
         (widen)
-        (remove-overlays nil nil 'my/find-name-icon t)
+        (remove-overlays nil nil 'dired-snacks--find-name-icon t)
         (erase-buffer)
         (setq-local default-directory (file-name-as-directory root))
         (if (null parsed)
             (insert "  " (directory-file-name root) ":\n"
                     "  total used in directory 0\n\n"
                     "  (no matches)\n")
-          (my/dired-find-name--insert-groups groups))
+          (dired-snacks--find-name-insert-groups groups))
         (dired-build-subdir-alist)
         (dired-insert-set-properties (point-min) (point-max))
         (when (bound-and-true-p nerd-icons-dired-mode)
           (run-hooks 'dired-after-readin-hook))
-        (my/dired-find-name--icon-subdirs)
+        (dired-snacks--find-name-icon-subdirs)
         (goto-char (point-min))
         (when (and parsed (null (cdr parsed)))
           (let ((target (expand-file-name (nth 1 (car parsed))
                                           (nth 0 (car parsed)))))
-            (my/dired-find-name--goto target)))))))
+            (dired-snacks--find-name-goto target)))))))
 
-(defun my/dired-find-name--sentinel (proc event)
+(defun dired-snacks--find-name-sentinel (proc event)
   "Render PROC's results when EVENT indicates completion, then clean up."
   (when (string-prefix-p "finished" event)
     (when-let* ((buf (process-buffer proc)) ((buffer-live-p buf)))
       (let ((details (with-current-buffer buf
                        (split-string (buffer-string) "\n" t))))
         (condition-case err
-            (my/dired-find-name--render my/dired-find-name--root details)
+            (dired-snacks--find-name-render dired-snacks--find-name-root details)
           (error (message "find-name render error: %S" err))))
       (kill-buffer buf))))
 
-(defun my/dired-find-name--dispatch (query)
+(defun dired-snacks--find-name-dispatch (query)
   "Kill any running search and start an async `fd' for QUERY."
-  (when (and my/dired-find-name--proc
-             (process-live-p my/dired-find-name--proc))
-    (delete-process my/dired-find-name--proc))
+  (when (and dired-snacks--find-name-proc
+             (process-live-p dired-snacks--find-name-proc))
+    (delete-process dired-snacks--find-name-proc))
   (cond
    ((string-empty-p query)
-    (my/dired-find-name--render my/dired-find-name--root nil))
+    (dired-snacks--find-name-render dired-snacks--find-name-root nil))
    ((not (executable-find "fd"))
     (message "find-name: the `fd' program is required for live search"))
    (t
@@ -322,41 +345,44 @@ Each entry must be a (DIR BASENAME LISTING) triple."
                  :buffer (generate-new-buffer " *find-name-fd*")
                  :noquery t
                  :connection-type 'pipe
-                 :command (cons "fd" (my/dired-find-name--fd-args
-                                      query my/dired-find-name--root))
-                 :sentinel #'my/dired-find-name--sentinel)))
-      (setq my/dired-find-name--proc proc)))))
+                 :command (cons "fd" (dired-snacks--find-name-fd-args
+                                      query dired-snacks--find-name-root))
+                 :sentinel #'dired-snacks--find-name-sentinel)))
+      (setq dired-snacks--find-name-proc proc)))))
 
-(defun my/dired-find-name--schedule (&rest _)
+(defun dired-snacks--find-name-schedule (&rest _)
   "Schedule a search after minibuffer input settles."
   (let ((query (minibuffer-contents-no-properties)))
-    (when (timerp my/dired-find-name--timer)
-      (cancel-timer my/dired-find-name--timer))
-    (setq my/dired-find-name--timer
-          (run-with-timer my/dired-find-name-debounce nil
-                          #'my/dired-find-name--dispatch query))))
+    (when (timerp dired-snacks--find-name-timer)
+      (cancel-timer dired-snacks--find-name-timer))
+    (setq dired-snacks--find-name-timer
+          (run-with-timer dired-snacks-find-name-debounce nil
+                          #'dired-snacks--find-name-dispatch query))))
 
-(defun my/dired-find-name--cleanup ()
+(defun dired-snacks--find-name-cleanup ()
   "Tear down the live-search timer and process."
-  (when (timerp my/dired-find-name--timer)
-    (cancel-timer my/dired-find-name--timer))
-  (when (and my/dired-find-name--proc
-             (process-live-p my/dired-find-name--proc))
-    (delete-process my/dired-find-name--proc))
-  (setq my/dired-find-name--timer nil
-        my/dired-find-name--proc nil))
+  (when (timerp dired-snacks--find-name-timer)
+    (cancel-timer dired-snacks--find-name-timer))
+  (when (and dired-snacks--find-name-proc
+             (process-live-p dired-snacks--find-name-proc))
+    (delete-process dired-snacks--find-name-proc))
+  (setq dired-snacks--find-name-timer nil
+        dired-snacks--find-name-proc nil))
 
-(defun my/dired-find-name ()
-  "Find files under `default-directory' whose names contain a query.
-Display live results in a Dired buffer as you type."
+;;;###autoload
+(defun dired-snacks-find-name ()
+  "Search for files under `default-directory', showing results as you type."
   (interactive)
   (require 'dired)
   (let* ((root (expand-file-name default-directory))
+         (here (selected-window))
+         (side (window-parameter here 'window-side))
+         (slot (window-parameter here 'window-slot))
          (bufname (format "*find-name: %s*" (abbreviate-file-name root)))
          (buf (progn (when (get-buffer bufname) (kill-buffer bufname))
                      (get-buffer-create bufname))))
-    (setq my/dired-find-name--buffer buf
-          my/dired-find-name--root root)
+    (setq dired-snacks--find-name-buffer buf
+          dired-snacks--find-name-root root)
     (with-current-buffer buf
       (let ((inhibit-read-only t))
         (erase-buffer)
@@ -368,7 +394,10 @@ Display live results in a Dired buffer as you type."
         (keymap-set map "q" #'kill-current-buffer)
         (keymap-set map "TAB" #'dired-hide-subdir)
         (use-local-map map)))
-    (display-buffer buf)
+    (let ((display-buffer-overriding-action
+           (and side `(display-buffer-in-side-window
+                       (side . ,side) (slot . ,(or slot 0))))))
+      (display-buffer buf))
     (let ((confirmed nil))
       (unwind-protect
           (progn
@@ -377,9 +406,9 @@ Display live results in a Dired buffer as you type."
                   (minibuffer-with-setup-hook
                       (lambda ()
                         (add-hook 'after-change-functions
-                                  #'my/dired-find-name--schedule nil t)
+                                  #'dired-snacks--find-name-schedule nil t)
                         (add-hook 'minibuffer-exit-hook
-                                  #'my/dired-find-name--cleanup nil t))
+                                  #'dired-snacks--find-name-cleanup nil t))
                     (read-from-minibuffer
                      (format "Find name under %s: "
                              (abbreviate-file-name root))))
@@ -391,16 +420,12 @@ Display live results in a Dired buffer as you type."
                       (select-window win)
                     (pop-to-buffer buf)))
               (when (buffer-live-p buf) (kill-buffer buf))))
-        (my/dired-find-name--cleanup)))))
+        (dired-snacks--find-name-cleanup)))))
 
 ;; ===============================================================
-;;; dired-find-file (smart RET)
+;;; find-file (smart RET)
 
-(declare-function dired-get-file-for-visit "dired")
-(declare-function dired-do-open "dired-aux")
-(declare-function dired-find-file "dired")
-
-(defcustom my/dired-external-extensions
+(defcustom dired-snacks-external-extensions
   '("png" "jpg" "jpeg" "gif" "bmp" "webp" "tiff" "tif" "svg" "ico" "avif"
     "mp4" "mkv" "avi" "mov" "webm" "flv" "wmv" "mpg" "mpeg" "m4v"
     "mp3" "flac" "wav" "ogg" "opus" "m4a" "aac"
@@ -408,29 +433,29 @@ Display live results in a Dired buffer as you type."
     "cbz" "cbr")
   "File extensions to open in an external application."
   :type '(repeat string)
-  :group 'dired)
+  :group 'dired-snacks)
 
-(defcustom my/dired-find-file-full-window nil
-  "Whether `my/dired-find-file' opens files in a full window.
-When non-nil, the Dired buffer is killed after opening the file."
+(defcustom dired-snacks-find-file-full-window nil
+  "When non-nil, opening a file kills the Dired buffer and fills the window."
   :type 'boolean
-  :group 'dired)
+  :group 'dired-snacks)
 
-(defun my/dired-external-file-p (file)
+(defun dired-snacks--external-file-p (file)
   "Return non-nil if FILE should be opened externally."
   (when-let* ((ext (file-name-extension file)))
-    (member (downcase ext) my/dired-external-extensions)))
+    (member (downcase ext) dired-snacks-external-extensions)))
 
-(defun my/dired-find-file ()
+;;;###autoload
+(defun dired-snacks-find-file ()
   "Visit the file on this line in Emacs or an external application."
   (interactive)
   (let ((file (dired-get-file-for-visit)))
     (cond
      ((and (not (file-directory-p file))
-           (my/dired-external-file-p file)
+           (dired-snacks--external-file-p file)
            (fboundp 'dired-do-open))
       (dired-do-open))
-     ((and my/dired-find-file-full-window
+     ((and dired-snacks-find-file-full-window
            (not (file-directory-p file)))
       (kill-buffer (current-buffer))
       (find-file file))
@@ -438,57 +463,45 @@ When non-nil, the Dired buffer is killed after opening the file."
       (dired-find-file)))))
 
 ;; ===============================================================
-;;; dired-subtree
+;;; subtree
 
-(declare-function nerd-icons-dired--refresh "nerd-icons-dired")
-(declare-function dired-build-subdir-alist "dired")
-(declare-function dired-insert-directory "dired")
-(declare-function dired-move-to-filename "dired")
-(declare-function dired-kill-subdir "dired-aux")
-(declare-function dired-get-filename "dired")
-(declare-function dired-goto-subdir "dired")
-
-(defvar dired-actual-switches)
-(defvar dired-subdir-alist)
-
-(defcustom my/dired-subtree-line-prefix "  "
+(defcustom dired-snacks-subtree-line-prefix "  "
   "Indentation added per nesting level in a subtree."
   :type 'string
-  :group 'dired)
+  :group 'dired-snacks)
 
-(defcustom my/dired-subtree-after-change-hook nil
-  "Hook run after a subtree is expanded or collapsed.
-Icons are refreshed automatically when `nerd-icons-dired' is present."
+(defcustom dired-snacks-subtree-after-change-hook nil
+  "Hook run after a subtree is expanded or collapsed."
   :type 'hook
-  :group 'dired)
+  :group 'dired-snacks)
 
-(defvar-local my/dired-subtree--overlays nil
+(defvar-local dired-snacks--subtree-overlays nil
   "Subtree overlays in this buffer.")
 
-(defvar-local my/dired-subtree--dirs nil
-  "Directories currently expanded as subtrees, used for revert cleanup.")
+(defvar-local dired-snacks--subtree-dirs nil
+  "Directories currently expanded as subtrees.")
 
-(defun my/dired-subtree--depth-at (pos)
+(defun dired-snacks--subtree-depth-at (pos)
   "Return the depth of the innermost subtree covering POS, or 0 if none."
   (let ((depth 0))
     (dolist (ov (overlays-at pos) depth)
-      (let ((d (overlay-get ov 'my/dired-subtree)))
+      (let ((d (overlay-get ov 'dired-snacks--subtree)))
         (when (and d (> d depth)) (setq depth d))))))
 
-(defun my/dired-subtree--child-overlay ()
+(defun dired-snacks--subtree-child-overlay ()
   "Return the subtree expanded directly under the current line, or nil."
   (let ((start (save-excursion (forward-line 1) (line-beginning-position))))
     (seq-find (lambda (ov)
                 (and (overlay-buffer ov)
-                     (overlay-get ov 'my/dired-subtree)
+                     (overlay-get ov 'dired-snacks--subtree)
                      (= (overlay-start ov) start)))
-              my/dired-subtree--overlays)))
+              dired-snacks--subtree-overlays)))
 
-(defun my/dired-subtree--insert ()
+(defun dired-snacks--subtree-insert ()
   "Insert the directory on this line as an inline subtree."
   (let* ((dir (file-name-as-directory (dired-get-filename nil t)))
-         (depth (1+ (my/dired-subtree--depth-at (point))))
-         (prefix (apply #'concat (make-list depth my/dired-subtree-line-prefix)))
+         (depth (1+ (dired-snacks--subtree-depth-at (point))))
+         (prefix (apply #'concat (make-list depth dired-snacks-subtree-line-prefix)))
          (inhibit-read-only t))
     (save-excursion
       (forward-line 1)
@@ -498,74 +511,511 @@ Icons are refreshed automatically when `nerd-icons-dired' is present."
         (dired-build-subdir-alist)
         (save-excursion (goto-char beg) (forward-line 1) (setq header-end (point)))
         (let ((header (make-overlay beg header-end)))
-          (overlay-put header 'invisible 'my/dired-subtree-header)
+          (overlay-put header 'invisible 'dired-snacks--subtree-header)
           (overlay-put header 'evaporate t)
-          (push header my/dired-subtree--overlays))
+          (push header dired-snacks--subtree-overlays))
         (let ((ov (make-overlay beg end)))
-          (overlay-put ov 'my/dired-subtree depth)
+          (overlay-put ov 'dired-snacks--subtree depth)
           (overlay-put ov 'line-prefix prefix)
           (overlay-put ov 'evaporate t)
-          (push ov my/dired-subtree--overlays))
-        (unless (member dir my/dired-subtree--dirs)
-          (push dir my/dired-subtree--dirs))))
-    (run-hooks 'my/dired-subtree-after-change-hook)
+          (push ov dired-snacks--subtree-overlays))
+        (unless (member dir dired-snacks--subtree-dirs)
+          (push dir dired-snacks--subtree-dirs))))
+    (run-hooks 'dired-snacks-subtree-after-change-hook)
     (dired-move-to-filename)))
 
-(defun my/dired-subtree--remove (ov)
+(defun dired-snacks--subtree-remove (ov)
   "Collapse the subtree tracked by overlay OV."
   (let ((beg (overlay-start ov))
         (end (overlay-end ov))
         (inhibit-read-only t))
     (dolist (o (overlays-in beg end))
-      (when (and (memq o my/dired-subtree--overlays)
+      (when (and (memq o dired-snacks--subtree-overlays)
                  (>= (overlay-start o) beg)
                  (<= (overlay-end o) end))
-        (setq my/dired-subtree--overlays (delq o my/dired-subtree--overlays))
+        (setq dired-snacks--subtree-overlays (delq o dired-snacks--subtree-overlays))
         (delete-overlay o)))
     (delete-region beg end)
     (dired-build-subdir-alist)
-    (setq my/dired-subtree--dirs
+    (setq dired-snacks--subtree-dirs
           (seq-filter (lambda (d) (assoc d dired-subdir-alist))
-                      my/dired-subtree--dirs)))
-  (run-hooks 'my/dired-subtree-after-change-hook)
+                      dired-snacks--subtree-dirs)))
+  (run-hooks 'dired-snacks-subtree-after-change-hook)
   (dired-move-to-filename))
 
-(defun my/dired-subtree-toggle ()
+;;;###autoload
+(defun dired-snacks-subtree-toggle ()
   "Expand the directory at point as an inline subtree, or collapse it."
   (interactive)
   (let ((dir (dired-get-filename nil t)))
     (cond
      ((not (and dir (file-directory-p dir)))
       (user-error "Point is not on a directory"))
-     ((my/dired-subtree--child-overlay)
-      (my/dired-subtree--remove (my/dired-subtree--child-overlay)))
-     (t (my/dired-subtree--insert)))))
+     ((dired-snacks--subtree-child-overlay)
+      (dired-snacks--subtree-remove (dired-snacks--subtree-child-overlay)))
+     (t (dired-snacks--subtree-insert)))))
 
-(defun my/dired-subtree--reset ()
-  "Collapse every tracked subtree, e.g. after the buffer is reverted."
-  (when my/dired-subtree--dirs
+(defun dired-snacks--subtree-reset ()
+  "Collapse every tracked subtree."
+  (when dired-snacks--subtree-dirs
     (let ((inhibit-read-only t))
       ;; deepest first, so a parent is removed only after its children
-      (dolist (dir (sort (copy-sequence my/dired-subtree--dirs)
+      (dolist (dir (sort (copy-sequence dired-snacks--subtree-dirs)
                          (lambda (a b) (> (length a) (length b)))))
         (when (assoc dir dired-subdir-alist)
           (save-excursion
             (when (dired-goto-subdir dir)
               (dired-kill-subdir)))))
-      (mapc #'delete-overlay my/dired-subtree--overlays)
-      (setq my/dired-subtree--overlays nil
-            my/dired-subtree--dirs nil))))
+      (mapc #'delete-overlay dired-snacks--subtree-overlays)
+      (setq dired-snacks--subtree-overlays nil
+            dired-snacks--subtree-dirs nil))))
 
-(defun my/dired-subtree--setup ()
+(defun dired-snacks--subtree-setup ()
   "Enable inline subtrees in the current Dired buffer."
-  (add-to-invisibility-spec 'my/dired-subtree-header)
-  (add-hook 'dired-after-readin-hook #'my/dired-subtree--reset nil t))
+  (add-to-invisibility-spec 'dired-snacks--subtree-header)
+  (add-hook 'dired-after-readin-hook #'dired-snacks--subtree-reset nil t))
 
-(add-hook 'dired-mode-hook #'my/dired-subtree--setup)
+(defun dired-snacks--subtree-refresh-icons ()
+  "Redraw file icons after a subtree change, when `nerd-icons-dired' is on."
+  (when (bound-and-true-p nerd-icons-dired-mode)
+    (nerd-icons-dired--refresh)))
 
-;; redraw file icons after a subtree changes, when nerd-icons is in use.
-(with-eval-after-load 'nerd-icons-dired
-  (add-hook 'my/dired-subtree-after-change-hook #'nerd-icons-dired--refresh))
+;; ===============================================================
+;;; breadcrumb
+
+(defcustom dired-snacks-breadcrumb-separator " » "
+  "Separator drawn between breadcrumb segments."
+  :type 'string
+  :group 'dired-snacks)
+
+(defcustom dired-snacks-breadcrumb-home "~"
+  "Glyph for the home directory in the breadcrumb."
+  :type 'string
+  :group 'dired-snacks)
+
+(defcustom dired-snacks-breadcrumb-root "/"
+  "Glyph for the filesystem root in the breadcrumb."
+  :type 'string
+  :group 'dired-snacks)
+
+(defcustom dired-snacks-breadcrumb-margin "  "
+  "Left padding before the breadcrumb."
+  :type 'string
+  :group 'dired-snacks)
+
+(defcustom dired-snacks-breadcrumb-hide-header t
+  "When non-nil, hide the directory header line."
+  :type 'boolean
+  :group 'dired-snacks)
+
+(defcustom dired-snacks-breadcrumb-spacing 0.2
+  "Height of the gap under the breadcrumb, as a fraction of a line."
+  :type 'number
+  :group 'dired-snacks)
+
+(defcustom dired-snacks-breadcrumb-height 0.95
+  "Font size of the breadcrumb, as a fraction of the default."
+  :type 'number
+  :group 'dired-snacks)
+
+(defun dired-snacks--breadcrumb-segments (dir)
+  "Split DIR into breadcrumb segments."
+  (let* ((abbr (abbreviate-file-name (directory-file-name dir)))
+         (parts (split-string abbr "/" t)))
+    (cond
+     ((string-prefix-p "~" abbr) (cons dired-snacks-breadcrumb-home (cdr parts)))
+     ((string-prefix-p "/" abbr) (cons dired-snacks-breadcrumb-root parts))
+     (t parts))))
+
+(defun dired-snacks--breadcrumb ()
+  "Return a breadcrumb for the directory at point, or nil."
+  (when (derived-mode-p 'dired-mode)
+    (let* ((dir (or (ignore-errors (dired-current-directory)) default-directory))
+           (height dired-snacks-breadcrumb-height)
+           (sep (propertize dired-snacks-breadcrumb-separator
+                            'face `(:inherit shadow :height ,height))))
+      (concat dired-snacks-breadcrumb-margin
+              (mapconcat (lambda (s)
+                           (propertize (string-replace "%" "%%" s)
+                                       'face `(:inherit dired-header :height ,height)))
+                         (dired-snacks--breadcrumb-segments dir)
+                         sep)))))
+
+(defun dired-snacks--breadcrumb-decorate ()
+  "Hide the directory header and add a gap under the breadcrumb."
+  (unless (eq (current-buffer) dired-snacks--find-name-buffer)
+    (remove-overlays (point-min) (point-max) 'dired-snacks--header t)
+    (let* ((first (next-single-property-change (point-min) 'dired-filename))
+           (end (if first (save-excursion (goto-char first) (pos-bol))
+                  (point-max)))
+           (ov (make-overlay (point-min) end)))
+      (overlay-put ov 'dired-snacks--header t)
+      (overlay-put ov 'evaporate t)
+      (when dired-snacks-breadcrumb-hide-header
+        (overlay-put ov 'invisible 'dired-snacks--header))
+      (when (> dired-snacks-breadcrumb-spacing 0)
+        (overlay-put ov 'before-string
+                     (propertize "\n" 'face `(:height ,dired-snacks-breadcrumb-spacing)))))))
+
+(defun dired-snacks--breadcrumb-setup ()
+  "Show the breadcrumb header line and decorate the listing."
+  (add-to-invisibility-spec 'dired-snacks--header)
+  (setq-local header-line-format '(:eval (dired-snacks--breadcrumb)))
+  (add-hook 'dired-after-readin-hook #'dired-snacks--breadcrumb-decorate nil t))
+
+;; ===============================================================
+;;; split
+
+(defun dired-snacks--windows ()
+  "Windows showing a Dired buffer."
+  (seq-filter (lambda (w)
+                (eq (buffer-local-value 'major-mode (window-buffer w)) 'dired-mode))
+              (window-list)))
+
+(defvar-local dired-snacks--split-pane nil
+  "Non-nil in a Dired buffer opened as a split pane.")
+
+(defun dired-snacks-quit ()
+  "Close this Dired pane, selecting the other one when there is one."
+  (interactive)
+  (let ((others (remq (selected-window) (dired-snacks--windows))))
+    (if dired-snacks--split-pane
+        (kill-current-buffer)
+      (quit-window))
+    (when-let* ((w (seq-find #'window-live-p others)))
+      (select-window w))))
+
+(defun dired-snacks--quit-setup ()
+  "Make q close this Dired pane."
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map dired-mode-map)
+    (keymap-set map "q" #'dired-snacks-quit)
+    (use-local-map map)))
+
+(defun dired-snacks--quit-teardown ()
+  "Give the current Dired buffer its usual keymap back."
+  (use-local-map dired-mode-map))
+
+(defun dired-snacks--split-mark ()
+  "Mark the current buffer as a split pane."
+  (setq-local dired-snacks--split-pane t))
+
+;;;###autoload
+(defun dired-snacks-split ()
+  "Open a second Dired in the current directory, beside this one."
+  (interactive)
+  (let* ((dir default-directory)
+         (win (selected-window))
+         (side (window-parameter win 'window-side))
+         (buf (let ((dired-buffers nil)) (dired-noselect dir))))
+    (with-current-buffer buf (dired-snacks--split-mark))
+    (if side
+        (let ((display-buffer-overriding-action
+               `(display-buffer-in-side-window
+                 (side . ,side)
+                 (slot . ,(1+ (or (window-parameter win 'window-slot) 0))))))
+          (select-window (display-buffer buf)))
+      (select-window (split-window-right))
+      (switch-to-buffer buf))))
+
+(defun dired-snacks--find-isolated (orig file)
+  "Keep Dired panes independent when entering directories."
+  (if (and (file-directory-p file) (cdr (dired-snacks--windows)))
+      (let ((dired-buffers nil)
+            (pane dired-snacks--split-pane))
+        (set-buffer-modified-p nil)
+        (dired--find-file #'find-alternate-file file)
+        (when pane (dired-snacks--split-mark)))
+    (funcall orig file)))
+
+;; ===============================================================
+;;; pane appearance (cursor, hl-line)
+
+(defun dired-snacks--update-panes (&rest _)
+  "Hide the cursor and keep `hl-line' in the selected pane only."
+  (let* ((wins (dired-snacks--windows))
+         (multi (and (cdr wins) t))
+         (sel (selected-window)))
+    (dolist (w wins)
+      (with-current-buffer (window-buffer w)
+        (unless (null cursor-type)
+          (setq-local cursor-type nil))
+        (cond
+         (multi
+          (setq-local hl-line-sticky-flag nil)
+          (when (and (not (eq w sel)) (fboundp 'hl-line-unhighlight))
+            (hl-line-unhighlight)))
+         (t
+          (kill-local-variable 'hl-line-sticky-flag)))))))
+
+(defun dired-snacks--show-cursor ()
+  "Restore the cursor."
+  (kill-local-variable 'cursor-type))
+
+;; ===============================================================
+;;; mode-line
+
+(defcustom dired-snacks-mode-line-show-size t
+  "When non-nil, show the size of the entry at point."
+  :type 'boolean :group 'dired-snacks)
+
+(defcustom dired-snacks-mode-line-show-time t
+  "When non-nil, show the modification time of the entry at point."
+  :type 'boolean :group 'dired-snacks)
+
+(defcustom dired-snacks-mode-line-show-omit t
+  "When non-nil, show the `dired-omit-mode' indicator."
+  :type 'boolean :group 'dired-snacks)
+
+(defcustom dired-snacks-mode-line-show-sort t
+  "When non-nil, show the sort criterion."
+  :type 'boolean :group 'dired-snacks)
+
+(defcustom dired-snacks-mode-line-index-width 7
+  "Width reserved for the entry counter, so it never shifts."
+  :type 'integer :group 'dired-snacks)
+
+(defcustom dired-snacks-mode-line-size-width 8
+  "Width reserved for the entry size, so it never shifts."
+  :type 'integer :group 'dired-snacks)
+
+(defcustom dired-snacks-mode-line-time-format "%Y-%m-%d %H:%M"
+  "Format of the timestamp shown in the mode line."
+  :type 'string :group 'dired-snacks)
+
+(defvar-local dired-snacks--ml-last-file nil
+  "File at point after the last command.")
+
+(defvar-local dired-snacks--ml-attr-cache nil
+  "Cached attributes of the entry at point.")
+
+(defvar-local dired-snacks--ml-dir-size-cache nil
+  "Cached recursive size of the directories in this listing.")
+
+(defvar-local dired-snacks--ml-total-cache nil
+  "Cached count of the entries in this listing.")
+
+(defvar-local dired-snacks--ml-current-cache nil
+  "Cached index of the entry at point.")
+
+(defun dired-snacks--ml-entry-p ()
+  "Return non-nil when the current line holds an entry."
+  (when-let* ((name (dired-get-filename 'no-dir t)))
+    (not (member name '("." "..")))))
+
+(defun dired-snacks--ml-total ()
+  "Return the number of visible files and directories."
+  (let ((tick (buffer-chars-modified-tick)))
+    (unless (eql tick (car dired-snacks--ml-total-cache))
+      (setq dired-snacks--ml-total-cache
+            (cons tick
+                  (save-excursion
+                    (goto-char (point-min))
+                    (let ((n 0))
+                      (while (not (eobp))
+                        (when (dired-snacks--ml-entry-p) (setq n (1+ n)))
+                        (forward-line 1))
+                      n)))))
+    (cdr dired-snacks--ml-total-cache)))
+
+(defun dired-snacks--ml-current ()
+  "Return the position of the entry at point in the listing."
+  (let ((key (cons (pos-bol) (buffer-chars-modified-tick))))
+    (unless (equal key (car dired-snacks--ml-current-cache))
+      (setq dired-snacks--ml-current-cache
+            (cons key
+                  (let ((limit (car key)) (n 0))
+                    (save-excursion
+                      (goto-char (point-min))
+                      (while (and (<= (point) limit) (not (eobp)))
+                        (when (dired-snacks--ml-entry-p) (setq n (1+ n)))
+                        (forward-line 1)))
+                    n))))
+    (cdr dired-snacks--ml-current-cache)))
+
+(defun dired-snacks--ml-index ()
+  "Return the entry counter, as current over total."
+  (when (derived-mode-p 'dired-mode)
+    (let ((s (concat (number-to-string (dired-snacks--ml-current))
+                     "/" (number-to-string (dired-snacks--ml-total)))))
+      (concat "  " (string-pad s dired-snacks-mode-line-index-width nil t)))))
+
+(defun dired-snacks--ml-file-attrs ()
+  "Return the attributes of the entry at point, or nil."
+  (when-let* ((name (and (derived-mode-p 'dired-mode)
+                         (not (file-remote-p default-directory))
+                         (dired-get-filename nil t))))
+    (unless (equal name (car dired-snacks--ml-attr-cache))
+      (setq dired-snacks--ml-attr-cache (cons name (file-attributes name))))
+    (cdr dired-snacks--ml-attr-cache)))
+
+(defun dired-snacks--ml-directory-size (dir)
+  "Total size in bytes of everything under DIR."
+  (let ((tick (buffer-chars-modified-tick)))
+    (unless (eql tick (car dired-snacks--ml-dir-size-cache))
+      (setq dired-snacks--ml-dir-size-cache (cons tick (make-hash-table :test 'equal))))
+    (let ((table (cdr dired-snacks--ml-dir-size-cache)))
+      (or (gethash dir table)
+          (puthash dir
+                   (let ((total 0))
+                     (dolist (file (directory-files-recursively dir "" nil))
+                       (when-let* ((size (file-attribute-size (file-attributes file))))
+                         (setq total (+ total size))))
+                     total)
+                   table)))))
+
+(defun dired-snacks--ml-size ()
+  "Return the size of the entry at point, or nil.
+Directories are measured recursively."
+  (when dired-snacks-mode-line-show-size
+    (when-let* ((attrs (dired-snacks--ml-file-attrs)))
+      (let* ((size (if (eq (file-attribute-type attrs) t)
+                       (dired-snacks--ml-directory-size (dired-get-filename nil t))
+                     (file-attribute-size attrs)))
+             (text (string-pad (file-size-human-readable size)
+                               dired-snacks-mode-line-size-width nil t)))
+        (concat "  " (propertize text 'face 'shadow))))))
+
+(defun dired-snacks--ml-time ()
+  "Return the modification time of the entry at point, or nil."
+  (when dired-snacks-mode-line-show-time
+    (when-let* ((attrs (dired-snacks--ml-file-attrs)))
+      (concat "  " (propertize (format-time-string dired-snacks-mode-line-time-format
+                                                   (file-attribute-modification-time attrs))
+                               'face 'shadow)))))
+
+(defun dired-snacks--ml-omit ()
+  "Return the `dired-omit-mode' indicator, or nil."
+  (when (and dired-snacks-mode-line-show-omit (bound-and-true-p dired-omit-mode))
+    (propertize "  omit" 'face 'shadow)))
+
+(defun dired-snacks--sort-criterion (switches)
+  "Return the sort criterion named by the `ls' SWITCHES."
+  (let ((parts (split-string switches)))
+    (cond
+     ((member "--sort=none" parts) "none")
+     ((member "--sort=time" parts) "time")
+     ((member "--sort=size" parts) "size")
+     ((member "--sort=version" parts) "version")
+     ((member "--sort=extension" parts) "type")
+     ((member "--sort=width" parts) "width")
+     ((string-match-p "\\(?:\\`\\| \\)-[a-zA-Z]*t" switches) "time")
+     ((string-match-p "\\(?:\\`\\| \\)-[a-zA-Z]*S" switches) "size")
+     ((string-match-p "\\(?:\\`\\| \\)-[a-zA-Z]*X" switches) "type")
+     ((string-match-p "\\(?:\\`\\| \\)-[a-zA-Z]*v" switches) "version")
+     (t "name"))))
+
+(defun dired-snacks--ml-sort ()
+  "Return the sort criterion of this listing, or nil."
+  (when (and dired-snacks-mode-line-show-sort (derived-mode-p 'dired-mode))
+    (concat "  " (propertize (dired-snacks--sort-criterion dired-actual-switches)
+                             'face 'shadow))))
+
+(defun dired-snacks--ml-width (&rest segments)
+  "Total display width of SEGMENTS."
+  (apply #'+ (mapcar #'string-width (delq nil segments))))
+
+(defun dired-snacks--ml-right ()
+  "Return the right-hand segments of the mode line.
+The omit indicator and the sort criterion are dropped when space runs out."
+  (when (derived-mode-p 'dired-mode)
+    (let ((size (dired-snacks--ml-size))
+          (time (dired-snacks--ml-time))
+          (crit (dired-snacks--ml-sort))
+          (omit (dired-snacks--ml-omit))
+          (index (dired-snacks--ml-index))
+          (room (- (window-width)
+                   (+ 10 (max 12 (string-width (buffer-name)))))))
+      (when (> (dired-snacks--ml-width size time crit omit index) room)
+        (setq omit nil))
+      (when (> (dired-snacks--ml-width size time crit omit index) room)
+        (setq crit nil))
+      (concat size time crit omit index))))
+
+(defcustom dired-snacks-mode-line-format
+  '("%e  "
+    (:propertize " " display (raise +0.1)) ;; top padding
+    (:propertize " " display (raise -0.1)) ;; bottom padding
+    mode-line-modified
+    "  "
+    mode-line-buffer-identification
+    mode-line-format-right-align
+    (:eval (dired-snacks--ml-right))
+    "  ")
+  "The mode line shown in Dired buffers."
+  :type 'sexp :group 'dired-snacks)
+
+(defun dired-snacks--ml-refresh ()
+  "Refresh the mode line when point moves to another entry."
+  (let ((name (dired-get-filename nil t)))
+    (unless (equal name dired-snacks--ml-last-file)
+      (setq dired-snacks--ml-last-file name)
+      (force-mode-line-update))))
+
+(defun dired-snacks--ml-setup ()
+  "Give this Dired buffer its own mode line."
+  (setq-local mode-line-format dired-snacks-mode-line-format)
+  (add-hook 'post-command-hook #'dired-snacks--ml-refresh nil t))
+
+(defun dired-snacks--ml-teardown ()
+  "Give this Dired buffer the usual mode line back."
+  (kill-local-variable 'mode-line-format)
+  (remove-hook 'post-command-hook #'dired-snacks--ml-refresh t)
+  (force-mode-line-update))
+
+(defun dired-snacks--map-buffers (fn)
+  "Call FN in every live Dired buffer."
+  (dolist (buf (buffer-list))
+    (with-current-buffer buf
+      (when (derived-mode-p 'dired-mode) (funcall fn)))))
+
+;; ===============================================================
+;;; minor mode
+
+(defun dired-snacks--enable ()
+  "Install the passive features."
+  (add-hook 'find-file-hook #'dired-snacks--zoxide-add-default-directory)
+  (add-hook 'dired-mode-hook #'dired-snacks--zoxide-add-default-directory)
+  (add-hook 'dired-mode-hook #'dired-snacks--subtree-setup)
+  (add-hook 'dired-mode-hook #'dired-snacks--breadcrumb-setup)
+  (add-hook 'dired-mode-hook #'dired-snacks--update-panes)
+  (add-hook 'dired-mode-hook #'dired-snacks--ml-setup)
+  (add-hook 'dired-mode-hook #'dired-snacks--quit-setup)
+  (add-hook 'wdired-mode-hook #'dired-snacks--show-cursor)
+  (add-hook 'window-configuration-change-hook #'dired-snacks--update-panes)
+  (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
+  (advice-add 'dired--find-possibly-alternative-file :around #'dired-snacks--find-isolated)
+  (advice-add 'wdired-change-to-dired-mode :after #'dired-snacks--update-panes)
+  (dired-snacks--map-buffers #'dired-snacks--ml-setup)
+  (dired-snacks--map-buffers #'dired-snacks--quit-setup))
+
+(defun dired-snacks--disable ()
+  "Remove the passive features."
+  (remove-hook 'find-file-hook #'dired-snacks--zoxide-add-default-directory)
+  (remove-hook 'dired-mode-hook #'dired-snacks--zoxide-add-default-directory)
+  (remove-hook 'dired-mode-hook #'dired-snacks--subtree-setup)
+  (remove-hook 'dired-mode-hook #'dired-snacks--breadcrumb-setup)
+  (remove-hook 'dired-mode-hook #'dired-snacks--update-panes)
+  (remove-hook 'dired-mode-hook #'dired-snacks--ml-setup)
+  (remove-hook 'dired-mode-hook #'dired-snacks--quit-setup)
+  (remove-hook 'wdired-mode-hook #'dired-snacks--show-cursor)
+  (remove-hook 'window-configuration-change-hook #'dired-snacks--update-panes)
+  (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
+  (advice-remove 'dired--find-possibly-alternative-file #'dired-snacks--find-isolated)
+  (advice-remove 'wdired-change-to-dired-mode #'dired-snacks--update-panes)
+  (dired-snacks--map-buffers #'dired-snacks--ml-teardown)
+  (dired-snacks--map-buffers #'dired-snacks--quit-teardown))
+
+;;;###autoload
+(define-minor-mode dired-snacks-mode
+  "Toggle the passive Dired enhancements globally.
+The commands work on their own; this mode adds the breadcrumb, the
+Dired mode line, the split panes and the zoxide history."
+  :global t
+  :group 'dired-snacks
+  (if dired-snacks-mode
+      (dired-snacks--enable)
+    (dired-snacks--disable)))
 
 (provide 'dired-snacks)
 ;;; dired-snacks.el ends here

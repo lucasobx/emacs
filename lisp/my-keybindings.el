@@ -97,7 +97,7 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
 
 (my/bind
   '("<f1>"          scratch-buffer)
-  '("<f2>"          my/rotate-theme)
+  '("<f5>"          my/rotate-theme)
   '("C-<backspace>" my/backward-delete)
   '("C-<tab>"       other-window)
   '("C-0"           my/wrap-parens)
@@ -108,8 +108,8 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
   '("C-,"           popper-toggle)
   '("C-<"           popper-cycle)
   '("C-p"           yank)
-  '("C-z"           my/zoxide-dired)
-  '("C-f"           my/dired-find-name)
+  '("C-z"           dired-snacks-zoxide)
+  '("C-f"           dired-snacks-find-name)
   '("C-o"           my/open-line-below)
   '("M-<down>"      my/move-text-down)
   '("M-<up>"        my/move-text-up)
@@ -208,11 +208,11 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
 
 (wk-add "C-h" "help")
 (my/bind
-  '("C-h f" helpful-function   "describe function")
-  '("C-h v" helpful-variable   "describe variable")
-  '("C-h h" helpful-at-point   "help at point")
-  '("C-h k" devil-describe-key "describe key")
-  '("C-h d" devdocs-lookup     "devdocs"))
+  '("C-h h" helpful-at-point "help at point")
+  '("C-h f" helpful-function "desc function")
+  '("C-h v" helpful-variable "desc variable")
+  '("C-h k" describe-keymap  "desc keymap")
+  '("C-h d" devdocs-lookup   "devdocs"))
 
 (wk-add "C-q" "select")
 (my/bind
@@ -264,12 +264,13 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
 
 (with-eval-after-load 'dired
   (my/bind-local dired-mode-map
-    '("RET"      my/dired-find-file)
-    '("TAB"      my/dired-subtree-toggle)
+    '("RET"      dired-snacks-find-file)
     '("<f2>"     wdired-change-to-wdired-mode)
+    '("TAB"      dired-snacks-subtree-toggle)
+    '("M-y"      dired-snacks-copy-file-uri)
     '("M-f"      dired-create-empty-file)
     '("M-d"      dired-create-directory)
-    '("M-y"      my/dired-copy-file-uri)
+    '("M-s"      dired-snacks-split)
     '("M-<left>" dired-up-directory)
     '("M-."      dired-omit-mode)))
 

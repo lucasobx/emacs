@@ -499,6 +499,7 @@
   (setopt consult-fd-args
           '("fd" "--color=auto" "--full-path" "--hidden"))
   (setopt consult-buffer-sources '(consult-source-buffer))
+  :config
   (setopt consult-buffer-filter
           (append consult-buffer-filter
                   '("\\*Async Shell Command\\*" "Output\\*$" "\\*Help\\*" "\\*Messages\\*"

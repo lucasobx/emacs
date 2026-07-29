@@ -440,21 +440,44 @@
   :type 'boolean
   :group 'dired-snacks)
 
+(defcustom dired-snacks-external-openers
+  '(("gio" "open")
+    ("xdg-open"))
+  "Programs tried, in order, to open a file externally.
+Each entry is (PROGRAM ARG...); the first available PROGRAM is used."
+  :type '(repeat (cons string (repeat string)))
+  :group 'dired-snacks)
+
 (defun dired-snacks--external-file-p (file)
   "Return non-nil if FILE should be opened externally."
   (when-let* ((ext (file-name-extension file)))
     (member (downcase ext) dired-snacks-external-extensions)))
 
+(defun dired-snacks--external-opener ()
+  "Return the first available opener, as (PROGRAM ARG...), or nil."
+  (seq-find (lambda (entry) (executable-find (car entry)))
+            dired-snacks-external-openers))
+
+(defun dired-snacks--open-external (files)
+  "Open each of FILES in its default application."
+  (let ((opener (dired-snacks--external-opener)))
+    (unless opener
+      (user-error "No external opener found; install glib2 (gio) or xdg-utils"))
+    (dolist (file files)
+      (apply #'call-process (car opener) nil 0 nil
+             (append (cdr opener) (list (expand-file-name file)))))))
+
 ;;;###autoload
 (defun dired-snacks-find-file ()
-  "Visit the file on this line in Emacs or an external application."
+  "Open files in Emacs or externally. Open every marked files at once."
   (interactive)
   (let ((file (dired-get-file-for-visit)))
     (cond
      ((and (not (file-directory-p file))
-           (dired-snacks--external-file-p file)
-           (fboundp 'dired-do-open))
-      (dired-do-open))
+           (dired-snacks--external-file-p file))
+      (dired-snacks--open-external
+       (or (dired-get-marked-files nil nil #'dired-snacks--external-file-p)
+           (list file))))
      ((and dired-snacks-find-file-full-window
            (not (file-directory-p file)))
       (kill-buffer (current-buffer))
@@ -790,7 +813,24 @@
   "Cached attributes of the entry at point.")
 
 (defvar-local dired-snacks--ml-dir-size-cache nil
-  "Cached recursive size of the directories in this listing.")
+  "Cached recursive directory sizes, a hash of DIR to (MTIME . SIZE).")
+
+(defvar-local dired-snacks--ml-dir-size-jobs nil
+  "Directories with a `du' process in flight.")
+
+(defcustom dired-snacks-mode-line-size-placeholder "…"
+  "Text shown while a directory's size is being computed."
+  :type 'string :group 'dired-snacks)
+
+(defcustom dired-snacks-mode-line-size-idle-delay 0.2
+  "Idle time before a directory's size starts computing."
+  :type 'number :group 'dired-snacks)
+
+(defvar-local dired-snacks--ml-dir-size-timer nil
+  "Idle timer that starts the pending `du' computation.")
+
+(defvar dired-snacks--ml-du-program 'unset
+  "Cached path to `du', or `unset' before it is looked up.")
 
 (defvar-local dired-snacks--ml-total-cache nil
   "Cached count of the entries in this listing.")
@@ -849,30 +889,99 @@
       (setq dired-snacks--ml-attr-cache (cons name (file-attributes name))))
     (cdr dired-snacks--ml-attr-cache)))
 
-(defun dired-snacks--ml-directory-size (dir)
-  "Total size in bytes of everything under DIR."
-  (let ((tick (buffer-chars-modified-tick)))
-    (unless (eql tick (car dired-snacks--ml-dir-size-cache))
-      (setq dired-snacks--ml-dir-size-cache (cons tick (make-hash-table :test 'equal))))
-    (let ((table (cdr dired-snacks--ml-dir-size-cache)))
-      (or (gethash dir table)
-          (puthash dir
-                   (let ((total 0))
-                     (dolist (file (directory-files-recursively dir "" nil))
-                       (when-let* ((size (file-attribute-size (file-attributes file))))
-                         (setq total (+ total size))))
-                     total)
-                   table)))))
+(defun dired-snacks--ml-du-program ()
+  "Return the path to `du', or nil when it is unavailable."
+  (when (eq dired-snacks--ml-du-program 'unset)
+    (setq dired-snacks--ml-du-program (executable-find "du")))
+  dired-snacks--ml-du-program)
+
+(defun dired-snacks--ml-dir-size-cache-table ()
+  "Return this buffer's directory-size cache, creating it if needed."
+  (or dired-snacks--ml-dir-size-cache
+      (setq dired-snacks--ml-dir-size-cache (make-hash-table :test 'equal))))
+
+(defun dired-snacks--ml-dir-size-jobs-table ()
+  "Return this buffer's `du' job table, creating it if needed."
+  (or dired-snacks--ml-dir-size-jobs
+      (setq dired-snacks--ml-dir-size-jobs (make-hash-table :test 'equal))))
+
+(defun dired-snacks--ml-dir-size-cached (dir mtime)
+  "Return DIR's cached size when still fresh for MTIME, else nil."
+  (when-let* ((cache dired-snacks--ml-dir-size-cache)
+              (hit (gethash dir cache))
+              ((time-equal-p (car hit) mtime)))
+    (cdr hit)))
+
+(defun dired-snacks--ml-dir-size-start (dir mtime)
+  "Spawn an async `du' for DIR, caching its size tagged with MTIME."
+  (let* ((dired-buf (current-buffer))
+         (out (generate-new-buffer " *dired-snacks-du*"))
+         (proc (make-process
+                :name "dired-snacks-du"
+                :buffer out
+                :noquery t
+                :connection-type 'pipe
+                :command (list (dired-snacks--ml-du-program)
+                               "--summarize" "--bytes"
+                               (expand-file-name dir))
+                :sentinel
+                (lambda (proc event)
+                  (when (memq (process-status proc) '(exit signal))
+                    (let ((size (and (string-prefix-p "finished" event)
+                                     (with-current-buffer out
+                                       (goto-char (point-min))
+                                       (and (re-search-forward
+                                             "\\`[[:space:]]*\\([0-9]+\\)" nil t)
+                                            (string-to-number (match-string 1)))))))
+                      (when (buffer-live-p dired-buf)
+                        (with-current-buffer dired-buf
+                          (remhash dir (dired-snacks--ml-dir-size-jobs-table))
+                          (when size
+                            (puthash dir (cons mtime size)
+                                     (dired-snacks--ml-dir-size-cache-table)))
+                          (force-mode-line-update t)))
+                      (when (buffer-live-p out) (kill-buffer out))))))))
+    (puthash dir proc (dired-snacks--ml-dir-size-jobs-table))))
+
+(defun dired-snacks--ml-dir-size-schedule (dir mtime)
+  "Start DIR's `du' after a short idle, tagging the result with MTIME."
+  (when (timerp dired-snacks--ml-dir-size-timer)
+    (cancel-timer dired-snacks--ml-dir-size-timer))
+  (let ((buf (current-buffer)))
+    (setq dired-snacks--ml-dir-size-timer
+          (run-with-idle-timer
+           dired-snacks-mode-line-size-idle-delay nil
+           (lambda ()
+             (when (buffer-live-p buf)
+               (with-current-buffer buf
+                 (unless (or (dired-snacks--ml-dir-size-cached dir mtime)
+                             (gethash dir (dired-snacks--ml-dir-size-jobs-table)))
+                   (dired-snacks--ml-dir-size-start dir mtime)))))))))
+
+(defun dired-snacks--ml-dir-size-maybe (dir)
+  "Schedule a `du' for DIR when it is a directory lacking a fresh size."
+  (when (and (dired-snacks--ml-du-program)
+             (file-directory-p dir))
+    (let ((mtime (file-attribute-modification-time (file-attributes dir))))
+      (unless (dired-snacks--ml-dir-size-cached dir mtime)
+        (dired-snacks--ml-dir-size-schedule dir mtime)))))
 
 (defun dired-snacks--ml-size ()
   "Return the size of the entry at point, or nil.
 Directories are measured recursively."
   (when dired-snacks-mode-line-show-size
     (when-let* ((attrs (dired-snacks--ml-file-attrs)))
-      (let* ((size (if (eq (file-attribute-type attrs) t)
-                       (dired-snacks--ml-directory-size (dired-get-filename nil t))
-                     (file-attribute-size attrs)))
-             (text (string-pad (file-size-human-readable size)
+      (let* ((dirp (eq (file-attribute-type attrs) t))
+             (size (cond
+                    ((not dirp) (file-attribute-size attrs))
+                    ((not (dired-snacks--ml-du-program))
+                     (file-attribute-size attrs))
+                    (t (dired-snacks--ml-dir-size-cached
+                        (dired-get-filename nil t)
+                        (file-attribute-modification-time attrs)))))
+             (text (string-pad (if size
+                                   (file-size-human-readable size)
+                                 dired-snacks-mode-line-size-placeholder)
                                dired-snacks-mode-line-size-width nil t)))
         (concat "  " (propertize text 'face 'shadow))))))
 
@@ -950,6 +1059,8 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (let ((name (dired-get-filename nil t)))
     (unless (equal name dired-snacks--ml-last-file)
       (setq dired-snacks--ml-last-file name)
+      (when (and dired-snacks-mode-line-show-size name)
+        (dired-snacks--ml-dir-size-maybe name))
       (force-mode-line-update))))
 
 (defun dired-snacks--ml-setup ()
@@ -959,6 +1070,8 @@ The omit indicator and the sort criterion are dropped when space runs out."
 
 (defun dired-snacks--ml-teardown ()
   "Give this Dired buffer the usual mode line back."
+  (when (timerp dired-snacks--ml-dir-size-timer)
+    (cancel-timer dired-snacks--ml-dir-size-timer))
   (kill-local-variable 'mode-line-format)
   (remove-hook 'post-command-hook #'dired-snacks--ml-refresh t)
   (force-mode-line-update))

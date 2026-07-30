@@ -574,6 +574,7 @@
   :ensure t
   :hook
   (prog-mode . flycheck-mode)
+  ;; (prog-mode . flycheck-annotate-mode)
   :custom
   (flycheck-check-syntax-automatically '(save mode-enabled idle-change))
   (flycheck-display-errors-function #'flycheck-display-error-messages)
@@ -582,17 +583,12 @@
   :config
   (setcdr (assq 'flycheck-mode minor-mode-map-alist)
           (make-sparse-keymap))
-  (add-hook 'lisp-interaction-mode-hook (lambda () (flycheck-mode -1))))
-
-(use-package flycheck-eglot
-  :ensure t
-  :after (flycheck eglot)
-  :config
+  (add-hook 'lisp-interaction-mode-hook (lambda () (flycheck-mode -1)))
   (global-flycheck-eglot-mode 1))
 
 (use-package consult-flycheck
   :ensure t
-  :after (flycheck eglot))
+  :after (consult flycheck))
 
 (use-package apheleia
   :ensure t

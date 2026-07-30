@@ -566,6 +566,10 @@
   :hook
   ((lua-ts-mode ruby-ts-mode python-ts-mode) . eglot-ensure))
 
+(use-package consult-eglot
+  :ensure t
+  :after (consult eglot))
+
 (use-package flycheck
   :ensure t
   :hook

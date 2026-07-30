@@ -23,7 +23,6 @@
   (require 'dired-aux)
   (require 'dired-x)
   (require 'wdired)
-  (require 'hl-line)
   (require 'browse-url)
   (require 'completion-preview))
 
@@ -752,30 +751,6 @@ Each entry is (PROGRAM ARG...); the first available PROGRAM is used."
     (funcall orig file)))
 
 ;; ===============================================================
-;;; pane appearance (cursor, hl-line)
-
-(defun dired-snacks--update-panes (&rest _)
-  "Hide the cursor and keep `hl-line' in the selected pane only."
-  (let* ((wins (dired-snacks--windows))
-         (multi (and (cdr wins) t))
-         (sel (selected-window)))
-    (dolist (w wins)
-      (with-current-buffer (window-buffer w)
-        (unless (null cursor-type)
-          (setq-local cursor-type nil))
-        (cond
-         (multi
-          (setq-local hl-line-sticky-flag nil)
-          (when (and (not (eq w sel)) (fboundp 'hl-line-unhighlight))
-            (hl-line-unhighlight)))
-         (t
-          (kill-local-variable 'hl-line-sticky-flag)))))))
-
-(defun dired-snacks--show-cursor ()
-  "Restore the cursor."
-  (kill-local-variable 'cursor-type))
-
-;; ===============================================================
 ;;; mode-line
 
 (defcustom dired-snacks-mode-line-show-size t
@@ -1091,14 +1066,10 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (add-hook 'dired-mode-hook #'dired-snacks--zoxide-add-default-directory)
   (add-hook 'dired-mode-hook #'dired-snacks--subtree-setup)
   (add-hook 'dired-mode-hook #'dired-snacks--breadcrumb-setup)
-  (add-hook 'dired-mode-hook #'dired-snacks--update-panes)
   (add-hook 'dired-mode-hook #'dired-snacks--ml-setup)
   (add-hook 'dired-mode-hook #'dired-snacks--quit-setup)
-  (add-hook 'wdired-mode-hook #'dired-snacks--show-cursor)
-  (add-hook 'window-configuration-change-hook #'dired-snacks--update-panes)
   (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (advice-add 'dired--find-possibly-alternative-file :around #'dired-snacks--find-isolated)
-  (advice-add 'wdired-change-to-dired-mode :after #'dired-snacks--update-panes)
   (dired-snacks--map-buffers #'dired-snacks--ml-setup)
   (dired-snacks--map-buffers #'dired-snacks--quit-setup))
 
@@ -1108,14 +1079,10 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (remove-hook 'dired-mode-hook #'dired-snacks--zoxide-add-default-directory)
   (remove-hook 'dired-mode-hook #'dired-snacks--subtree-setup)
   (remove-hook 'dired-mode-hook #'dired-snacks--breadcrumb-setup)
-  (remove-hook 'dired-mode-hook #'dired-snacks--update-panes)
   (remove-hook 'dired-mode-hook #'dired-snacks--ml-setup)
   (remove-hook 'dired-mode-hook #'dired-snacks--quit-setup)
-  (remove-hook 'wdired-mode-hook #'dired-snacks--show-cursor)
-  (remove-hook 'window-configuration-change-hook #'dired-snacks--update-panes)
   (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (advice-remove 'dired--find-possibly-alternative-file #'dired-snacks--find-isolated)
-  (advice-remove 'wdired-change-to-dired-mode #'dired-snacks--update-panes)
   (dired-snacks--map-buffers #'dired-snacks--ml-teardown)
   (dired-snacks--map-buffers #'dired-snacks--quit-teardown))
 

@@ -590,6 +590,13 @@
   :ensure t
   :after (flycheck eglot))
 
+(use-package apheleia
+  :ensure t
+  :hook (ruby-ts-mode . apheleia-mode)
+  :config
+  (setf (alist-get 'ruby-ts-mode apheleia-mode-alist)
+        'rubocop))
+
 (use-package eldoc
   :ensure nil
   :init

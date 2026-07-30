@@ -252,7 +252,7 @@
   :init
   (popper-mode +1)
   :custom
-  (popper-window-height 13)
+  (popper-window-height 15)
   (popper-mode-line "")
   (popper-reference-buffers
    '("\\*eldoc\\*"
@@ -548,6 +548,10 @@
 
 ;; (use-package markdown-ts-mode
 ;;   :ensure nil)
+
+(use-package nix-ts-mode
+  :ensure t
+  :mode ("\\.nix\\'"))
 
 ;; ===============================================================
 ;;; IDE

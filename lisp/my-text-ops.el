@@ -223,6 +223,13 @@ Otherwise FALLBACK is evaluated."
   (interactive)
   (my/delete-thing 'line))
 
+(defun my/delete-buffer ()
+  "Delete the entire buffer content with visual feedback."
+  (interactive)
+  (pulse-momentary-highlight-region (point-min) (point-max))
+  (sit-for 0.15)
+  (kill-region (point-min) (point-max)))
+
 (my/define-ops my/delete-thing
                (my/delete-paragraph 'paragraph "Delete paragraph at point.")
                (my/delete-defun     'defun     "Delete defun at point."))
@@ -239,6 +246,13 @@ Otherwise FALLBACK is evaluated."
   "Copy line at point with visual feedback."
   (interactive)
   (my/copy-thing 'line))
+
+(defun my/copy-buffer ()
+  "Copy the entire buffer content to the kill ring with visual feedback."
+  (interactive)
+  (pulse-momentary-highlight-region (point-min) (point-max))
+  (kill-ring-save (point-min) (point-max))
+  (message "Copied buffer"))
 
 (my/define-ops my/copy-thing
                (my/copy-paragraph 'paragraph "Copy paragraph at point.")
@@ -258,6 +272,13 @@ Otherwise FALLBACK is evaluated."
   "Toggle comment on current line."
   (interactive)
   (comment-line 1))
+
+(defun my/toggle-comment-buffer ()
+  "Toggle comment on the entire buffer."
+  (interactive)
+  (pulse-momentary-highlight-region (point-min) (point-max))
+  (sit-for 0.05)
+  (comment-or-uncomment-region (point-min) (point-max)))
 
 (my/define-ops my/toggle-comment-thing
                (my/toggle-comment-paragraph 'paragraph "Toggle comment on paragraph at point.")

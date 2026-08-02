@@ -146,7 +146,8 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
   '("]" my/delete-in-brackets "delete inside []")
   '("s" my/delete-symbol      "delete symbol")
   '("d" my/delete-line        "delete line")
-  '("w" my/delete-word        "delete word"))
+  '("w" my/delete-word        "delete word")
+  '("a" my/delete-buffer      "delete buffer"))
 
 (wk-add "C-y" "copy")
 (my/bind-sub my/copy-map "C-y"
@@ -155,7 +156,8 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
   '("w" my/copy-word            "copy word")
   '("y" my/copy-line            "copy line")
   '("0" my/copy-inside-parens   "inside ()")
-  '("]" my/copy-inside-brackets "inside []"))
+  '("]" my/copy-inside-brackets "inside []")
+  '("a" my/copy-buffer          "copy buffer"))
 
 ;; ===============================================================
 ;;; PREFIX GROUPS
@@ -163,7 +165,8 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
 (wk-add "C-;" "comment")
 (my/bind
   '("C-; p" my/toggle-comment-paragraph "paragraph")
-  '("C-; ;" my/toggle-comment-line      "line"))
+  '("C-; ;" my/toggle-comment-line      "line")
+  '("C-; a" my/toggle-comment-buffer    "buffer"))
 
 ;; line-block counts (1-9): delete/copy/comment/select
 (dotimes (i 9)

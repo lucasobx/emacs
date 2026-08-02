@@ -145,19 +145,19 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
   '("0" my/delete-in-parens   "delete inside ()")
   '("]" my/delete-in-brackets "delete inside []")
   '("s" my/delete-symbol      "delete symbol")
+  '("b" my/delete-buffer      "delete buffer")
   '("d" my/delete-line        "delete line")
-  '("w" my/delete-word        "delete word")
-  '("a" my/delete-buffer      "delete buffer"))
+  '("w" my/delete-word        "delete word"))
 
 (wk-add "C-y" "copy")
 (my/bind-sub my/copy-map "C-y"
   '("p" my/copy-paragraph       "copy paragraph")
   '("s" my/copy-symbol          "copy symbol")
+  '("b" my/copy-buffer          "copy buffer")
   '("w" my/copy-word            "copy word")
   '("y" my/copy-line            "copy line")
   '("0" my/copy-inside-parens   "inside ()")
-  '("]" my/copy-inside-brackets "inside []")
-  '("a" my/copy-buffer          "copy buffer"))
+  '("]" my/copy-inside-brackets "inside []"))
 
 ;; ===============================================================
 ;;; PREFIX GROUPS
@@ -165,8 +165,8 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
 (wk-add "C-;" "comment")
 (my/bind
   '("C-; p" my/toggle-comment-paragraph "paragraph")
-  '("C-; ;" my/toggle-comment-line      "line")
-  '("C-; a" my/toggle-comment-buffer    "buffer"))
+  '("C-; b" my/toggle-comment-buffer    "buffer")
+  '("C-; ;" my/toggle-comment-line      "line"))
 
 ;; line-block counts (1-9): delete/copy/comment/select
 (dotimes (i 9)
@@ -222,8 +222,8 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
   '("C-q p" my/select-paragraph "select paragraph")
   '("C-q 0" my/select-in-parens "select in parens")
   '("C-q s" my/select-symbol    "select symbol")
-  '("C-q q" my/select-line      "select line")
-  '("C-q a" mark-whole-buffer   "select all"))
+  '("C-q b" mark-whole-buffer   "select buffer")
+  '("C-q q" my/select-line      "select line"))
 
 (wk-add "C-t" "tools")
 (my/bind

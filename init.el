@@ -252,7 +252,7 @@
   :init
   (popper-mode +1)
   :custom
-  (popper-window-height 15)
+  (popper-window-height 16)
   (popper-mode-line "")
   (popper-reference-buffers
    '("\\*eldoc\\*"
@@ -540,7 +540,8 @@
   :ensure nil
   :mode ("\\.py\\'" . python-ts-mode)
   :custom
-  (python-indent-offset 4))
+  (python-indent-offset 4)
+  (python-indent-guess-indent-offset-verbose nil))
 
 (use-package markdown-mode
   :ensure t
@@ -584,6 +585,7 @@
   (flycheck-display-errors-function #'flycheck-display-error-messages)
   (flycheck-idle-change-delay 0.5)
   (flycheck-indication-mode nil)
+  (flycheck-eglot-exclusive nil)
   :config
   (setcdr (assq 'flycheck-mode minor-mode-map-alist)
           (make-sparse-keymap))
@@ -733,9 +735,13 @@
   :ensure nil
   :defer t
   :custom
+  (eshell-visual-subcommands '(("git" "log" "diff" "show")))
+  (eshell-visual-options '(("git" "--help" "--paginate")))
   (eshell-prompt-regexp my/eshell-prompt-regexp)
+  (eshell-destroy-buffer-when-process-dies t)
   (eshell-prompt-function #'my/eshell-prompt)
   (eshell-scroll-to-bottom-on-input 'this)
+  (eshell-scroll-show-maximum-output nil)
   (eshell-highlight-prompt nil)
   (eshell-history-size 100000)
   (eshell-hist-ignoredups t)

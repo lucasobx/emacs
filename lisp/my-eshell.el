@@ -69,8 +69,7 @@ The whole prompt is read-only; input typed after it stays editable."
 (declare-function eshell-write-aliases-list "em-alias")
 
 (defvar my/eshell-aliases
-  '(("git"   "*git -c color.ui=always $*")
-    ("clear" "clear-scrollback")
+  '(("clear" "clear-scrollback")
     ("gg"    "magit-status")
     ("f"     "find-file $1")
     ("l"     "ls -lh $*")

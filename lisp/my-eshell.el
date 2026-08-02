@@ -224,6 +224,22 @@ jump to the best match for ARGS."
      (if keywords (my/eshell--zoxide-query keywords) (my/eshell--zoxide-pick))
      keywords)))
 
+(defun my/eshell-cd-zoxide-fallback (orig-fn &rest args)
+  "Around advice for `eshell/cd': on a miss, retry ARGS via zoxide.
+ORIG-FN is the native `cd'. Re-signal its error when zoxide finds nothing."
+  (condition-case err
+      (apply orig-fn args)
+    (error
+     (let* ((keywords (my/eshell--zoxide-args (flatten-tree args)))
+            (dir (and keywords
+                      (executable-find "zoxide")
+                      (my/eshell--zoxide-query keywords))))
+       (if dir
+           (funcall orig-fn dir)
+         (signal (car err) (cdr err)))))))
+
+(advice-add 'eshell/cd :around #'my/eshell-cd-zoxide-fallback)
+
 (defun pcomplete/z ()
   "Completion for the `z' eshell command from the zoxide database."
   (while (pcomplete-here (my/eshell--zoxide-list))))

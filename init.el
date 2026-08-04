@@ -366,6 +366,7 @@
   (dired-recursive-deletes 'always)
   (dired-recursive-copies 'always)
   (dired-auto-revert-buffer t)
+  (hl-line-sticky-flag nil)
   (dired-omit-files "^\\.")
   (dired-omit-verbose nil)
   (dired-free-space nil)

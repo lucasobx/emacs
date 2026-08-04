@@ -38,6 +38,8 @@
 (declare-function dired-insert-set-properties "dired")
 (declare-function dired-unmark-all-marks "dired")
 (declare-function dired-find-file "dired")
+(declare-function dired-goto-file "dired")
+(declare-function dired-add-file "dired-aux")
 (declare-function dired--find-file "dired")
 (declare-function dired-kill-subdir "dired-aux")
 (declare-function dired-hide-subdir "dired-aux")
@@ -504,6 +506,58 @@ Files sharing an opener are passed together in one call."
       (find-file file))
      (t
       (dired-find-file)))))
+
+;; ===============================================================
+;;; duplicate
+
+(defun dired-snacks--numbered-stem (base)
+  "Return BASE without a trailing -N suffix."
+  (if (string-match "\\`\\(.+?\\)-[0-9]+\\'" base)
+      (match-string 1 base)
+    base))
+
+(defun dired-snacks--unique-copy-name (file)
+  "Return an absolute, free name for a numbered copy of FILE."
+  (let* ((file (directory-file-name (expand-file-name file)))
+         (dir  (file-name-directory file))
+         (node (file-name-nondirectory file))
+         (ext  (unless (file-directory-p file) (file-name-extension node)))
+         (base (if ext (file-name-sans-extension node) node))
+         (stem (dired-snacks--numbered-stem base))
+         (n 1)
+         candidate)
+    (while (progn
+             (setq candidate
+                   (expand-file-name
+                    (concat stem "-" (number-to-string n)
+                            (and ext (concat "." ext)))
+                    dir))
+             (file-exists-p candidate))
+      (setq n (1+ n)))
+    candidate))
+
+(defun dired-snacks--duplicate-file (file)
+  "Copy FILE to a numbered name and return that name."
+  (let ((copy (dired-snacks--unique-copy-name file)))
+    (if (file-directory-p file)
+        (copy-directory file copy nil t nil)
+      (copy-file file copy))
+    (dired-add-file copy)
+    copy))
+
+;;;###autoload
+(defun dired-snacks-duplicate ()
+  "Duplicate the marked files, or the file at point.
+Each copy is renamed with a numbered suffix to avoid clashes."
+  (interactive)
+  (let* ((files (dired-get-marked-files nil nil nil t))
+         (single (eq (car files) t))
+         (copies (mapcar #'dired-snacks--duplicate-file
+                         (if single (cdr files) files))))
+    (when copies
+      (dired-goto-file (car copies))
+      (message "Duplicated %d file%s"
+               (length copies) (if (length= copies 1) "" "s")))))
 
 ;; ===============================================================
 ;;; subtree

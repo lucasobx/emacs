@@ -56,6 +56,13 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
         (cond ((eq desc t) (my/wk-hide full))
               (desc         (wk-add full desc)))))))
 
+(defun my/duplicate-dwim ()
+  "Duplicate the file at point in Dired, or the line/region elsewhere."
+  (interactive)
+  (if (derived-mode-p 'dired-mode)
+      (dired-snacks-duplicate)
+    (duplicate-dwim)))
+
 ;; ===============================================================
 ;;; COMMANDS
 
@@ -117,7 +124,7 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
   '("M-u"           upcase-dwim)
   '("M-m"           mark-paragraph)
   '("M-l"           downcase-dwim)
-  '("M-p"           duplicate-dwim)
+  '("M-p"           my/duplicate-dwim)
   '("M-c"           capitalize-dwim))
 
 ;; ===============================================================

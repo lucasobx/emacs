@@ -8,13 +8,15 @@
 ;;; Commentary:
 
 ;; A bundle of small Dired enhancements:
-;; - zoxide     jump to a directory by frecency, with inline preview
-;; - find-name  live, as-you-type file-name search rendered as Dired
-;; - find-file  smart RET that opens some files in an external app
-;; - subtree    expand a directory inline, without leaving the buffer
-;; - breadcrumb a header-line path for the directory at point
-;; - split      a second Dired pane, with independent navigation
-;; - copy-uri   copy files as file:// URIs to the clipboard
+;; zoxide     - jump to a directory by frecency, with inline preview
+;; find-name  - incremental file-name search as you type
+;; find-file  - smart RET for opening files in external apps
+;; duplicate  - duplicate marked files with auto-numbered names
+;; subtree    - expand directories inline without leaving the buffer
+;; breadcrumb - show the current directory path in the header line
+;; split      - second Dired pane with independent navigation
+;; mode-line  - per-buffer mode line with size, time, sort, position
+;; copy-uri   - copy files as file:// URIs to the clipboard
 
 ;;; Code:
 

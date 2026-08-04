@@ -274,7 +274,7 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
 
 (with-eval-after-load 'dired
   (my/bind-local dired-mode-map
-    '("RET"      dired-snacks-find-file)
+    '("RET"      dired-snacks-open)
     '("<f2>"     wdired-change-to-wdired-mode)
     '("TAB"      dired-snacks-subtree-toggle)
     '("M-y"      dired-snacks-copy-file-uri)

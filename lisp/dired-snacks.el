@@ -10,7 +10,7 @@
 ;; A bundle of small Dired enhancements:
 ;; zoxide     - jump to a directory by frecency, with inline preview
 ;; find-name  - incremental file-name search as you type
-;; find-file  - smart RET for opening files in external apps
+;; open       - smart RET for opening files in external apps
 ;; duplicate  - duplicate marked files with auto-numbered names
 ;; subtree    - expand directories inline without leaving the buffer
 ;; breadcrumb - show the current directory path in the header line
@@ -426,9 +426,9 @@
         (dired-snacks--find-name-cleanup)))))
 
 ;; ===============================================================
-;;; find-file (smart RET)
+;;; open
 
-(defcustom dired-snacks-find-file-full-window nil
+(defcustom dired-snacks-open-full-window nil
   "When non-nil, opening a file kills the Dired buffer and fills the window."
   :type 'boolean
   :group 'dired-snacks)
@@ -492,8 +492,10 @@ Files sharing an opener are passed together in one call."
              (append (cdr opener) (nreverse paths))))))
 
 ;;;###autoload
-(defun dired-snacks-find-file ()
-  "Open files in Emacs or externally. Open every marked files at once."
+(defun dired-snacks-open ()
+  "Open the marked files, or the file at point.
+Files matching `dired-snacks-external-app-alist' open in an external
+application; the rest are visited in Emacs, and directories are entered."
   (interactive)
   (let ((file (dired-get-file-for-visit)))
     (cond
@@ -502,7 +504,7 @@ Files sharing an opener are passed together in one call."
       (dired-snacks--open-external
        (or (dired-get-marked-files nil nil #'dired-snacks--external-file-p)
            (list file))))
-     ((and dired-snacks-find-file-full-window
+     ((and dired-snacks-open-full-window
            (not (file-directory-p file)))
       (kill-buffer (current-buffer))
       (find-file file))

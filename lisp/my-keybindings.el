@@ -116,7 +116,7 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
   '("C-<"           popper-cycle)
   '("C-p"           yank)
   '("C-z"           dired-snacks-zoxide)
-  '("C-f"           dired-snacks-find-name)
+  '("C-f"           dired-snacks-find)
   '("C-o"           my/open-line-below)
   '("M-<down>"      my/move-text-down)
   '("M-<up>"        my/move-text-up)

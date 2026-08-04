@@ -424,16 +424,6 @@
 ;; ===============================================================
 ;;; find-file (smart RET)
 
-(defcustom dired-snacks-external-extensions
-  '("png" "jpg" "jpeg" "gif" "bmp" "webp" "tiff" "tif" "svg" "ico" "avif"
-    "mp4" "mkv" "avi" "mov" "webm" "flv" "wmv" "mpg" "mpeg" "m4v"
-    "mp3" "flac" "wav" "ogg" "opus" "m4a" "aac"
-    "xcf" "kra" "psd" "blend"
-    "cbz" "cbr")
-  "File extensions to open in an external application."
-  :type '(repeat string)
-  :group 'dired-snacks)
-
 (defcustom dired-snacks-find-file-full-window nil
   "When non-nil, opening a file kills the Dired buffer and fills the window."
   :type 'boolean
@@ -447,24 +437,55 @@ Each entry is (PROGRAM ARG...); the first available PROGRAM is used."
   :type '(repeat (cons string (repeat string)))
   :group 'dired-snacks)
 
+(defcustom dired-snacks-external-app-alist nil
+  "File extensions to open in an external application.
+Each entry is (EXTENSIONS PROGRAM ARG...), where EXTENSIONS is a
+string or list of strings.  PROGRAM opens those files; when
+omitted, `dired-snacks-external-openers' is used instead."
+  :type '(repeat (cons (choice string (repeat string))
+                       (repeat string)))
+  :group 'dired-snacks)
+
+(defun dired-snacks--file-ext (file)
+  "Return the downcased extension of FILE, or nil for a directory."
+  (unless (file-directory-p file)
+    (downcase (or (file-name-extension file) ""))))
+
+(defun dired-snacks--entry-for-ext (ext)
+  "Return the alist entry matching EXT, or nil."
+  (when ext
+    (seq-find (lambda (entry) (member ext (ensure-list (car entry))))
+              dired-snacks-external-app-alist)))
+
 (defun dired-snacks--external-file-p (file)
   "Return non-nil if FILE should be opened externally."
-  (when-let* ((ext (file-name-extension file)))
-    (member (downcase ext) dired-snacks-external-extensions)))
+  (dired-snacks--entry-for-ext (dired-snacks--file-ext file)))
 
-(defun dired-snacks--external-opener ()
-  "Return the first available opener, as (PROGRAM ARG...), or nil."
+(defun dired-snacks--default-opener ()
+  "Return the first available default opener, as (PROGRAM ARG...), or nil."
   (seq-find (lambda (entry) (executable-find (car entry)))
             dired-snacks-external-openers))
 
+(defun dired-snacks--opener-for-file (file)
+  "Return the opener for FILE, as (PROGRAM ARG...), or nil.
+Prefer the mapped program, falling back to the default opener."
+  (let ((mapped (cdr (dired-snacks--entry-for-ext
+                      (dired-snacks--file-ext file)))))
+    (if (and mapped (executable-find (car mapped)))
+        mapped
+      (dired-snacks--default-opener))))
+
 (defun dired-snacks--open-external (files)
-  "Open each of FILES in its default application."
-  (let ((opener (dired-snacks--external-opener)))
-    (unless opener
-      (user-error "No external opener found; install glib2 (gio) or xdg-utils"))
+  "Open each of FILES in its external application.
+Files sharing an opener are passed together in one call."
+  (let ((groups nil))
     (dolist (file files)
+      (if-let* ((opener (dired-snacks--opener-for-file file)))
+          (push (expand-file-name file) (alist-get opener groups nil nil #'equal))
+        (user-error "No external opener found; install glib2 (gio) or xdg-utils")))
+    (pcase-dolist (`(,opener . ,paths) groups)
       (apply #'call-process (car opener) nil 0 nil
-             (append (cdr opener) (list (expand-file-name file)))))))
+             (append (cdr opener) (nreverse paths))))))
 
 ;;;###autoload
 (defun dired-snacks-find-file ()

@@ -388,6 +388,13 @@
   (dired-snacks-mode-line-show-time nil)
   (dired-snacks-mode-line-show-omit nil)
   (dired-snacks-mode-line-show-size t)
+  (dired-snacks-external-app-alist
+   '((("mkv" "mp4" "webm" "avi" "mov" "mpg" "m4v") "vlc")
+     (("mp3" "flac" "wav" "ogg" "opus" "m4a" "aac") "vlc")
+     ("pdf" "zen-browser")
+     ;; no app specified: use gio/xdg-open (system default).
+     (("png" "jpg" "jpeg" "gif" "bmp" "webp" "tiff" "svg" "ico" "avif"))
+     (("xcf" "kra" "psd" "blend" "cbz" "cbr"))))
   :config
   (dired-snacks-mode 1))
 

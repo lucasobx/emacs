@@ -42,9 +42,6 @@ Untracked entries are ignored so they color the branch as clean."
 ;; ===============================================================
 ;;; PROMPT
 
-(defconst my/eshell-prompt-regexp "^[^#$\n]*[#$] "
-  "Regexp matching the trailing part of `my/eshell-prompt'.")
-
 (defun my/eshell-prompt ()
   "Return the eshell prompt: abbreviated cwd, git segment, prompt char.
 The whole prompt is read-only; input typed after it stays editable."

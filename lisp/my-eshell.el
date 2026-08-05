@@ -71,8 +71,8 @@ The whole prompt is read-only; input typed after it stays editable."
 (defvar my/eshell-aliases
   '(("clear" "clear-scrollback")
     ("gg"    "magit-status")
-    ("f"     "find-file $1")
-    ("l"     "ls -lh $*")
+    ("ff"    "find-file $1")
+    ("ll"    "ls -lh $*")
     ("d"     "dired $1")
     ("q"     "exit"))
   "Eshell command aliases.")

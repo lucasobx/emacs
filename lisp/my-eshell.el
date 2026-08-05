@@ -92,41 +92,7 @@ The whole prompt is read-only; input typed after it stays editable."
 (add-hook 'eshell-mode-hook #'my/eshell-set-aliases)
 
 ;; ===============================================================
-;;; TERMINAL FRAME
 
-(declare-function eshell "eshell")
-(defvar eshell-buffer-name)
-
-(defcustom my/eshell-terminal-frame-title "eshell-term"
-  "Frame title of the standalone eshell terminal.
-Match this title from your compositor's window rules."
-  :type 'string
-  :group 'my)
-
-(defcustom my/eshell-terminal-hide-mode-line t
-  "When non-nil, hide the mode line in the standalone eshell terminal."
-  :type 'boolean
-  :group 'my)
-
-(defun my/eshell-terminal--exit ()
-  "Quit Emacs after the terminal's eshell buffer is killed."
-  (run-at-time 0 nil #'kill-emacs))
-
-(defun my/eshell-terminal--setup (dedicated)
-  "Strip the current eshell buffer down to a bare terminal.
-When DEDICATED is non-nil, killing the buffer quits Emacs."
-  (setq-local truncate-lines nil
-              header-line-format nil)
-  (when my/eshell-terminal-hide-mode-line
-    (setq-local mode-line-format nil))
-  (set-window-fringes (selected-window) 0 0)
-  (when dedicated
-    (add-hook 'kill-buffer-hook #'my/eshell-terminal--exit nil t)))
-
-(defun my/eshell-terminal (&optional dedicated)
-  "Open a bare Eshell terminal filling the frame.
-With DEDICATED non-nil, exiting the shell also quits Emacs; pass it
-when launching a throwaway terminal from your compositor."
   (interactive)
   (set-frame-parameter nil 'title my/eshell-terminal-frame-title)
   (let ((eshell-buffer-name (generate-new-buffer-name "*eshell-term*")))

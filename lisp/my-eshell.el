@@ -133,6 +133,41 @@ when launching a throwaway terminal from your compositor."
     (eshell))
   (delete-other-windows)
   (my/eshell-terminal--setup dedicated))
+;; ===============================================================
+;;; CAT
+
+(declare-function eshell/cat "em-unix")
+(declare-function eshell-print "esh-mode")
+
+(defun my/eshell--cat-file-p (arg)
+  "Return non-nil when ARG names a readable regular file."
+  (and (stringp arg)
+       (not (string-prefix-p "-" arg))
+       (file-regular-p arg)
+       (file-readable-p arg)))
+
+(defun my/eshell--cat-fontified (filename)
+  "Return the contents of FILENAME with its major-mode fontification."
+  (let ((buffer (get-file-buffer filename)))
+    (with-current-buffer (or buffer (find-file-noselect filename t))
+      (unwind-protect
+          (progn (font-lock-ensure) (buffer-string))
+        (unless buffer (kill-buffer))))))
+
+(defun my/eshell-cat-syntax-highlight (orig-fn &rest args)
+  "Around advice for `eshell/cat' that syntax-highlights regular files.
+Falls back to ORIG-FN for pipelines, flags, and non-file ARGS."
+  (let ((files (flatten-tree args)))
+    (if (and (not (bound-and-true-p eshell-in-pipeline-p))
+             files
+             (seq-every-p #'my/eshell--cat-file-p files))
+        (progn (dolist (file files)
+                 (eshell-print (my/eshell--cat-fontified file)))
+               nil)
+      (apply orig-fn args))))
+
+(with-eval-after-load 'em-unix
+  (advice-add 'eshell/cat :around #'my/eshell-cat-syntax-highlight))
 
 ;; ===============================================================
 ;;; ZOXIDE

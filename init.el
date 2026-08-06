@@ -22,7 +22,6 @@
 (require 'my-exec-path)
 (require 'my-move-text)
 (require 'my-text-ops)
-(require 'my-eshell)
 (require 'my-cache)
 
 ;; ===============================================================
@@ -68,7 +67,6 @@
   (tab-always-indent 'complete)
   (delete-pair-push-mark t)
   (indent-tabs-mode nil)
-  (truncate-lines t)
   (undo-no-redo t)
   (tab-width 2)
 
@@ -112,6 +110,7 @@
   ;; modes
   (minibuffer-electric-default-mode 1)
   (minibuffer-depth-indicate-mode 1)
+  (global-visual-line-mode 1)
   (global-auto-revert-mode 1)
   (delete-selection-mode 1)
   (file-name-shadow-mode 1)
@@ -301,7 +300,7 @@
           '(:internal-border-width 10
             :right-divider-width 1
             :mode-line-width 1
-            :fringe-width 4))
+            :fringe-width 2))
   (spacious-padding-mode 1))
 
 (use-package rainbow-delimiters
@@ -730,17 +729,22 @@
   :ensure nil
   :defer t
   :custom
-  (eshell-visual-subcommands '(("git" "log" "diff" "show")))
-  (eshell-visual-options '(("git" "--help" "--paginate")))
-  (eshell-prompt-regexp my/eshell-prompt-regexp)
-  (eshell-destroy-buffer-when-process-dies t)
-  (eshell-prompt-function #'my/eshell-prompt)
+  (eshell-visual-subcommands
+   '(("git" "log" "diff" "show" "help")
+     ("sudo" "dnf")
+     ("docker" "run" "exec" "attach" "top" "logs" "stats" "compose")
+     ("podman" "run" "exec" "attach" "top" "logs" "stats" "compose")))
   (eshell-scroll-to-bottom-on-input 'this)
   (eshell-scroll-show-maximum-output nil)
-  (eshell-highlight-prompt nil)
+  (eshell-hist-ignoredups 'erase)
   (eshell-history-size 100000)
-  (eshell-hist-ignoredups t)
   (eshell-banner-message ""))
+
+(use-package eshell-snacks
+  :ensure nil
+  :load-path "~/.config/emacs/lisp"
+  :config
+  (eshell-snacks-mode 1))
 
 ;; ===============================================================
 ;;; VERSION CONTROL

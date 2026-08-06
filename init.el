@@ -759,8 +759,19 @@
       (mapc #'kill-buffer buffers)))
   :bind
   (:map magit-status-mode-map ("q" . my/magit-kill-buffers))
+  :custom
+  (magit-section-visibility-indicators nil)
   :config
   (magit-process-apply-ansi-colors t)
   (keymap-set transient-map "<escape>" #'transient-quit-one))
+
+(use-package diff-hl
+  :ensure t
+  :custom
+  (diff-hl-draw-borders nil)
+  :config
+  (setcdr (assq 'diff-hl-mode minor-mode-map-alist)
+          (make-sparse-keymap))
+  (global-diff-hl-mode 1))
 
 ;;; init.el ends here

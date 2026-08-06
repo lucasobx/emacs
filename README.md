@@ -1,6 +1,5 @@
 ### Requirements
 * emacs 31+
-* linux + wayland
 * wl-copy
 * ripgrep
 * fd-find

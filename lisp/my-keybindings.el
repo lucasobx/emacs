@@ -118,6 +118,7 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
   '("C-z"           dired-snacks-zoxide)
   '("C-f"           dired-snacks-find)
   '("C-o"           my/open-line-below)
+  '("C-t"           eshell)
   '("M-<down>"      my/move-text-down)
   '("M-<up>"        my/move-text-up)
   '("M-k"           kill-line)
@@ -232,11 +233,6 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
   '("C-q b" mark-whole-buffer   "select buffer")
   '("C-q q" my/select-line      "select line"))
 
-(wk-add "C-t" "tools")
-(my/bind
-  '("C-t t" eshell       "eshell")
-  '("C-t m" magit-status "magit"))
-
 (wk-add "C-b" "buffer")
 (my/bind
   '("C-b b" consult-buffer    "switch to buffer")
@@ -249,6 +245,11 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
   '("C-w w" split-window-below "new window ↓")
   '("C-w v" split-window-right "new window →")
   '("C-w d" delete-window      "close window"))
+
+(wk-add "C-v" "vc")
+(my/bind
+ '("C-v d" diff-hl-show-hunk "show diff")
+ '("C-v v" magit-status "git status"))
 
 (wk-add "C-x" "")
 (my/bind

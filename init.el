@@ -329,19 +329,6 @@
   :hook
   (compilation-filter . ansi-color-compilation-filter))
 
-(use-package line-reminder
-  :ensure t
-  :hook
-  (prog-mode . line-reminder-mode)
-  :config
-  (add-hook 'minibuffer-setup-hook (lambda () (line-reminder-mode -1)))
-  (setopt line-reminder-show-option 'indicators)
-  (setopt line-reminder-bitmap 'vertical-bar)
-  (set-face-attribute 'line-reminder-modified-sign-face nil
-                      :foreground (face-attribute 'line-number-current-line :foreground))
-  (set-face-attribute 'line-reminder-saved-sign-face nil
-                      :foreground (face-attribute 'default :background)))
-
 (use-package whitespace
   :ensure nil
   :defer t

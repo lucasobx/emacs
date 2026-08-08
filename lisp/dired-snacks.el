@@ -744,23 +744,23 @@ Each copy is renamed with a numbered suffix to avoid clashes."
                            (propertize (dired-snacks--breadcrumb-quote s)
                                        'face `(:inherit dired-header :height ,height)))
                          (dired-snacks--breadcrumb-segments dir)
-                         sep)))))
+                         sep)
+              (when (> dired-snacks-breadcrumb-spacing 0)
+                (propertize " " 'display
+                            `(raise ,(- dired-snacks-breadcrumb-spacing))))))))
 
 (defun dired-snacks--breadcrumb-decorate ()
-  "Hide the directory header and add a gap under the breadcrumb."
+  "Hide the directory header line."
   (unless (eq (current-buffer) dired-snacks--find-buffer)
     (remove-overlays (point-min) (point-max) 'dired-snacks--header t)
-    (let* ((first (next-single-property-change (point-min) 'dired-filename))
-           (end (if first (save-excursion (goto-char first) (pos-bol))
-                  (point-max)))
-           (ov (make-overlay (point-min) end)))
-      (overlay-put ov 'dired-snacks--header t)
-      (overlay-put ov 'evaporate t)
-      (when dired-snacks-breadcrumb-hide-header
-        (overlay-put ov 'invisible 'dired-snacks--header))
-      (when (> dired-snacks-breadcrumb-spacing 0)
-        (overlay-put ov 'before-string
-                     (propertize "\n" 'face `(:height ,dired-snacks-breadcrumb-spacing)))))))
+    (when dired-snacks-breadcrumb-hide-header
+      (let* ((first (next-single-property-change (point-min) 'dired-filename))
+             (end (if first (save-excursion (goto-char first) (pos-bol))
+                    (point-max)))
+             (ov (make-overlay (point-min) end)))
+        (overlay-put ov 'dired-snacks--header t)
+        (overlay-put ov 'evaporate t)
+        (overlay-put ov 'invisible 'dired-snacks--header)))))
 
 (defun dired-snacks--breadcrumb-setup ()
   "Show the breadcrumb header line and decorate the listing."

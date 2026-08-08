@@ -73,43 +73,6 @@
   (setq-local scroll-step 0))
 
 ;; ===============================================================
-;;; VISUAL COMMANDS
-
-;; A dead term buffer is left in char mode, forwarding every key to a
-;; process that no longer exists; line mode makes it readable instead.
-
-(declare-function term-line-mode "term")
-(defvar eshell-parent-buffer)
-
-(defvar-keymap eshell-snacks-visual-exit-mode-map
-  :doc "Keymap for a visual command's buffer after its process died."
-  "q" #'eshell-snacks-visual-quit)
-
-(define-minor-mode eshell-snacks-visual-exit-mode
-  "Minor mode for a finished visual command's buffer.
-Its keymap shadows the term keymaps, so `q' quits."
-  :keymap eshell-snacks-visual-exit-mode-map)
-
-(defun eshell-snacks-visual-quit ()
-  "Kill this visual command's buffer and return to the eshell that ran it."
-  (interactive)
-  (let ((parent (and (boundp 'eshell-parent-buffer)
-                     (buffer-live-p eshell-parent-buffer)
-                     eshell-parent-buffer)))
-    (kill-buffer)
-    (when parent (switch-to-buffer parent))))
-
-(defun eshell-snacks--visual-finished (proc &rest _)
-  "Make PROC's buffer readable and quittable now that PROC has died.
-Advice on `eshell-term-sentinel', which may have killed it already."
-  (when-let* ((buffer (process-buffer proc))
-              ((buffer-live-p buffer))
-              ((not (eq 'run (process-status proc)))))
-    (with-current-buffer buffer
-      (when (derived-mode-p 'term-mode) (term-line-mode))
-      (eshell-snacks-visual-exit-mode 1))))
-
-;; ===============================================================
 ;;; ENVIRONMENT
 
 ;; Buffer-local, so visual commands in `term' keep their own pager.
@@ -658,7 +621,6 @@ ORIG-FN is the native `cd', whose error is re-signaled on no match."
   (add-hook 'eshell-exit-hook #'eshell-snacks-save-merged-history)
   (add-hook 'eshell-post-command-hook #'eshell-snacks--zoxide-track)
   (add-hook 'kill-emacs-hook #'eshell-snacks-save-merged-history)
-  (advice-add 'eshell-term-sentinel :after #'eshell-snacks--visual-finished)
   (advice-add 'eshell-print-maybe-n :around #'eshell-snacks--suppress-ui-result)
   (advice-add 'eshell-write-aliases-list :override #'ignore)
   (advice-add 'eshell-write-history :override #'ignore)
@@ -679,7 +641,6 @@ ORIG-FN is the native `cd', whose error is re-signaled on no match."
   (remove-hook 'eshell-exit-hook #'eshell-snacks-save-merged-history)
   (remove-hook 'eshell-post-command-hook #'eshell-snacks--zoxide-track)
   (remove-hook 'kill-emacs-hook #'eshell-snacks-save-merged-history)
-  (advice-remove 'eshell-term-sentinel #'eshell-snacks--visual-finished)
   (advice-remove 'eshell-print-maybe-n #'eshell-snacks--suppress-ui-result)
   (advice-remove 'eshell-write-aliases-list #'ignore)
   (advice-remove 'eshell-write-history #'ignore)

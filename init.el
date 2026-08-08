@@ -742,6 +742,17 @@
   :config
   (eshell-snacks-mode 1))
 
+(use-package ghostel
+  :ensure t
+  :config
+  (add-to-list 'ghostel-eval-cmds '("magit-status-setup-buffer" magit-status-setup-buffer)))
+
+(use-package ghostel-eshell
+  :hook (eshell-load . ghostel-eshell-visual-command-mode))
+
+(use-package ghostel-compile
+  :hook (after-init . ghostel-compile-global-mode))
+
 ;; ===============================================================
 ;;; VERSION CONTROL
 

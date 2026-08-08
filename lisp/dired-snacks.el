@@ -13,7 +13,7 @@
 ;; open       - smart RET for opening files in external apps
 ;; duplicate  - duplicate marked files with auto-numbered names
 ;; subtree    - expand directories inline without leaving the buffer
-;; breadcrumb - show the current directory path in the header line
+;; breadcrumb - show the current directory in the header line
 ;; split      - second Dired pane with independent navigation
 ;; mode-line  - per-buffer mode line with size, time, sort, position
 ;; copy-uri   - copy files as file:// URIs to the clipboard
@@ -24,7 +24,6 @@
   (require 'dired)
   (require 'dired-aux)
   (require 'dired-x)
-  (require 'wdired)
   (require 'browse-url)
   (require 'completion-preview))
 
@@ -67,7 +66,7 @@
   "Overlay showing the best zoxide match in the minibuffer.")
 
 (defun dired-snacks--zoxide-query (input)
-  "Return the directory for INPUT: a literal path, else zoxide's best match."
+  "Return the directory for INPUT: a literal name, else zoxide's best match."
   (when (and input (not (string-empty-p input)))
     (let ((expanded (expand-file-name input)))
       (if (and (string-match-p "[/~]" input) (file-directory-p expanded))
@@ -89,8 +88,8 @@
              (file-directory-p default-directory))
     (dired-snacks--zoxide-add default-directory)))
 
-(defun dired-snacks--zoxide-path-like-p (input)
-  "Return non-nil if INPUT looks like a literal filesystem path."
+(defun dired-snacks--zoxide-file-name-p (input)
+  "Return non-nil if INPUT looks like a literal file name."
   (and (string-match-p "[/~]" input) t))
 
 (defun dired-snacks--zoxide-update-ghost (&rest _)
@@ -98,23 +97,23 @@
   (when (overlayp dired-snacks--zoxide-ghost-ov)
     (delete-overlay dired-snacks--zoxide-ghost-ov))
   (let ((input (minibuffer-contents)))
-    (unless (dired-snacks--zoxide-path-like-p input)
+    (unless (dired-snacks--zoxide-file-name-p input)
       (when-let* ((dir (dired-snacks--zoxide-query input)))
         (setq dired-snacks--zoxide-ghost-ov (make-overlay (point-max) (point-max) nil t t))
         (overlay-put dired-snacks--zoxide-ghost-ov 'after-string
                      (propertize (concat "  → " (abbreviate-file-name dir))
                                  'face 'shadow 'cursor t))))))
 
-(defun dired-snacks--zoxide-path-capf ()
-  "Completion-at-point function for literal paths."
+(defun dired-snacks--zoxide-file-name-capf ()
+  "Completion-at-point function for literal file names."
   (list (minibuffer-prompt-end) (point) #'completion-file-name-table))
 
 (defun dired-snacks--zoxide-inhibit-preview ()
-  "Inhibit `completion-preview' unless the input looks like a literal path."
-  (not (dired-snacks--zoxide-path-like-p (minibuffer-contents))))
+  "Inhibit `completion-preview' unless the input is a literal file name."
+  (not (dired-snacks--zoxide-file-name-p (minibuffer-contents))))
 
-(defun dired-snacks--zoxide-complete-path ()
-  "Complete the minibuffer input as a directory path."
+(defun dired-snacks--zoxide-complete-file-name ()
+  "Complete the minibuffer input as a directory name."
   (interactive)
   (let* ((beg (minibuffer-prompt-end))
          (input (buffer-substring-no-properties beg (point-max)))
@@ -137,11 +136,11 @@
       (insert (concat (or (file-name-directory input) "") comp))))))
 
 (defun dired-snacks-zoxide-complete ()
-  "Complete the minibuffer input, as a path or as a zoxide match."
+  "Complete the minibuffer input, as a file name or as a zoxide match."
   (interactive)
   (let ((input (minibuffer-contents)))
-    (if (dired-snacks--zoxide-path-like-p input)
-        (dired-snacks--zoxide-complete-path)
+    (if (dired-snacks--zoxide-file-name-p input)
+        (dired-snacks--zoxide-complete-file-name)
       (if-let* ((dir (dired-snacks--zoxide-query input)))
           (progn (delete-minibuffer-contents)
                  (insert (abbreviate-file-name dir)))
@@ -158,12 +157,13 @@
 (defun dired-snacks-zoxide ()
   "Prompt for a zoxide query and open the chosen directory in Dired."
   (interactive)
+  (require 'completion-preview)
   (let* ((orig (current-buffer))
          (input (minibuffer-with-setup-hook
                     (lambda ()
                       (setq dired-snacks--zoxide-ghost-ov nil)
                       (add-hook 'after-change-functions #'dired-snacks--zoxide-update-ghost nil t)
-                      (add-hook 'completion-at-point-functions #'dired-snacks--zoxide-path-capf nil t)
+                      (add-hook 'completion-at-point-functions #'dired-snacks--zoxide-file-name-capf nil t)
                       (add-hook 'completion-preview-inhibit-functions
                                 #'dired-snacks--zoxide-inhibit-preview nil t)
                       (setq-local completion-preview-completion-styles '(basic)
@@ -212,8 +212,10 @@
 ;; ===============================================================
 ;;; find
 
-(defvar dired-snacks-find-prune-dirs '(".git" ".hg" ".svn" ".jj")
-  "Directory names excluded from searches.")
+(defcustom dired-snacks-find-prune-dirs '(".git" ".hg" ".svn" ".jj")
+  "Directory names excluded from searches."
+  :type '(repeat string)
+  :group 'dired-snacks)
 
 (defcustom dired-snacks-find-debounce 0.15
   "Seconds of idle input before the live search refreshes."
@@ -243,11 +245,11 @@
 (defun dired-snacks--find-parse (line)
   "Parse an `fd --list-details' LINE into (DIR BASENAME LISTING)."
   (when (string-match "\\(/.*\\)\\'" line)
-    (let ((path (match-string 1 line))
+    (let ((file (match-string 1 line))
           (prefix (substring line 0 (match-beginning 1))))
-      (list (file-name-directory path)
-            (file-name-nondirectory path)
-            (concat prefix (file-name-nondirectory path))))))
+      (list (file-name-directory file)
+            (file-name-nondirectory file)
+            (concat prefix (file-name-nondirectory file))))))
 
 (defun dired-snacks--find-icon-subdirs ()
   "Add folder icons to Dired subdir headers."
@@ -485,9 +487,9 @@ Files sharing an opener are passed together in one call."
       (if-let* ((opener (dired-snacks--opener-for-file file)))
           (push (expand-file-name file) (alist-get opener groups nil nil #'equal))
         (user-error "No external opener found; install glib2 (gio) or xdg-utils")))
-    (pcase-dolist (`(,opener . ,paths) groups)
+    (pcase-dolist (`(,opener . ,names) groups)
       (apply #'call-process (car opener) nil 0 nil
-             (append (cdr opener) (nreverse paths))))))
+             (append (cdr opener) (nreverse names))))))
 
 ;;;###autoload
 (defun dired-snacks-open ()
@@ -900,7 +902,7 @@ one Dired pane is on screen."
   "Idle timer that starts the pending `du' computation.")
 
 (defvar dired-snacks--ml-du-program 'unset
-  "Cached path to `du', or `unset' before it is looked up.")
+  "Cached file name of `du', or `unset' before it is looked up.")
 
 (defvar-local dired-snacks--ml-total-cache nil
   "Cached count of the entries in this listing.")
@@ -960,7 +962,7 @@ one Dired pane is on screen."
     (cdr dired-snacks--ml-attr-cache)))
 
 (defun dired-snacks--ml-du-program ()
-  "Return the path to `du', or nil when it is unavailable."
+  "Return the file name of `du', or nil when it is unavailable."
   (when (eq dired-snacks--ml-du-program 'unset)
     (setq dired-snacks--ml-du-program (executable-find "du")))
   dired-snacks--ml-du-program)

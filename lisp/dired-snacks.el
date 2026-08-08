@@ -157,6 +157,8 @@
 (defun dired-snacks-zoxide ()
   "Prompt for a zoxide query and open the chosen directory in Dired."
   (interactive)
+  ;; The setup hook sets `completion-preview' options, so the library has to
+  ;; be loaded before that, not by the autoloaded mode command.
   (require 'completion-preview)
   (let* ((orig (current-buffer))
          (input (minibuffer-with-setup-hook
@@ -388,6 +390,8 @@
       (let ((inhibit-read-only t))
         (erase-buffer)
         (setq-local default-directory (file-name-as-directory root))
+        ;; Keep this synthetic listing out of `dired-buffers', or Dired would
+        ;; later hand it back as the buffer for ROOT.
         (let ((dired-buffers nil)) (dired-mode root)))
       (when (bound-and-true-p dired-omit-mode) (dired-omit-mode -1))
       (let ((map (make-sparse-keymap)))
@@ -666,6 +670,8 @@ Each copy is renamed with a numbered suffix to avoid clashes."
 
 (defun dired-snacks--subtree-setup ()
   "Enable inline subtrees in the current Dired buffer."
+  ;; `add-to-invisibility-spec' does not check for duplicates, and setup
+  ;; runs again every time the mode is re-enabled.
   (remove-from-invisibility-spec 'dired-snacks--subtree-header)
   (add-to-invisibility-spec 'dired-snacks--subtree-header)
   (add-hook 'dired-after-readin-hook #'dired-snacks--subtree-reset nil t))
@@ -742,6 +748,8 @@ Each copy is renamed with a numbered suffix to avoid clashes."
 
 (defun dired-snacks--breadcrumb-decorate ()
   "Hide the directory header and add a gap under the breadcrumb."
+  ;; In the find buffer that first header is a real subdir line grouping the
+  ;; results, so it has to stay visible.
   (unless (eq (current-buffer) dired-snacks--find-buffer)
     (remove-overlays (point-min) (point-max) 'dired-snacks--header t)
     (let* ((first (next-single-property-change (point-min) 'dired-filename))
@@ -814,6 +822,8 @@ Each copy is renamed with a numbered suffix to avoid clashes."
   (let* ((dir default-directory)
          (win (selected-window))
          (side (window-parameter win 'window-side))
+         ;; Hiding `dired-buffers' makes Dired build a fresh buffer instead
+         ;; of returning the one already on screen.
          (buf (let ((dired-buffers nil)) (dired-noselect dir))))
     (with-current-buffer buf (dired-snacks--split-mark))
     (if side
@@ -833,6 +843,8 @@ one Dired pane is on screen."
   (if (and (file-directory-p file) (cdr (dired-snacks--windows)))
       (let ((dired-buffers nil)
             (pane dired-snacks--split-pane))
+        ;; Marks leave the buffer modified, and `find-alternate-file' asks
+        ;; before discarding it.
         (set-buffer-modified-p nil)
         (dired--find-file #'find-alternate-file file)
         (when pane (dired-snacks--split-mark)))
@@ -1154,6 +1166,8 @@ The omit indicator and the sort criterion are dropped when space runs out."
   "Install the buffer-local features in the current Dired buffer."
   (dired-snacks--subtree-setup)
   (dired-snacks--breadcrumb-setup)
+  ;; `dired-mode-hook' runs before the listing exists, so a buffer that
+  ;; already has one needs decorating right now.
   (dired-snacks--breadcrumb-decorate)
   (dired-snacks--mode-line-setup)
   (dired-snacks--quit-setup))

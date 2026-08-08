@@ -191,7 +191,7 @@
   "Copy the marked files as file:// URIs to the Wayland clipboard."
   (interactive)
   (unless (executable-find "wl-copy")
-    (user-error "wl-copy not found; install wl-clipboard"))
+    (user-error "Cannot find wl-copy; install wl-clipboard"))
   (require 'browse-url)
   (let* ((files (dired-get-marked-files))
          (uris (mapconcat (lambda (file)
@@ -203,8 +203,7 @@
                  :connection-type 'pipe
                  :noquery t)))
       (process-send-string proc uris)
-      (process-send-eof proc)
-      (while (accept-process-output proc 0.1)))
+      (process-send-eof proc))
     (dired-unmark-all-marks)
     (message "Copied %d file URI%s to clipboard"
              (length files)
@@ -264,8 +263,7 @@
                                 dir :height nerd-icons-dired-icon-size
                                 :face 'dired-directory))
                  (str  (concat icon nerd-icons-dired-infix-string))
-                 (ov   (make-overlay pos (1+ pos)))
-                 (inhibit-read-only t))
+                 (ov   (make-overlay pos (1+ pos))))
             (overlay-put ov 'dired-snacks--find-icon t)
             (overlay-put ov 'evaporate t)
             (overlay-put ov 'before-string (propertize str 'display str))))
@@ -673,8 +671,15 @@ Each copy is renamed with a numbered suffix to avoid clashes."
 
 (defun dired-snacks--subtree-setup ()
   "Enable inline subtrees in the current Dired buffer."
+  (remove-from-invisibility-spec 'dired-snacks--subtree-header)
   (add-to-invisibility-spec 'dired-snacks--subtree-header)
   (add-hook 'dired-after-readin-hook #'dired-snacks--subtree-reset nil t))
+
+(defun dired-snacks--subtree-teardown ()
+  "Disable inline subtrees in the current Dired buffer."
+  (remove-hook 'dired-after-readin-hook #'dired-snacks--subtree-reset t)
+  (dired-snacks--subtree-reset)
+  (remove-from-invisibility-spec 'dired-snacks--subtree-header))
 
 (defun dired-snacks--subtree-refresh-icons ()
   "Redraw file icons after a subtree change, when `nerd-icons-dired' is on."
@@ -760,15 +765,23 @@ Each copy is renamed with a numbered suffix to avoid clashes."
 
 (defun dired-snacks--breadcrumb-setup ()
   "Show the breadcrumb header line and decorate the listing."
+  (remove-from-invisibility-spec 'dired-snacks--header)
   (add-to-invisibility-spec 'dired-snacks--header)
   (setq-local header-line-format '(:eval (dired-snacks--breadcrumb)))
   (add-hook 'dired-after-readin-hook #'dired-snacks--breadcrumb-decorate nil t))
+
+(defun dired-snacks--breadcrumb-teardown ()
+  "Remove the breadcrumb header line and undo its decorations."
+  (remove-hook 'dired-after-readin-hook #'dired-snacks--breadcrumb-decorate t)
+  (remove-overlays (point-min) (point-max) 'dired-snacks--header t)
+  (remove-from-invisibility-spec 'dired-snacks--header)
+  (kill-local-variable 'header-line-format))
 
 ;; ===============================================================
 ;;; split
 
 (defun dired-snacks--windows ()
-  "Windows showing a Dired buffer."
+  "Return the list of windows showing a Dired buffer."
   (seq-filter (lambda (w)
                 (eq (buffer-local-value 'major-mode (window-buffer w)) 'dired-mode))
               (window-list)))
@@ -820,7 +833,10 @@ Each copy is renamed with a numbered suffix to avoid clashes."
       (switch-to-buffer buf))))
 
 (defun dired-snacks--find-isolated (orig file)
-  "Keep Dired panes independent when entering directories."
+  "Keep Dired panes independent when entering directories.
+FILE is the file or directory being visited.  ORIG is the advised
+function, called unchanged unless FILE is a directory and more than
+one Dired pane is on screen."
   (if (and (file-directory-p file) (cdr (dired-snacks--windows)))
       (let ((dired-buffers nil)
             (pane dired-snacks--split-pane))
@@ -1075,7 +1091,7 @@ Directories are measured recursively."
                              'face 'shadow))))
 
 (defun dired-snacks--ml-width (&rest segments)
-  "Total display width of SEGMENTS."
+  "Return the total display width of SEGMENTS."
   (apply #'+ (mapcar #'string-width (delq nil segments))))
 
 (defun dired-snacks--ml-right ()
@@ -1139,6 +1155,21 @@ The omit indicator and the sort criterion are dropped when space runs out."
 ;; ===============================================================
 ;;; minor mode
 
+(defun dired-snacks--setup ()
+  "Install the buffer-local features in the current Dired buffer."
+  (dired-snacks--subtree-setup)
+  (dired-snacks--breadcrumb-setup)
+  (dired-snacks--breadcrumb-decorate)
+  (dired-snacks--ml-setup)
+  (dired-snacks--quit-setup))
+
+(defun dired-snacks--teardown ()
+  "Remove the buffer-local features from the current Dired buffer."
+  (dired-snacks--subtree-teardown)
+  (dired-snacks--breadcrumb-teardown)
+  (dired-snacks--ml-teardown)
+  (dired-snacks--quit-teardown))
+
 (defun dired-snacks--enable ()
   "Install the passive features."
   (add-hook 'find-file-hook #'dired-snacks--zoxide-add-default-directory)
@@ -1149,8 +1180,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (add-hook 'dired-mode-hook #'dired-snacks--quit-setup)
   (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (advice-add 'dired--find-possibly-alternative-file :around #'dired-snacks--find-isolated)
-  (dired-snacks--map-buffers #'dired-snacks--ml-setup)
-  (dired-snacks--map-buffers #'dired-snacks--quit-setup))
+  (dired-snacks--map-buffers #'dired-snacks--setup))
 
 (defun dired-snacks--disable ()
   "Remove the passive features."
@@ -1162,8 +1192,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (remove-hook 'dired-mode-hook #'dired-snacks--quit-setup)
   (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (advice-remove 'dired--find-possibly-alternative-file #'dired-snacks--find-isolated)
-  (dired-snacks--map-buffers #'dired-snacks--ml-teardown)
-  (dired-snacks--map-buffers #'dired-snacks--quit-teardown))
+  (dired-snacks--map-buffers #'dired-snacks--teardown))
 
 ;;;###autoload
 (define-minor-mode dired-snacks-mode

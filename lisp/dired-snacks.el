@@ -214,13 +214,11 @@
 
 (defcustom dired-snacks-find-prune-dirs '(".git" ".hg" ".svn" ".jj")
   "Directory names excluded from searches."
-  :type '(repeat string)
-  :group 'dired-snacks)
+  :type '(repeat string))
 
 (defcustom dired-snacks-find-debounce 0.15
   "Seconds of idle input before the live search refreshes."
-  :type 'number
-  :group 'dired-snacks)
+  :type 'number)
 
 (defvar dired-snacks--find-proc nil
   "Current live-search `fd' process, or nil.")
@@ -430,16 +428,14 @@
 
 (defcustom dired-snacks-open-full-window nil
   "When non-nil, opening a file kills the Dired buffer and fills the window."
-  :type 'boolean
-  :group 'dired-snacks)
+  :type 'boolean)
 
 (defcustom dired-snacks-external-openers
   '(("gio" "open")
     ("xdg-open"))
   "Programs tried, in order, to open a file externally.
 Each entry is (PROGRAM ARG...); the first available PROGRAM is used."
-  :type '(repeat (cons string (repeat string)))
-  :group 'dired-snacks)
+  :type '(repeat (cons string (repeat string))))
 
 (defcustom dired-snacks-external-app-alist nil
   "File extensions to open in an external application.
@@ -447,8 +443,7 @@ Each entry is (EXTENSIONS PROGRAM ARG...), where EXTENSIONS is a
 string or list of strings.  PROGRAM opens those files; when
 omitted, `dired-snacks-external-openers' is used instead."
   :type '(repeat (cons (choice string (repeat string))
-                       (repeat string)))
-  :group 'dired-snacks)
+                       (repeat string))))
 
 (defun dired-snacks--file-ext (file)
   "Return the downcased extension of FILE, or nil for a directory."
@@ -568,13 +563,11 @@ Each copy is renamed with a numbered suffix to avoid clashes."
 
 (defcustom dired-snacks-subtree-line-prefix "  "
   "Indentation added per nesting level in a subtree."
-  :type 'string
-  :group 'dired-snacks)
+  :type 'string)
 
 (defcustom dired-snacks-subtree-after-change-hook nil
   "Hook run after a subtree is expanded or collapsed."
-  :type 'hook
-  :group 'dired-snacks)
+  :type 'hook)
 
 (defvar-local dired-snacks--subtree-overlays nil
   "Subtree overlays in this buffer.")
@@ -693,38 +686,31 @@ Each copy is renamed with a numbered suffix to avoid clashes."
 
 (defcustom dired-snacks-breadcrumb-separator " » "
   "Separator drawn between breadcrumb segments."
-  :type 'string
-  :group 'dired-snacks)
+  :type 'string)
 
 (defcustom dired-snacks-breadcrumb-home "~"
   "Glyph for the home directory in the breadcrumb."
-  :type 'string
-  :group 'dired-snacks)
+  :type 'string)
 
 (defcustom dired-snacks-breadcrumb-root "/"
   "Glyph for the filesystem root in the breadcrumb."
-  :type 'string
-  :group 'dired-snacks)
+  :type 'string)
 
 (defcustom dired-snacks-breadcrumb-margin "  "
   "Left padding before the breadcrumb."
-  :type 'string
-  :group 'dired-snacks)
+  :type 'string)
 
 (defcustom dired-snacks-breadcrumb-hide-header t
   "When non-nil, hide the directory header line."
-  :type 'boolean
-  :group 'dired-snacks)
+  :type 'boolean)
 
 (defcustom dired-snacks-breadcrumb-spacing 0.2
   "Height of the gap under the breadcrumb, as a fraction of a line."
-  :type 'number
-  :group 'dired-snacks)
+  :type 'number)
 
 (defcustom dired-snacks-breadcrumb-height 0.95
   "Font size of the breadcrumb, as a fraction of the default."
-  :type 'number
-  :group 'dired-snacks)
+  :type 'number)
 
 (defun dired-snacks--breadcrumb-segments (dir)
   "Split DIR into breadcrumb segments."
@@ -735,16 +721,21 @@ Each copy is renamed with a numbered suffix to avoid clashes."
      ((string-prefix-p "/" abbr) (cons dired-snacks-breadcrumb-root parts))
      (t parts))))
 
+(defun dired-snacks--breadcrumb-quote (string)
+  "Return STRING with `%' escaped, for use in a mode line construct."
+  (string-replace "%" "%%" string))
+
 (defun dired-snacks--breadcrumb ()
   "Return a breadcrumb for the directory at point, or nil."
   (when (derived-mode-p 'dired-mode)
     (let* ((dir (or (ignore-errors (dired-current-directory)) default-directory))
            (height dired-snacks-breadcrumb-height)
-           (sep (propertize dired-snacks-breadcrumb-separator
+           (sep (propertize (dired-snacks--breadcrumb-quote
+                             dired-snacks-breadcrumb-separator)
                             'face `(:inherit shadow :height ,height))))
-      (concat dired-snacks-breadcrumb-margin
+      (concat (dired-snacks--breadcrumb-quote dired-snacks-breadcrumb-margin)
               (mapconcat (lambda (s)
-                           (propertize (string-replace "%" "%%" s)
+                           (propertize (dired-snacks--breadcrumb-quote s)
                                        'face `(:inherit dired-header :height ,height)))
                          (dired-snacks--breadcrumb-segments dir)
                          sep)))))
@@ -852,139 +843,141 @@ one Dired pane is on screen."
 
 (defcustom dired-snacks-mode-line-show-size t
   "When non-nil, show the size of the entry at point."
-  :type 'boolean :group 'dired-snacks)
+  :type 'boolean)
 
 (defcustom dired-snacks-mode-line-show-time t
   "When non-nil, show the modification time of the entry at point."
-  :type 'boolean :group 'dired-snacks)
+  :type 'boolean)
 
 (defcustom dired-snacks-mode-line-show-omit t
   "When non-nil, show the `dired-omit-mode' indicator."
-  :type 'boolean :group 'dired-snacks)
+  :type 'boolean)
 
 (defcustom dired-snacks-mode-line-show-sort t
   "When non-nil, show the sort criterion."
-  :type 'boolean :group 'dired-snacks)
+  :type 'boolean)
 
 (defcustom dired-snacks-mode-line-index-width 7
   "Width reserved for the entry counter, so it never shifts."
-  :type 'integer :group 'dired-snacks)
+  :type 'integer)
 
 (defcustom dired-snacks-mode-line-size-width 8
   "Width reserved for the entry size, so it never shifts."
-  :type 'integer :group 'dired-snacks)
+  :type 'integer)
 
 (defcustom dired-snacks-mode-line-time-format "%Y-%m-%d %H:%M"
   "Format of the timestamp shown in the mode line."
-  :type 'string :group 'dired-snacks)
+  :type 'string)
 
-(defvar-local dired-snacks--ml-last-file nil
+(defvar-local dired-snacks--mode-line-last-file nil
   "File at point after the last command.")
 
-(defvar-local dired-snacks--ml-attr-cache nil
+(defvar-local dired-snacks--mode-line-attr-cache nil
   "Cached attributes of the entry at point.")
 
-(defvar-local dired-snacks--ml-dir-size-cache nil
+(defvar-local dired-snacks--mode-line-dir-size-cache nil
   "Cached recursive directory sizes, a hash of DIR to (MTIME . SIZE).")
 
-(defvar-local dired-snacks--ml-dir-size-jobs nil
+(defvar-local dired-snacks--mode-line-dir-size-jobs nil
   "Directories with a `du' process in flight.")
 
 (defcustom dired-snacks-mode-line-size-placeholder "…"
   "Text shown while a directory's size is being computed."
-  :type 'string :group 'dired-snacks)
+  :type 'string)
 
 (defcustom dired-snacks-mode-line-size-idle-delay 0.2
   "Idle time before a directory's size starts computing."
-  :type 'number :group 'dired-snacks)
+  :type 'number)
 
-(defvar-local dired-snacks--ml-dir-size-timer nil
+(defvar-local dired-snacks--mode-line-dir-size-timer nil
   "Idle timer that starts the pending `du' computation.")
 
-(defvar dired-snacks--ml-du-program 'unset
+(defvar dired-snacks--mode-line-du-program 'unset
   "Cached file name of `du', or `unset' before it is looked up.")
 
-(defvar-local dired-snacks--ml-total-cache nil
+(defvar-local dired-snacks--mode-line-total-cache nil
   "Cached count of the entries in this listing.")
 
-(defvar-local dired-snacks--ml-current-cache nil
+(defvar-local dired-snacks--mode-line-current-cache nil
   "Cached index of the entry at point.")
 
-(defun dired-snacks--ml-entry-p ()
+(defun dired-snacks--mode-line-entry-p ()
   "Return non-nil when the current line holds an entry."
   (when-let* ((name (dired-get-filename 'no-dir t)))
     (not (member name '("." "..")))))
 
-(defun dired-snacks--ml-total ()
+(defun dired-snacks--mode-line-total ()
   "Return the number of visible files and directories."
   (let ((tick (buffer-chars-modified-tick)))
-    (unless (eql tick (car dired-snacks--ml-total-cache))
-      (setq dired-snacks--ml-total-cache
+    (unless (eql tick (car dired-snacks--mode-line-total-cache))
+      (setq dired-snacks--mode-line-total-cache
             (cons tick
                   (save-excursion
                     (goto-char (point-min))
                     (let ((n 0))
                       (while (not (eobp))
-                        (when (dired-snacks--ml-entry-p) (setq n (1+ n)))
+                        (when (dired-snacks--mode-line-entry-p) (setq n (1+ n)))
                         (forward-line 1))
                       n)))))
-    (cdr dired-snacks--ml-total-cache)))
+    (cdr dired-snacks--mode-line-total-cache)))
 
-(defun dired-snacks--ml-current ()
+(defun dired-snacks--mode-line-current ()
   "Return the position of the entry at point in the listing."
   (let ((key (cons (pos-bol) (buffer-chars-modified-tick))))
-    (unless (equal key (car dired-snacks--ml-current-cache))
-      (setq dired-snacks--ml-current-cache
+    (unless (equal key (car dired-snacks--mode-line-current-cache))
+      (setq dired-snacks--mode-line-current-cache
             (cons key
                   (let ((limit (car key)) (n 0))
                     (save-excursion
                       (goto-char (point-min))
                       (while (and (<= (point) limit) (not (eobp)))
-                        (when (dired-snacks--ml-entry-p) (setq n (1+ n)))
+                        (when (dired-snacks--mode-line-entry-p) (setq n (1+ n)))
                         (forward-line 1)))
                     n))))
-    (cdr dired-snacks--ml-current-cache)))
+    (cdr dired-snacks--mode-line-current-cache)))
 
-(defun dired-snacks--ml-index ()
+(defun dired-snacks--mode-line-index ()
   "Return the entry counter, as current over total."
   (when (derived-mode-p 'dired-mode)
-    (let ((s (concat (number-to-string (dired-snacks--ml-current))
-                     "/" (number-to-string (dired-snacks--ml-total)))))
+    (let ((s (concat (number-to-string (dired-snacks--mode-line-current))
+                     "/" (number-to-string (dired-snacks--mode-line-total)))))
       (concat "  " (string-pad s dired-snacks-mode-line-index-width nil t)))))
 
-(defun dired-snacks--ml-file-attrs ()
+(defun dired-snacks--mode-line-file-attrs ()
   "Return the attributes of the entry at point, or nil."
   (when-let* ((name (and (derived-mode-p 'dired-mode)
                          (not (file-remote-p default-directory))
                          (dired-get-filename nil t))))
-    (unless (equal name (car dired-snacks--ml-attr-cache))
-      (setq dired-snacks--ml-attr-cache (cons name (file-attributes name))))
-    (cdr dired-snacks--ml-attr-cache)))
+    (let ((key (cons name (buffer-chars-modified-tick))))
+      (unless (equal key (car dired-snacks--mode-line-attr-cache))
+        (setq dired-snacks--mode-line-attr-cache
+              (cons key (file-attributes name)))))
+    (cdr dired-snacks--mode-line-attr-cache)))
 
-(defun dired-snacks--ml-du-program ()
+(defun dired-snacks--mode-line-du-program ()
   "Return the file name of `du', or nil when it is unavailable."
-  (when (eq dired-snacks--ml-du-program 'unset)
-    (setq dired-snacks--ml-du-program (executable-find "du")))
-  dired-snacks--ml-du-program)
+  (when (eq dired-snacks--mode-line-du-program 'unset)
+    (setq dired-snacks--mode-line-du-program (executable-find "du")))
+  dired-snacks--mode-line-du-program)
 
-(defun dired-snacks--ml-dir-size-cache-table ()
+(defun dired-snacks--mode-line-dir-size-cache-table ()
   "Return this buffer's directory-size cache, creating it if needed."
-  (or dired-snacks--ml-dir-size-cache
-      (setq dired-snacks--ml-dir-size-cache (make-hash-table :test 'equal))))
+  (or dired-snacks--mode-line-dir-size-cache
+      (setq dired-snacks--mode-line-dir-size-cache (make-hash-table :test 'equal))))
 
-(defun dired-snacks--ml-dir-size-jobs-table ()
+(defun dired-snacks--mode-line-dir-size-jobs-table ()
   "Return this buffer's `du' job table, creating it if needed."
-  (or dired-snacks--ml-dir-size-jobs
-      (setq dired-snacks--ml-dir-size-jobs (make-hash-table :test 'equal))))
+  (or dired-snacks--mode-line-dir-size-jobs
+      (setq dired-snacks--mode-line-dir-size-jobs (make-hash-table :test 'equal))))
 
-(defun dired-snacks--ml-dir-size-cached (dir mtime)
+(defun dired-snacks--mode-line-dir-size-cached (dir mtime)
   "Return DIR's cached size when still fresh for MTIME, else nil."
-  (when-let* ((cache dired-snacks--ml-dir-size-cache)
+  (when-let* ((cache dired-snacks--mode-line-dir-size-cache)
               (hit (gethash dir cache))
               ((time-equal-p (car hit) mtime)))
     (cdr hit)))
 
-(defun dired-snacks--ml-dir-size-start (dir mtime)
+(defun dired-snacks--mode-line-dir-size-start (dir mtime)
   "Spawn an async `du' for DIR, caching its size tagged with MTIME."
   (let* ((dired-buf (current-buffer))
          (out (generate-new-buffer " *dired-snacks-du*"))
@@ -993,7 +986,7 @@ one Dired pane is on screen."
                 :buffer out
                 :noquery t
                 :connection-type 'pipe
-                :command (list (dired-snacks--ml-du-program)
+                :command (list (dired-snacks--mode-line-du-program)
                                "--summarize" "--bytes"
                                (expand-file-name dir))
                 :sentinel
@@ -1007,48 +1000,48 @@ one Dired pane is on screen."
                                             (string-to-number (match-string 1)))))))
                       (when (buffer-live-p dired-buf)
                         (with-current-buffer dired-buf
-                          (remhash dir (dired-snacks--ml-dir-size-jobs-table))
+                          (remhash dir (dired-snacks--mode-line-dir-size-jobs-table))
                           (when size
                             (puthash dir (cons mtime size)
-                                     (dired-snacks--ml-dir-size-cache-table)))
+                                     (dired-snacks--mode-line-dir-size-cache-table)))
                           (force-mode-line-update t)))
                       (when (buffer-live-p out) (kill-buffer out))))))))
-    (puthash dir proc (dired-snacks--ml-dir-size-jobs-table))))
+    (puthash dir proc (dired-snacks--mode-line-dir-size-jobs-table))))
 
-(defun dired-snacks--ml-dir-size-schedule (dir mtime)
+(defun dired-snacks--mode-line-dir-size-schedule (dir mtime)
   "Start DIR's `du' after a short idle, tagging the result with MTIME."
-  (when (timerp dired-snacks--ml-dir-size-timer)
-    (cancel-timer dired-snacks--ml-dir-size-timer))
+  (when (timerp dired-snacks--mode-line-dir-size-timer)
+    (cancel-timer dired-snacks--mode-line-dir-size-timer))
   (let ((buf (current-buffer)))
-    (setq dired-snacks--ml-dir-size-timer
+    (setq dired-snacks--mode-line-dir-size-timer
           (run-with-idle-timer
            dired-snacks-mode-line-size-idle-delay nil
            (lambda ()
              (when (buffer-live-p buf)
                (with-current-buffer buf
-                 (unless (or (dired-snacks--ml-dir-size-cached dir mtime)
-                             (gethash dir (dired-snacks--ml-dir-size-jobs-table)))
-                   (dired-snacks--ml-dir-size-start dir mtime)))))))))
+                 (unless (or (dired-snacks--mode-line-dir-size-cached dir mtime)
+                             (gethash dir (dired-snacks--mode-line-dir-size-jobs-table)))
+                   (dired-snacks--mode-line-dir-size-start dir mtime)))))))))
 
-(defun dired-snacks--ml-dir-size-maybe (dir)
+(defun dired-snacks--mode-line-dir-size-maybe (dir)
   "Schedule a `du' for DIR when it is a directory lacking a fresh size."
-  (when (and (dired-snacks--ml-du-program)
+  (when (and (dired-snacks--mode-line-du-program)
              (file-directory-p dir))
     (let ((mtime (file-attribute-modification-time (file-attributes dir))))
-      (unless (dired-snacks--ml-dir-size-cached dir mtime)
-        (dired-snacks--ml-dir-size-schedule dir mtime)))))
+      (unless (dired-snacks--mode-line-dir-size-cached dir mtime)
+        (dired-snacks--mode-line-dir-size-schedule dir mtime)))))
 
-(defun dired-snacks--ml-size ()
+(defun dired-snacks--mode-line-size ()
   "Return the size of the entry at point, or nil.
 Directories are measured recursively."
   (when dired-snacks-mode-line-show-size
-    (when-let* ((attrs (dired-snacks--ml-file-attrs)))
+    (when-let* ((attrs (dired-snacks--mode-line-file-attrs)))
       (let* ((dirp (eq (file-attribute-type attrs) t))
              (size (cond
                     ((not dirp) (file-attribute-size attrs))
-                    ((not (dired-snacks--ml-du-program))
+                    ((not (dired-snacks--mode-line-du-program))
                      (file-attribute-size attrs))
-                    (t (dired-snacks--ml-dir-size-cached
+                    (t (dired-snacks--mode-line-dir-size-cached
                         (dired-get-filename nil t)
                         (file-attribute-modification-time attrs)))))
              (text (string-pad (if size
@@ -1057,15 +1050,15 @@ Directories are measured recursively."
                                dired-snacks-mode-line-size-width nil t)))
         (concat "  " (propertize text 'face 'shadow))))))
 
-(defun dired-snacks--ml-time ()
+(defun dired-snacks--mode-line-time ()
   "Return the modification time of the entry at point, or nil."
   (when dired-snacks-mode-line-show-time
-    (when-let* ((attrs (dired-snacks--ml-file-attrs)))
+    (when-let* ((attrs (dired-snacks--mode-line-file-attrs)))
       (concat "  " (propertize (format-time-string dired-snacks-mode-line-time-format
                                                    (file-attribute-modification-time attrs))
                                'face 'shadow)))))
 
-(defun dired-snacks--ml-omit ()
+(defun dired-snacks--mode-line-omit ()
   "Return the `dired-omit-mode' indicator, or nil."
   (when (and dired-snacks-mode-line-show-omit (bound-and-true-p dired-omit-mode))
     (propertize "  omit" 'face 'shadow)))
@@ -1086,66 +1079,66 @@ Directories are measured recursively."
      ((string-match-p "\\(?:\\`\\| \\)-[a-zA-Z]*v" switches) "version")
      (t "name"))))
 
-(defun dired-snacks--ml-sort ()
+(defun dired-snacks--mode-line-sort ()
   "Return the sort criterion of this listing, or nil."
   (when (and dired-snacks-mode-line-show-sort (derived-mode-p 'dired-mode))
     (concat "  " (propertize (dired-snacks--sort-criterion dired-actual-switches)
                              'face 'shadow))))
 
-(defun dired-snacks--ml-width (&rest segments)
+(defun dired-snacks--mode-line-width (&rest segments)
   "Return the total display width of SEGMENTS."
   (apply #'+ (mapcar #'string-width (delq nil segments))))
 
-(defun dired-snacks--ml-right ()
+(defun dired-snacks--mode-line-right ()
   "Return the right-hand segments of the mode line.
 The omit indicator and the sort criterion are dropped when space runs out."
   (when (derived-mode-p 'dired-mode)
-    (let ((size (dired-snacks--ml-size))
-          (time (dired-snacks--ml-time))
-          (crit (dired-snacks--ml-sort))
-          (omit (dired-snacks--ml-omit))
-          (index (dired-snacks--ml-index))
+    (let ((size (dired-snacks--mode-line-size))
+          (time (dired-snacks--mode-line-time))
+          (crit (dired-snacks--mode-line-sort))
+          (omit (dired-snacks--mode-line-omit))
+          (index (dired-snacks--mode-line-index))
           (room (- (window-width)
                    (+ 10 (max 12 (string-width (buffer-name)))))))
-      (when (> (dired-snacks--ml-width size time crit omit index) room)
+      (when (> (dired-snacks--mode-line-width size time crit omit index) room)
         (setq omit nil))
-      (when (> (dired-snacks--ml-width size time crit omit index) room)
+      (when (> (dired-snacks--mode-line-width size time crit omit index) room)
         (setq crit nil))
       (concat size time crit omit index))))
 
 (defcustom dired-snacks-mode-line-format
   '("%e  "
-    (:propertize " " display (raise +0.1)) ;; top padding
-    (:propertize " " display (raise -0.1)) ;; bottom padding
+    (:propertize " " display (raise +0.1)) ; top padding
+    (:propertize " " display (raise -0.1)) ; bottom padding
     mode-line-modified
     "  "
     mode-line-buffer-identification
     mode-line-format-right-align
-    (:eval (dired-snacks--ml-right))
+    (:eval (dired-snacks--mode-line-right))
     "  ")
   "The mode line shown in Dired buffers."
-  :type 'sexp :group 'dired-snacks)
+  :type 'sexp)
 
-(defun dired-snacks--ml-refresh ()
+(defun dired-snacks--mode-line-refresh ()
   "Refresh the mode line when point moves to another entry."
   (let ((name (dired-get-filename nil t)))
-    (unless (equal name dired-snacks--ml-last-file)
-      (setq dired-snacks--ml-last-file name)
+    (unless (equal name dired-snacks--mode-line-last-file)
+      (setq dired-snacks--mode-line-last-file name)
       (when (and dired-snacks-mode-line-show-size name)
-        (dired-snacks--ml-dir-size-maybe name))
+        (dired-snacks--mode-line-dir-size-maybe name))
       (force-mode-line-update))))
 
-(defun dired-snacks--ml-setup ()
+(defun dired-snacks--mode-line-setup ()
   "Give this Dired buffer its own mode line."
   (setq-local mode-line-format dired-snacks-mode-line-format)
-  (add-hook 'post-command-hook #'dired-snacks--ml-refresh nil t))
+  (add-hook 'post-command-hook #'dired-snacks--mode-line-refresh nil t))
 
-(defun dired-snacks--ml-teardown ()
+(defun dired-snacks--mode-line-teardown ()
   "Give this Dired buffer the usual mode line back."
-  (when (timerp dired-snacks--ml-dir-size-timer)
-    (cancel-timer dired-snacks--ml-dir-size-timer))
+  (when (timerp dired-snacks--mode-line-dir-size-timer)
+    (cancel-timer dired-snacks--mode-line-dir-size-timer))
   (kill-local-variable 'mode-line-format)
-  (remove-hook 'post-command-hook #'dired-snacks--ml-refresh t)
+  (remove-hook 'post-command-hook #'dired-snacks--mode-line-refresh t)
   (force-mode-line-update))
 
 (defun dired-snacks--map-buffers (fn)
@@ -1162,14 +1155,14 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (dired-snacks--subtree-setup)
   (dired-snacks--breadcrumb-setup)
   (dired-snacks--breadcrumb-decorate)
-  (dired-snacks--ml-setup)
+  (dired-snacks--mode-line-setup)
   (dired-snacks--quit-setup))
 
 (defun dired-snacks--teardown ()
   "Remove the buffer-local features from the current Dired buffer."
   (dired-snacks--subtree-teardown)
   (dired-snacks--breadcrumb-teardown)
-  (dired-snacks--ml-teardown)
+  (dired-snacks--mode-line-teardown)
   (dired-snacks--quit-teardown))
 
 (defun dired-snacks--enable ()
@@ -1178,7 +1171,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (add-hook 'dired-mode-hook #'dired-snacks--zoxide-add-default-directory)
   (add-hook 'dired-mode-hook #'dired-snacks--subtree-setup)
   (add-hook 'dired-mode-hook #'dired-snacks--breadcrumb-setup)
-  (add-hook 'dired-mode-hook #'dired-snacks--ml-setup)
+  (add-hook 'dired-mode-hook #'dired-snacks--mode-line-setup)
   (add-hook 'dired-mode-hook #'dired-snacks--quit-setup)
   (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (advice-add 'dired--find-possibly-alternative-file :around #'dired-snacks--find-isolated)
@@ -1190,7 +1183,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (remove-hook 'dired-mode-hook #'dired-snacks--zoxide-add-default-directory)
   (remove-hook 'dired-mode-hook #'dired-snacks--subtree-setup)
   (remove-hook 'dired-mode-hook #'dired-snacks--breadcrumb-setup)
-  (remove-hook 'dired-mode-hook #'dired-snacks--ml-setup)
+  (remove-hook 'dired-mode-hook #'dired-snacks--mode-line-setup)
   (remove-hook 'dired-mode-hook #'dired-snacks--quit-setup)
   (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (advice-remove 'dired--find-possibly-alternative-file #'dired-snacks--find-isolated)
@@ -1202,7 +1195,6 @@ The omit indicator and the sort criterion are dropped when space runs out."
 The commands work on their own; this mode adds the breadcrumb, the
 Dired mode line, the split panes and the zoxide history."
   :global t
-  :group 'dired-snacks
   (if dired-snacks-mode
       (dired-snacks--enable)
     (dired-snacks--disable)))

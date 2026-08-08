@@ -748,8 +748,6 @@ Each copy is renamed with a numbered suffix to avoid clashes."
 
 (defun dired-snacks--breadcrumb-decorate ()
   "Hide the directory header and add a gap under the breadcrumb."
-  ;; In the find buffer that first header is a real subdir line grouping the
-  ;; results, so it has to stay visible.
   (unless (eq (current-buffer) dired-snacks--find-buffer)
     (remove-overlays (point-min) (point-max) 'dired-snacks--header t)
     (let* ((first (next-single-property-change (point-min) 'dired-filename))

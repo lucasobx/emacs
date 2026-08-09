@@ -661,8 +661,6 @@
 
 (use-package multiple-cursors
   :ensure t
-  :custom
-  (mc/list-file (locate-user-emacs-file "mc-lists.el"))
   :config
   ;; prevent multiple-cursors from prompting about devil
   (add-to-list 'mc/cmds-to-run-once 'devil))

@@ -26,6 +26,8 @@
                                   my/old-file-name-handler-alist)))))
 
 ;; native/byte compilation
+(when (fboundp 'startup-redirect-eln-cache)
+  (startup-redirect-eln-cache "cache/eln-cache/"))
 (setq native-comp-async-report-warnings-errors 'silent)
 (setq byte-compile-warnings nil
       byte-compile-verbose nil)

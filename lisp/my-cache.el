@@ -1,5 +1,13 @@
-;;; my-cache.el --- centralized cache/state paths  -*- lexical-binding: t; -*-
+;;; my-cache.el --- Centralized cache/state paths  -*- lexical-binding: t; -*-
+
+;; Author: Lucas
+;; Keywords: files
+
 ;;; Commentary:
+
+;; Redirect the cache, history and state files various packages write into
+;; `user-emacs-directory' to a single `my/cache-directory'.
+
 ;;; Code:
 
 (defgroup my nil "Personal configuration." :group 'emacs)
@@ -24,9 +32,11 @@
     (bookmark-default-file       . "bookmarks")
     (project-list-file           . "projects")
     (savehist-file               . "history")
-    (eshell-directory-name .       "eshell/")
+    (eshell-directory-name       . "eshell/")
     (tramp-persistency-file-name . "tramp")
     (url-configuration-directory . "url/")
+    (mc/list-file                . "mc-lists.el")
+    (devdocs-data-dir            . "devdocs/")
     ;; directories (resolution-only, not variables):
     (auto-saves-sessions         . "auto-saves/sessions/")
     (tree-sitter                 . "tree-sitter/")
@@ -41,7 +51,7 @@ A trailing slash marks a directory.")
 (defun my/cache--path (key)
   "Return the absolute path for KEY in `my/cache-paths'."
   (let ((rel (cdr (assq key my/cache-paths))))
-    (unless rel (error "my/cache--path: unknown key %S" key))
+    (unless rel (error "my/cache--path: Unknown key %S" key))
     (expand-file-name rel my/cache-directory)))
 
 (defun my/cache--ensure-dirs ()

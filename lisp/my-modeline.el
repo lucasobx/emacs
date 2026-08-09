@@ -1,5 +1,13 @@
-;;; my-modeline.el --- custom modeline  -*- lexical-binding: t; -*-
+;;; my-modeline.el --- Custom mode line  -*- lexical-binding: t; -*-
+
+;; Author: Lucas
+;; Keywords: faces
+
 ;;; Commentary:
+
+;; Custom mode-line: modified flag, buffer name and position on the left,
+;; project, Git branch, collapsed minor modes and Flycheck error/warning on the right.
+
 ;;; Code:
 
 (declare-function flycheck-error-level-compilation-level "flycheck")
@@ -31,7 +39,7 @@
     (missing      . error)
     (unregistered . shadow)
     (ignored      . shadow))
-  "Cached vc mode-line segment.")
+  "Alist mapping each vc state to the face used for the branch segment.")
 
 (defvar-local my/mode-line--vcs nil
   "Cached vc segment for the current buffer.")
@@ -116,8 +124,8 @@
 
 (setq-default mode-line-format
               '("%e" "  "
-                (:propertize " " display (raise +0.1)) ;; top padding
-                (:propertize " " display (raise -0.1)) ;; bottom padding
+                (:propertize " " display (raise +0.1)) ; top padding
+                (:propertize " " display (raise -0.1)) ; bottom padding
                 (:propertize
                  (:eval (if (char-displayable-p ?λ) "λ " " ") face font-lock-keyword-face))
                 (:propertize
@@ -145,19 +153,11 @@
   (setq-default mode-line-misc-info
                 (assq-delete-all 'eglot--managed-mode mode-line-misc-info)))
 
-;; hide all minor modes except those listed below
+;; Collapse every minor-mode lighter except the ones after `not'.  For the
+;; inverse -- collapse only specific modes -- drop the `not' and list them
+;; directly, e.g. '(eldoc-mode abbrev-mode auto-revert-mode which-key-mode).
 (setq mode-line-collapse-minor-modes-to ""
-      mode-line-collapse-minor-modes
-      '(not flycheck-mode
-            ))
-
-;; hide only these minor modes
-;; (setq mode-line-collapse-minor-modes-to ""
-;;       mode-line-collapse-minor-modes
-;;       '(completion-preview-mode nerd-icons-dired-mode eldoc-box-hover-mode
-;;         line-reminder-mode smooth-scroll-mode outline-minor-mode
-;;         auto-revert-mode which-key-mode flyspell-mode
-;;         abbrev-mode eldoc-mode devil-mode))
+      mode-line-collapse-minor-modes '(not flycheck-mode))
 
 (provide 'my-modeline)
 ;;; my-modeline.el ends here

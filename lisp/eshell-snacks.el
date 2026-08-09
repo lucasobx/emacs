@@ -8,7 +8,6 @@
 ;;; Commentary:
 
 ;; A bundle of small Eshell enhancements:
-;;
 ;; prompt   - compact cwd with a cached git status segment
 ;; history  - shared history merged across all Eshell buffers
 ;; complete - history and completion with inline previews
@@ -108,7 +107,7 @@
 ;;; GIT SEGMENT
 
 (defun eshell-snacks--git-call (&rest args)
-  "Run git with ARGS in `default-directory'. Return trimmed stdout, or nil.
+  "Run git with ARGS in `default-directory'.  Return trimmed stdout, or nil.
 Uses `process-file', so it works over TRAMP."
   (with-temp-buffer
     (when (zerop (apply #'process-file "git" nil '(t nil) nil args))
@@ -183,7 +182,7 @@ Recomputes on a new git root or past `eshell-snacks-git-cache-ttl'."
    " "))
 
 (defvar eshell-snacks--saved-prompt-function 'unset
-  "Prompt function replaced by the mode. `unset' means it was unbound.")
+  "Prompt function replaced by the mode.  `unset' means it was unbound.")
 
 ;; Setting this before `em-prompt' loads is enough: `defcustom' keeps an
 ;; existing value instead of overwriting it.
@@ -254,8 +253,8 @@ Covers programs, aliases, builtins, elisp functions and paths."
   (or (member command '("." ".." "exit"))
       (and (executable-find command) t)
       (assoc command (bound-and-true-p eshell-command-aliases-list))
-      (fboundp (intern (concat "eshell/" command)))
-      (functionp (intern command))
+      (fboundp (intern-soft (concat "eshell/" command)))
+      (functionp (intern-soft command))
       (file-exists-p (expand-file-name command))))
 
 (defun eshell-snacks--validate-command ()
@@ -459,7 +458,7 @@ Falls back to ORIG-FN for pipelines, flags, and non-file ARGS."
     ("\\.7z\\'"   "7z" "x")
     ("\\.Z\\'"    "uncompress"))
   "How to unpack a file, matched by regexp against its name.
-Each entry is (REGEXP PROGRAM ARGS...). The file is appended last."
+Each entry is (REGEXP PROGRAM ARGS...).  The file is appended last."
   :type '(alist :key-type regexp :value-type (repeat string))
   :group 'eshell-snacks)
 
@@ -580,7 +579,7 @@ go through `zoxide query'."
 With no ARGS, pick interactively from the whole database, otherwise
 jump to the best match for ARGS."
   (unless (executable-find "zoxide")
-    (user-error "zoxide not found"))
+    (user-error "Cannot find zoxide"))
   (let ((keywords (eshell-snacks--zoxide-args args)))
     (eshell-snacks--zoxide-jump
      (if keywords (eshell-snacks--zoxide-query keywords) (eshell-snacks--zoxide-pick))

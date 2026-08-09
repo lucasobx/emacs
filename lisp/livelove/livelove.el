@@ -512,6 +512,61 @@ existing overlays' labels in place."
 (add-hook 'livelove-frame-functions #'livelove--on-frame)
 
 ;; ===============================================================
+;;; Live eval (REPL)
+
+(defvar livelove--eval-history nil
+  "Minibuffer history for `livelove-eval-expression'.")
+
+(defun livelove--send-eval (code)
+  "Send CODE to the running game for evaluation."
+  (livelove--prune-clients)
+  (unless livelove--clients
+    (user-error "livelove: No game connected"))
+  (livelove--broadcast (livelove--frame "EVAL" code))
+  (livelove--log 'debug "Sent EVAL: %s" code))
+
+;;;###autoload
+(defun livelove-eval-expression (code)
+  "Evaluate the Lua CODE in the running game.
+CODE is a Lua expression or statement, read from the minibuffer; the
+result appears in the echo area once the game replies."
+  (interactive (list (read-string "LÖVE eval: " nil 'livelove--eval-history)))
+  (unless (string-blank-p code)
+    (livelove--send-eval code)))
+
+;;;###autoload
+(defun livelove-eval-region (beg end)
+  "Evaluate the region between BEG and END in the running game."
+  (interactive "r")
+  (livelove--send-eval (buffer-substring-no-properties beg end)))
+
+;;;###autoload
+(defun livelove-eval-line ()
+  "Evaluate the current line in the running game."
+  (interactive)
+  (let ((code (string-trim (thing-at-point 'line t))))
+    (unless (string-blank-p code)
+      (livelove--send-eval code))))
+
+(defun livelove--handle-eval-result (payload)
+  "Show the EVAL_RESULT carried by PAYLOAD in the echo area."
+  (when payload
+    (condition-case err
+        (let ((data (json-parse-string payload :object-type 'alist)))
+          (if-let* ((errmsg (alist-get 'error data)))
+              (message "livelove eval error: %s" errmsg)
+            (message "livelove → %s" (alist-get 'value data))))
+      (error
+       (livelove--log 'warning "Bad EVAL_RESULT: %s" (error-message-string err))))))
+
+(defun livelove--on-eval-result (header payload _client)
+  "Show an EVAL_RESULT frame's PAYLOAD; ignore frames with any other HEADER."
+  (when (equal header "EVAL_RESULT")
+    (livelove--handle-eval-result payload)))
+
+(add-hook 'livelove-frame-functions #'livelove--on-eval-result)
+
+;; ===============================================================
 ;;; Minor mode and project integration
 
 (defcustom livelove-auto-start-server t

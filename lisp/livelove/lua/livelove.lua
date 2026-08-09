@@ -410,6 +410,30 @@ local function try_update_asset(full_path, content)
     return false -- No matching asset was found
 end
 
+-- Evaluate CODE against the globals in a persistent session env and reply
+-- with EVAL_RESULT. Tries an expression first, then a statement.
+livelove.eval_env = nil
+function livelove.handle_eval(code)
+    livelove.eval_env = livelove.eval_env or setmetatable({}, { __index = _G })
+    local fn, err = load("return " .. code, "livelove-eval", "t", livelove.eval_env)
+    if not fn then
+        fn, err = load(code, "livelove-eval", "t", livelove.eval_env)
+    end
+    local reply
+    if not fn then
+        reply = json_encode({ ok = false, error = err })
+    else
+        local ok, result = pcall(fn)
+        if not ok then
+            reply = json_encode({ ok = false, error = tostring(result) })
+        else
+            local enc_ok, encoded = pcall(lua_encode, result)
+            reply = json_encode({ ok = true, value = enc_ok and encoded or tostring(result) })
+        end
+    end
+    livelove.local_channel:push("EVAL_RESULT\n" .. reply .. "\n---END---\n")
+end
+
 function livelove.instantupdate()
     if livelove.state == "init" then
         livelove.exitinitstate()
@@ -424,7 +448,9 @@ function livelove.instantupdate()
         local path, content = message:match("([^\n]*)\n(.+)")
 
         if path then
-            if path:match("ASSET_FILE_UPDATE:(.+)") then
+            if path == "EVAL" then
+                livelove.handle_eval(content)
+            elseif path:match("ASSET_FILE_UPDATE:(.+)") then
                 path = path:match("ASSET_FILE_UPDATE:(.+)")
                 try_update_asset(path, content)
             else

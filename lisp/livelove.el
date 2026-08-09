@@ -1,6 +1,8 @@
 ;;; livelove.el --- Live coding bridge for LÖVE 2D  -*- lexical-binding: t; -*-
 
 ;; Author: Lucas
+;; Version: 0.1.0
+;; Package-Requires: ((emacs "31.0"))
 ;; Keywords: games, tools
 
 ;;; Commentary:

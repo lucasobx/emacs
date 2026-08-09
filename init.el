@@ -17,12 +17,12 @@
 
 (add-to-list 'load-path (locate-user-emacs-file "lisp"))
 (byte-recompile-directory (expand-file-name "lisp" user-emacs-directory) 0)
+(require 'my-cache)
+(require 'my-exec-path)
 (require 'my-load-theme)
 (require 'my-keybindings)
-(require 'my-exec-path)
 (require 'my-move-text)
 (require 'my-text-ops)
-(require 'my-cache)
 
 ;; ===============================================================
 ;;; EMACS

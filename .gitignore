@@ -1,8 +1,8 @@
 package-quickstart.el
 custom-vars.el
+lisp/**/*.elc
 tree-sitter/
 mc-lists.el
-lisp/*.elc
 eln-cache/
 devdocs/
 eshell/

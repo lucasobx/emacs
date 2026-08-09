@@ -1,13 +1,17 @@
 ;;; livelove.el --- Live coding bridge for LÖVE 2D  -*- lexical-binding: t; -*-
+
+;; Author: Lucas
+;; Keywords: games, tools
+
 ;;; Commentary:
 ;;
 ;; Usage:
-;; (global-livelove-mode 1)   ; auto-enable in Lua buffers of LÖVE projects
+;; (global-livelove-mode 1) ; auto-enable in Lua buffers of LÖVE projects
 ;; or, per buffer: M-x livelove-mode
 ;; then run the game with M-x livelove-run.
 ;;
 ;; The game connects to the server once, without retrying, so the server must
-;; be listening before the game starts; `livelove-run' takes care of that order.
+;; be listening before the game starts, `livelove-run' takes care of that order.
 ;; Other commands: `livelove-status', `livelove-show-log', `livelove-stop'.
 ;;
 ;;; Code:
@@ -229,7 +233,7 @@ Client connections inherit the filter, sentinel and coding system."
        (livelove--log 'error "Cannot start server: %s"
                       (error-message-string err))
        (user-error
-        "livelove: cannot bind %s:%d (another instance already listening?)"
+        "livelove: Cannot bind %s:%d (another instance already listening?)"
         livelove-host livelove-port)))))
 
 (defun livelove-stop-server ()
@@ -505,7 +509,7 @@ existing overlays' labels in place."
        (livelove--log 'warning "Bad VARS_UPDATE: %s" (error-message-string err))))))
 
 (defun livelove--on-frame (header payload _client)
-  "Render the values from a VARS_UPDATE frame; ignore other headers."
+  "Render a VARS_UPDATE frame's PAYLOAD; ignore frames with any other HEADER."
   (when (equal header "VARS_UPDATE")
     (livelove--handle-vars-update payload)))
 
@@ -544,7 +548,7 @@ LÖVE project."
               (livelove-start-server))
             (livelove--register (current-buffer)))
         (setq livelove-mode nil)
-        (user-error "livelove: buffer has no file"))
+        (user-error "livelove: Buffer has no file"))
     (livelove--deregister (current-buffer))
     (when (and livelove-auto-start-server
                (null livelove--managed-buffers)
@@ -610,7 +614,7 @@ the runtime in the project root with output in the *love* buffer."
   (unless (executable-find livelove-love-command)
     (user-error "livelove: %s not found in PATH" livelove-love-command))
   (let ((default-directory (or (livelove--love-project-root)
-                               (user-error "livelove: not inside a LÖVE project"))))
+                               (user-error "livelove: Not inside a LÖVE project"))))
     (unless (process-live-p livelove--server)
       (livelove-start-server))
     (setq livelove--game-process

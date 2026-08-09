@@ -133,11 +133,11 @@ Untracked entries are ignored, so they leave the branch clean."
   "Seconds the git prompt segment stays cached before it is recomputed."
   :type 'number :group 'eshell-snacks)
 
-(defvar eshell-snacks--git-cache nil
+(defvar-local eshell-snacks--git-cache nil
   "Last computed git segment data, a plist, or nil.")
-(defvar eshell-snacks--git-cache-root nil
+(defvar-local eshell-snacks--git-cache-root nil
   "Git root the cached data was computed for.")
-(defvar eshell-snacks--git-cache-time 0
+(defvar-local eshell-snacks--git-cache-time 0
   "Time the cache was last computed.")
 
 (defun eshell-snacks--git-compute ()
@@ -255,7 +255,8 @@ Covers programs, aliases, builtins, elisp functions and paths."
       (assoc command (bound-and-true-p eshell-command-aliases-list))
       (fboundp (intern-soft (concat "eshell/" command)))
       (functionp (intern-soft command))
-      (file-exists-p (expand-file-name command))))
+      (let ((path (expand-file-name command)))
+        (and (file-regular-p path) (file-executable-p path)))))
 
 (defun eshell-snacks--validate-command ()
   "Fontify the first word of the current input by command validity."
@@ -317,9 +318,7 @@ Excludes the external shells, which are never written to."
 
 (defcustom eshell-snacks-external-history-files
   '("~/.bash_history" "~/.zsh_history")
-  "Shell history files offered as completions besides eshell's own.
-Read only, never written back.  Zsh timestamp prefixes
-\(\":1700000000:0;\") are stripped."
+  "Shell history files offered as completions besides eshell's own."
   :type '(repeat file)
   :group 'eshell-snacks)
 

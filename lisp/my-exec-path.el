@@ -1,5 +1,13 @@
-;;; my-exec-path.el --- exec path from shell  -*- lexical-binding: t; -*-
+;;; my-exec-path.el --- Exec path from shell  -*- lexical-binding: t; -*-
+
+;; Author: Lucas
+;; Keywords: unix, processes
+
 ;;; Commentary:
+
+;; Get PATH from the login shell on startup, so GUI Emacs
+;; can find the same executables as the terminal.
+
 ;;; Code:
 
 (defun my/exec-path--command (shell)
@@ -11,18 +19,15 @@
     (_ nil)))
 
 (defun my/exec-path-from-shell ()
-  "Sync `exec-path' and PATH with the login shell asynchronously."
+  "Sync the variable `exec-path' and PATH with the login shell, asynchronously."
   (interactive)
   (let* ((shell (file-name-nondirectory (or (getenv "SHELL") "")))
          (command (my/exec-path--command shell)))
     (if (not command)
         (message ">>> exec-path: unsupported shell `%s'" shell)
       (let ((output "")
-            ;; Capture stderr separately and discard it: an interactive shell
-            ;; with no tty prints job-control warnings that would otherwise be
-            ;; mixed into stdout and corrupt the PATH we parse.
             (stderr (generate-new-buffer " *my-exec-path-stderr*")))
-        ;; `make-process' signals synchronously when the shell is missing;
+        ;; `make-process' signals synchronously when the shell is missin,
         ;; clean up the stderr buffer instead of leaking it in that case.
         (condition-case err
             (make-process
@@ -43,8 +48,7 @@
                            (lwarn 'my/exec-path :warning "empty PATH from `%s'" shell)
                          (setenv "PATH" path)
                          (setq exec-path (append (remq nil (parse-colon-path path))
-                                                 (list exec-directory)))
-                         (setq-default eshell-path-env path))))
+                                                 (list exec-directory))))))
                     ((string-match-p "\\`\\(?:exited abnormally\\|failed\\)" event)
                      (lwarn 'my/exec-path :warning
                             "`%s' failed to report PATH: %s" shell (string-trim event))))

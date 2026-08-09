@@ -1,6 +1,6 @@
 ### Requirements
 * emacs 31+
-* wl-copy
+* wl-clipboard
 * ripgrep
 * fd-find
 * zoxide

@@ -544,6 +544,10 @@
 ;; (use-package markdown-ts-mode
 ;;   :ensure nil)
 
+(use-package glsl-mode
+  :ensure t
+  :mode ("\\.glsl\\'" . glsl-mode))
+
 ;; ===============================================================
 ;;; IDE
 
@@ -580,6 +584,7 @@
   (setcdr (assq 'flycheck-mode minor-mode-map-alist)
           (make-sparse-keymap))
   (add-hook 'lisp-interaction-mode-hook (lambda () (flycheck-mode -1)))
+  (add-hook 'glsl-mode-hook (lambda () (flycheck-mode -1)))
   (global-flycheck-eglot-mode 1))
 
 (use-package consult-flycheck

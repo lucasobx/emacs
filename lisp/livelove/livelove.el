@@ -16,6 +16,12 @@
 ;; be listening before the game starts, `livelove-run' takes care of that order.
 ;; Other commands: `livelove-status', `livelove-show-log', `livelove-stop'.
 ;;
+;; A project needs only its own `main.lua' with the livelove boilerplate (see
+;; the game side): require livelove, then call `livelove.instantupdate' and
+;; `livelove.postdraw'.  `livelove-run' links the Lua support files the game
+;; needs into the project from `livelove-support-dir'; set
+;; `livelove-link-support-files' to nil to manage them yourself.
+;;
 ;;; Code:
 
 (defgroup livelove nil
@@ -30,8 +36,7 @@ Keep this loopback-only unless you understand the exposure."
 
 (defcustom livelove-port 12345
   "TCP port the livelove server listens on.
-The LÖVE client hard-codes 12345, so change this only if you also
-patch the game side."
+The LÖVE client hard-codes 12345; change it only if you patch the game too."
   :type 'natnum)
 
 (defcustom livelove-log-level 'info
@@ -74,9 +79,8 @@ Set to nil to disable logging entirely."
   "Abnormal hook run when a game connects, called with the client process.")
 
 (defvar livelove-frame-functions nil
-  "Abnormal hook run for each received frame.
-Each function is called with (HEADER PAYLOAD CLIENT): HEADER is the
-frame's first line and PAYLOAD the remainder, or nil.")
+  "Abnormal hook run for each received frame, with (HEADER PAYLOAD CLIENT).
+HEADER is the frame's first line, PAYLOAD the rest (or nil), CLIENT the process.")
 
 (defvar-local livelove--values nil
   "Hash table mapping a variable name to its latest value string.")
@@ -360,26 +364,17 @@ Mark overlay positions stale and schedule a source push."
   "Face for live variable values shown next to their names.")
 
 (defcustom livelove-align-values 'decimal
-  "How to pad live value overlays to reduce jitter.
-Values that change every frame keep changing width, which makes the
-surrounding code shift around.  This reserves space per variable
-from the widest value seen so far:
-
-  nil       Show each value exactly as reported (no padding).
-  decimal   Align numeric values on the decimal point: the integer
-            part is right-padded and the fractional part left-padded
-            to the widest seen.  Non-numeric values (tables, strings,
-            booleans) are shown unpadded, since padding those tends to
-            hurt readability more than it helps."
+  "How to pad live value overlays to reduce width jitter.
+nil shows each value as reported.  `decimal' aligns numeric values on the
+decimal point, padding to the widest integer and fractional parts seen and
+leaving non-numeric values unpadded."
   :type '(choice (const :tag "Off" nil)
                  (const :tag "Align on the decimal point" decimal)))
 
 (defcustom livelove-align-max-width nil
-  "Maximum columns reserved per side when aligning values.
-As a number, the integer and fractional parts are each padded to at
-most this many columns, so a one-off huge value cannot inflate the
-reserved width for every later value.  Values wider than the cap are
-still shown in full.  nil means no cap."
+  "Maximum columns reserved per side when aligning values, or nil for no cap.
+Caps padding so a one-off huge value cannot inflate every later value's width;
+values wider than the cap are still shown in full."
   :type '(choice (const :tag "No cap" nil) natnum))
 
 (defconst livelove--number-regexp "\\`-?[0-9]+\\(\\.[0-9]+\\)?\\'"
@@ -393,10 +388,9 @@ still shown in full.  nil means no cap."
     (clrhash livelove--overlays)))
 
 (defun livelove--align-decimal (name value)
-  "Pad numeric VALUE of variable NAME to the widest value seen.
-Integers among floats reserve the fractional columns with spaces
-rather than a trailing dot, so the decimal column stays aligned.
-`livelove-align-max-width' caps how many columns are reserved."
+  "Pad numeric VALUE of variable NAME to the widest width seen for NAME.
+Integers reserve the fractional columns with spaces so the decimal column
+stays aligned; `livelove-align-max-width' caps the reserved columns."
   (unless (hash-table-p livelove--label-widths)
     (setq livelove--label-widths (make-hash-table :test 'equal)))
   (let* ((dot (string-search "." value))
@@ -521,9 +515,8 @@ existing overlays' labels in place."
 ;;; Minor mode and project integration
 
 (defcustom livelove-auto-start-server t
-  "When non-nil, `livelove-mode' manages the server automatically.
-Enabling the mode starts the server if it is not running, and
-disabling it in the last tracked buffer stops the server."
+  "When non-nil, `livelove-mode' starts and stops the server automatically.
+The server starts on first enable and stops when the last buffer is untracked."
   :type 'boolean)
 
 (defcustom livelove-lua-modes '(lua-ts-mode lua-mode)
@@ -537,10 +530,9 @@ Used by `global-livelove-mode' to decide where to enable."
 
 (define-minor-mode livelove-mode
   "Live coding for a LÖVE 2D buffer.
-Push this buffer's source to the running game for hot reload and
-show the values the game reports as overlays next to each variable.
-See `global-livelove-mode' to enable this automatically across a
-LÖVE project."
+Push this buffer's source to the running game for hot reload, and show the
+values it reports as overlays.  See `global-livelove-mode' to enable this
+across a project automatically."
   :lighter " LL"
   (if livelove-mode
       (if (buffer-file-name)
@@ -596,6 +588,46 @@ LÖVE project."
   "Executable used to launch the LÖVE runtime."
   :type 'string)
 
+(defcustom livelove-link-support-files t
+  "When non-nil, `livelove-run' links the Lua support files into the project.
+The canonical files ship in `livelove-support-dir', symlinks are placed in the
+project root so the game can `require' them."
+  :type 'boolean)
+
+(defcustom livelove-support-dir
+  (expand-file-name "lua/"
+                    (file-name-directory
+                     (or load-file-name buffer-file-name default-directory)))
+  "Directory holding the Lua files the game needs at runtime.
+Defaults to the `lua/' directory shipped alongside this package."
+  :type 'directory)
+
+(defconst livelove--support-files
+  '("livelove.lua" "MessageProcessor.lua" "instrumenter.lua")
+  "Lua support files linked into a project by `livelove-run'.")
+
+(defun livelove--ensure-support-files (project-dir)
+  "Link the Lua support files into PROJECT-DIR from `livelove-support-dir'.
+A real file or a good symlink already there is left alone; only a broken
+symlink is replaced.  Falls back to copying when a symlink cannot be made."
+  (dolist (file livelove--support-files)
+    (let ((target (expand-file-name file livelove-support-dir))
+          (link (expand-file-name file project-dir)))
+      (cond
+       ((not (file-exists-p target))
+        (livelove--log 'warning "Support file missing from package: %s" target))
+       ((file-exists-p link) nil) ; real file or working link: leave it
+       (t
+        (when (file-symlink-p link) ; dangling link: clear it first
+          (delete-file link))
+        (condition-case err
+            (make-symbolic-link target link)
+          (error
+           (livelove--log 'warning "Symlink failed (%s); copying instead"
+                          (error-message-string err))
+           (copy-file target link)))
+        (livelove--log 'info "Linked support file %s" file))))))
+
 (defvar livelove--game-process nil
   "The LÖVE process launched by `livelove-run', or nil.")
 
@@ -617,6 +649,8 @@ the runtime in the project root with output in the *love* buffer."
     (user-error "livelove: %s not found in PATH" livelove-love-command))
   (let ((default-directory (or (livelove--love-project-root)
                                (user-error "livelove: Not inside a LÖVE project"))))
+    (when livelove-link-support-files
+      (livelove--ensure-support-files default-directory))
     (unless (process-live-p livelove--server)
       (livelove-start-server))
     (setq livelove--game-process

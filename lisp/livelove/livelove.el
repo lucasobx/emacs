@@ -637,6 +637,81 @@ across a project automatically."
   (livelove-mode -1))
 
 ;; ===============================================================
+;;; Asset hot reload
+
+(declare-function file-notify-add-watch "filenotify")
+(declare-function file-notify-rm-watch "filenotify")
+
+(defcustom livelove-watch-assets t
+  "When non-nil, `livelove-run' watches asset files and pushes changes.
+Files under the project whose extension is in `livelove-asset-extensions'
+are sent as ASSET_FILE_UPDATE frames when they change on disk, so shaders
+and data reload without restarting. The game must register each asset with
+`livelove.asset'."
+  :type 'boolean)
+
+(defcustom livelove-asset-extensions '("glsl" "frag" "vert" "vs" "fs")
+  "File extensions treated as reloadable text assets.
+Only text assets work, binary assets (images, audio) would corrupt the stream."
+  :type '(repeat string))
+
+(defvar livelove--asset-watches nil
+  "Active file-notify descriptors for watched asset directories.")
+
+(defun livelove--asset-file-p (file)
+  "Return non-nil when FILE's extension is in `livelove-asset-extensions'."
+  (when-let* ((ext (file-name-extension file)))
+    (member (downcase ext) livelove-asset-extensions)))
+
+(defun livelove--asset-directories (root)
+  "Return the directories under ROOT that hold reloadable asset files.
+Hidden directories such as .git are skipped."
+  (when livelove-asset-extensions
+    (let ((regexp (concat "\\.\\(?:"
+                          (mapconcat #'regexp-quote livelove-asset-extensions "\\|")
+                          "\\)\\'")))
+      (delete-dups
+       (mapcar #'file-name-directory
+               (directory-files-recursively
+                root regexp nil
+                (lambda (dir)
+                  (not (string-prefix-p
+                        "." (file-name-nondirectory (directory-file-name dir)))))))))))
+
+(defun livelove--on-asset-change (event)
+  "Send an ASSET_FILE_UPDATE for the file named in a file-notify EVENT."
+  (pcase-let ((`(,_desc ,action ,file ,file1) (append event '(nil))))
+    (let ((target (if (and (eq action 'renamed) file1) file1 file)))
+      (when (and (memq action '(created changed renamed))
+                 (stringp target)
+                 (livelove--asset-file-p target)
+                 (file-readable-p target))
+        (livelove--broadcast
+         (livelove--frame (concat "ASSET_FILE_UPDATE:" target)
+                          (with-temp-buffer
+                            (insert-file-contents target)
+                            (buffer-string))))
+        (livelove--log 'info "Sent ASSET_FILE_UPDATE for %s" target)))))
+
+(defun livelove--watch-assets (root)
+  "Watch every asset directory under ROOT for changes."
+  (livelove--unwatch-assets)
+  (require 'filenotify)
+  (dolist (dir (livelove--asset-directories root))
+    (condition-case err
+        (push (file-notify-add-watch dir '(change) #'livelove--on-asset-change)
+              livelove--asset-watches)
+      (error
+       (livelove--log 'warning "Cannot watch %s: %s"
+                      dir (error-message-string err))))))
+
+(defun livelove--unwatch-assets ()
+  "Remove every active asset file-notify watch."
+  (dolist (desc livelove--asset-watches)
+    (file-notify-rm-watch desc))
+  (setq livelove--asset-watches nil))
+
+;; ===============================================================
 ;;; Running the game
 
 (defcustom livelove-love-command "love"
@@ -687,9 +762,10 @@ symlink is replaced.  Falls back to copying when a symlink cannot be made."
   "The LÖVE process launched by `livelove-run', or nil.")
 
 (defun livelove--game-sentinel (proc _event)
-  "Clear `livelove--game-process' once PROC has exited."
+  "Clear `livelove--game-process' and asset watches once PROC has exited."
   (unless (process-live-p proc)
     (setq livelove--game-process nil)
+    (livelove--unwatch-assets)
     (livelove--log 'info "Game exited")))
 
 ;;;###autoload
@@ -708,6 +784,8 @@ the runtime in the project root with output in the *love* buffer."
       (livelove--ensure-support-files default-directory))
     (unless (process-live-p livelove--server)
       (livelove-start-server))
+    (when livelove-watch-assets
+      (livelove--watch-assets default-directory))
     (setq livelove--game-process
           (make-process :name "love"
                         :buffer "*love*"

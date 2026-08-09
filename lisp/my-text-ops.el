@@ -1,5 +1,15 @@
-;;; my-text-ops.el --- text editing operations -*- lexical-binding: t; -*-
+;;; my-text-ops.el --- Text editing operations -*- lexical-binding: t; -*-
+
+;; Author: Lucas
+;; Keywords: convenience
+
 ;;; Commentary:
+
+;; Small editing commands built around `thing-at-point': select, copy,
+;; delete, comment or wrap the word, symbol, line, paragraph, defun, or the
+;; content inside a pair of delimiters at point, with a brief pulse for
+;; feedback.  Line-block variants act on the current line plus N below it.
+
 ;;; Code:
 
 ;; ===============================================================
@@ -10,16 +20,22 @@
   (delete-region (point) (progn (backward-word 1) (point))))
 
 (defun my/backward-delete ()
-  "Delete a word, a character, or whitespace."
+  "Delete a word, a character, or whitespace, backward."
   (interactive)
-  (cond
-   ((or (looking-back (rx (char word)) 1)
-        (looking-back (rx (seq (char word) (= 1 blank))) 1))
-    (my/delete-dont-kill))
-   ((looking-back (rx (char blank)) 1)
-    (delete-horizontal-space t))
-   (t
-    (backward-delete-char-untabify 1))))
+  (let ((c (char-before)))
+    (cond
+     ;; a word char, or a single space/tab just after a word: delete the word
+     ((or (and c (eq (char-syntax c) ?w))
+          (and (memq c '(?\s ?\t))
+               (let ((prev (char-before (1- (point)))))
+                 (and prev (eq (char-syntax prev) ?w)))))
+      (my/delete-dont-kill))
+     ;; other horizontal whitespace: collapse it backward
+     ((memq c '(?\s ?\t))
+      (delete-horizontal-space t))
+     ;; anything else (punctuation, newline, start of buffer): one character
+     (t
+      (backward-delete-char-untabify 1)))))
 
 (defun my/open-line-below ()
   "Create a new line below and move to it."

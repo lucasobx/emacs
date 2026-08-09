@@ -54,19 +54,67 @@
 ;; ===============================================================
 ;;; DELIMITER BOUNDS
 
-(defmacro my/define-inside (suffix open)
-  "Define an inside-bounds function named from SUFFIX for the OPEN delimiter."
-  `(defun ,(intern (format "my/inside-%s" suffix)) ()
-     ,(format "Return bounds of content inside %s." suffix)
-     (when (or (looking-at ,(regexp-quote open))
-               (ignore-errors (backward-up-list 1) t))
-       (let ((start (1+ (point)))
-             (end   (1- (progn (forward-sexp) (point)))))
-         (cons start end)))))
+(defun my/inside--via-sexp (open)
+  "Return the inside bounds of the nearest enclosing OPEN char, or nil.
+OPEN needs list syntax; climbs past enclosing pairs of other types."
+  (save-excursion
+    (let ((found (eq (char-after) open)))
+      (while (and (not found)
+                  (condition-case nil (progn (backward-up-list 1) t)
+                    (error nil)))
+        (setq found (eq (char-after) open)))
+      (when found
+        ;; `forward-sexp' signals on an unbalanced delimiter; treat that as
+        ;; "no bounds", like the rest of these helpers do.
+        (ignore-errors
+          (let ((start (1+ (point))))
+            (forward-sexp)
+            (cons start (1- (point)))))))))
 
-(my/define-inside parens   "(")
-(my/define-inside brackets "[")
-(my/define-inside braces   "{")
+(defun my/inside--via-scan (open close)
+  "Return the inside bounds of the nearest OPEN/CLOSE pair by scanning text.
+For delimiters lacking list syntax; balances nesting but ignores strings."
+  (save-excursion
+    (let ((re (rx-to-string `(any ,open ,close) t))
+          (start (and (eq (char-after) open) (1+ (point)))))
+      (unless start
+        (let ((depth 0))
+          (save-excursion
+            (while (and (not start) (re-search-backward re nil t))
+              (cond
+               ((eq (char-after) close) (setq depth (1+ depth)))
+               ((zerop depth) (setq start (1+ (point))))
+               (t (setq depth (1- depth))))))))
+      (when start
+        (goto-char start)
+        (let ((depth 0) end)
+          (while (and (not end) (re-search-forward re nil t))
+            (let ((c (char-before)))
+              (cond
+               ((eq c open) (setq depth (1+ depth)))
+               ((zerop depth) (setq end (1- (point))))
+               (t (setq depth (1- depth))))))
+          (when end (cons start end)))))))
+
+(defun my/inside--bounds (open close)
+  "Return the content bounds for the nearest OPEN/CLOSE pair, or nil.
+OPEN and CLOSE are characters; uses sexp motion or a scan per OPEN's syntax."
+  (if (eq (char-syntax open) ?\()
+      (my/inside--via-sexp open)
+    (my/inside--via-scan open close)))
+
+(defmacro my/define-inside (suffix open close)
+  "Define a bounds function named from SUFFIX for the OPEN/CLOSE pair.
+OPEN and CLOSE are one-character strings."
+  `(defun ,(intern (format "my/inside-%s" suffix)) ()
+     ,(format
+       "Return the bounds (START . END) inside the nearest enclosing %s, or nil."
+       suffix)
+     (my/inside--bounds ,(string-to-char open) ,(string-to-char close))))
+
+(my/define-inside parens   "(" ")")
+(my/define-inside brackets "[" "]")
+(my/define-inside braces   "{" "}")
 
 ;; ===============================================================
 ;;; SELECTION
@@ -97,13 +145,14 @@
 (defmacro my/define-select-inside (name bounds-fn)
   "Define NAME selecting the region returned by BOUNDS-FN."
   `(defun ,name ()
-     "Select content inside delimiters at point."
+     ,(format "Select the content inside the nearest %s at point."
+              (substring (symbol-name bounds-fn) (length "my/inside-")))
      (interactive)
      (my/select-bounds (,bounds-fn))))
 
-(my/define-select-inside my/select-in-parens   my/inside-parens)
-(my/define-select-inside my/select-in-brackets my/inside-brackets)
-(my/define-select-inside my/select-in-braces   my/inside-braces)
+(my/define-select-inside my/select-inside-parens   my/inside-parens)
+(my/define-select-inside my/select-inside-brackets my/inside-brackets)
+(my/define-select-inside my/select-inside-braces   my/inside-braces)
 
 ;; ===============================================================
 ;;; WRAPPING
@@ -134,21 +183,6 @@
 ;; ===============================================================
 ;;; OPERATION HELPERS
 
-;; region-aware dispatch
-(defmacro my/region-or (fallback &rest body)
-  "Act on the active region, falling back to FALLBACK when none is active.
-When a region is active it is highlighted, BODY runs with `beg' and `end'
-bound to the region bounds, and the mark is deactivated afterwards.
-Otherwise FALLBACK is evaluated."
-  (declare (indent 1))
-  `(if (use-region-p)
-       (let ((beg (region-beginning))
-             (end (region-end)))
-         (pulse-momentary-highlight-region beg end)
-         ,@body
-         (deactivate-mark))
-     ,fallback))
-
 ;; generic operations
 (defun my/delete-thing (thing)
   "Delete THING at point and save to kill ring with visual feedback."
@@ -163,6 +197,7 @@ Otherwise FALLBACK is evaluated."
   (let ((bounds (save-excursion (funcall bounds-fn))))
     (when bounds
       (pulse-momentary-highlight-region (car bounds) (cdr bounds))
+      (sit-for 0.15)
       (kill-region (car bounds) (cdr bounds)))))
 
 (defun my/copy-thing (thing)
@@ -251,9 +286,9 @@ Otherwise FALLBACK is evaluated."
                (my/delete-defun     'defun     "Delete defun at point."))
 
 (my/define-ops my/delete-inside
-               (my/delete-in-parens   #'my/inside-parens   "Delete text inside parentheses.")
-               (my/delete-in-brackets #'my/inside-brackets "Delete text inside brackets.")
-               (my/delete-in-braces   #'my/inside-braces   "Delete text inside braces."))
+               (my/delete-inside-parens   #'my/inside-parens   "Delete text inside parentheses.")
+               (my/delete-inside-brackets #'my/inside-brackets "Delete text inside brackets.")
+               (my/delete-inside-braces   #'my/inside-braces   "Delete text inside braces."))
 
 ;; ===============================================================
 ;;; COPY COMMANDS
@@ -335,15 +370,17 @@ Otherwise FALLBACK is evaluated."
 
 (defmacro my/define-line-counts (helper)
   "Define commands HELPER-1 .. HELPER-9 calling HELPER with N (1-9)."
-  `(progn
-     ,@(mapcar
-        (lambda (n)
-          `(defun ,(intern (format "%s-%d" helper n)) ()
-             ,(format "Run `%s' on the current line plus %d line%s below it."
-                      helper n (if (= n 1) "" "s"))
-             (interactive)
-             (,helper ,n)))
-        (number-sequence 1 9))))
+  (let ((verb (capitalize (substring (symbol-name helper)
+                                     (length "my/") (- (length "-lines"))))))
+    `(progn
+       ,@(mapcar
+          (lambda (n)
+            `(defun ,(intern (format "%s-%d" helper n)) ()
+               ,(format "%s the current line plus %d line%s below it."
+                        verb n (if (= n 1) "" "s"))
+               (interactive)
+               (,helper ,n)))
+          (number-sequence 1 9)))))
 
 (my/define-line-counts my/delete-lines)
 (my/define-line-counts my/copy-lines)

@@ -150,8 +150,8 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
 (wk-add "C-d" "delete")
 (my/bind-sub my/delete-map "C-d"
   '("p" my/delete-paragraph   "delete paragraph")
-  '("0" my/delete-in-parens   "delete inside ()")
-  '("]" my/delete-in-brackets "delete inside []")
+  '("0" my/delete-inside-parens   "delete inside ()")
+  '("]" my/delete-inside-brackets "delete inside []")
   '("s" my/delete-symbol      "delete symbol")
   '("b" my/delete-buffer      "delete buffer")
   '("d" my/delete-line        "delete line")
@@ -228,7 +228,7 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
 (wk-add "C-q" "select")
 (my/bind
   '("C-q p" my/select-paragraph "select paragraph")
-  '("C-q 0" my/select-in-parens "select in parens")
+  '("C-q 0" my/select-inside-parens "select in parens")
   '("C-q s" my/select-symbol    "select symbol")
   '("C-q b" mark-whole-buffer   "select buffer")
   '("C-q q" my/select-line      "select line"))

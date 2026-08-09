@@ -1,6 +1,20 @@
-;;; my-keybindings.el --- keybindings  -*- lexical-binding: t; -*-
+;;; my-keybindings.el --- Keybindings  -*- lexical-binding: t; -*-
+
+;; Author: Lucas
+;; Keywords: convenience
+
 ;;; Commentary:
+
+;; Personal keybindings: a global override keymap, region-aware
+;; prefixes with which-key labels, and mode-local bindings.
+
 ;;; Code:
+
+(declare-function dired-snacks-duplicate "dired-snacks")
+(defvar winner-mode-map)
+(defvar ruby-ts-mode-map)
+(defvar dired-mode-map)
+(defvar org-mode-map)
 
 ;; ===============================================================
 ;;; SETUP
@@ -48,7 +62,7 @@
 
 (defun my/bind-sub (map prefix &rest bindings)
   "Bind each (KEY COMMAND [DESC]) in BINDINGS in prefix MAP.
-Each which-key label is registered under PREFIX + KEY. DESC t hides it."
+Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   (dolist (binding bindings)
     (seq-let (key command desc) binding
       (keymap-set map key command)
@@ -222,7 +236,8 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
   '("C-h h" helpful-at-point "help at point")
   '("C-h f" helpful-function "desc function")
   '("C-h v" helpful-variable "desc variable")
-  '("C-h k" describe-keymap  "desc keymap")
+  '("C-h k" describe-key     "desc key")
+  '("C-h K" describe-keymap  "desc keymap")
   '("C-h d" devdocs-lookup   "devdocs"))
 
 (wk-add "C-q" "select")
@@ -286,9 +301,8 @@ Each which-key label is registered under PREFIX + KEY. DESC t hides it."
     '("M-."      dired-omit-mode)))
 
 (with-eval-after-load 'org
-  (wk-add-map org-mode-map "C-o" "org")
   (my/bind-local org-mode-map
-    '("C-o t" org-hide-drawers-toggle "toggle drawers")))
+    '("C-c t" org-hide-drawers-toggle "toggle drawers")))
 
 (provide 'my-keybindings)
 ;;; my-keybindings.el ends here

@@ -529,23 +529,23 @@ REGION is a (BEG . END) cons, or nil for the whole buffer."
              livelove--values)))
 
 (defun livelove--render (buffer)
-  "Refresh value overlays for BUFFER.
-Rescan positions only when the text changed; otherwise update the existing
-overlays' labels in place.  Does nothing while `livelove-show-hints' is nil."
+  "Refresh value overlays for BUFFER, unless `livelove-show-hints' is nil.
+Rescan positions after a text change, otherwise update labels in place."
   (when (and (buffer-live-p buffer) livelove-show-hints)
     (with-current-buffer buffer
       (unless (hash-table-p livelove--overlays)
         (setq livelove--overlays (make-hash-table :test 'equal)))
       (when (hash-table-p livelove--values)
-        (save-excursion
-          (without-restriction
-            (let ((region (livelove--scope-bounds)))
-              (if livelove--dirty-positions
-                  (livelove--render-full region)
-                (livelove--render-values region)))))))))
+        (save-match-data
+          (save-excursion
+            (without-restriction
+              (let ((region (livelove--scope-bounds)))
+                (if livelove--dirty-positions
+                    (livelove--render-full region)
+                  (livelove--render-values region))))))))))
 
 (defun livelove--rescope (buffer)
-  "Re-render BUFFER's hints when the scoped region changed.
+  "Re-render BUFFER's hints when the scoped region changes.
 Only acts for the `line' and `defun' scopes while hints are shown."
   (when (and (buffer-live-p buffer) livelove-show-hints
              (memq livelove-hints-scope '(line defun)))

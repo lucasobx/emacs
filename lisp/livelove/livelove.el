@@ -36,7 +36,7 @@ Keep this loopback-only unless you understand the exposure."
 
 (defcustom livelove-port 12345
   "TCP port the livelove server listens on.
-The LÖVE client hard-codes 12345; change it only if you patch the game too."
+The LÖVE client hard-codes 12345, so change it only if you patch the game too."
   :type 'natnum)
 
 (defcustom livelove-log-level 'info
@@ -48,8 +48,7 @@ Set to nil to disable logging entirely."
                  (const :tag "Error"    error)
                  (const :tag "Disabled" nil)))
 
-;; ===============================================================
-;;; Protocol constants and state
+;;;; Protocol constants and state
 
 (defconst livelove--frame-terminator "\n---END---\n"
   "Delimiter that terminates every livelove protocol frame.")
@@ -77,7 +76,7 @@ Set to nil to disable logging entirely."
 
 (defvar livelove--live-vars t
   "Non-nil when the game should report live variable values.
-Mirrors the game's live_vars flag; reset to t when a game launches.")
+It mirrors the game's live_vars flag and resets to t when a game launches.")
 
 (defvar livelove-connect-functions nil
   "Abnormal hook run when a game connects, called with the client process.")
@@ -99,15 +98,14 @@ HEADER is the frame's first line, PAYLOAD the rest (or nil), CLIENT the process.
   "Non-nil when overlay positions may be stale after a buffer change.")
 
 (defvar-local livelove--label-widths nil
-  "Hash table mapping a variable name to the (MAX-LEFT . MAX-RIGHT)
-value widths seen, used to keep numeric overlays from jittering.")
+  "Hash table mapping a variable name to the widest (MAX-LEFT . MAX-RIGHT)
+value widths seen, which keeps numeric overlays from jittering.")
 
 (defvar-local livelove--hint-region nil
   "The (BEG . END) region overlays currently cover, or nil for the whole buffer.
 Used to re-render only when the scoped region changes.")
 
-;; ===============================================================
-;;; Logging
+;;;; Logging
 
 (defun livelove--log-buffer ()
   "Return the livelove log buffer, creating it in `special-mode' if needed."
@@ -139,12 +137,11 @@ Used to re-render only when the scoped region changes.")
   (interactive)
   (display-buffer (livelove--log-buffer)))
 
-;; ===============================================================
-;;; Incoming frames
+;;;; Incoming frames
 
 (defun livelove--dispatch-frame (raw client)
   "Dispatch a single protocol frame RAW received from CLIENT.
-RAW still has its surrounding newlines; they are trimmed here."
+RAW still has its surrounding newlines, which are trimmed here."
   (let* ((frame (string-trim raw))
          (newline (string-search "\n" frame))
          (header (if newline (substring frame 0 newline) frame))
@@ -161,8 +158,7 @@ RAW still has its surrounding newlines; they are trimmed here."
       (setq start (+ end (length livelove--frame-terminator))))
     (process-put client 'livelove--buffer (substring data start))))
 
-;; ===============================================================
-;;; Outgoing frames
+;;;; Outgoing frames
 
 (defun livelove--frame (header &optional payload)
   "Return a protocol frame carrying HEADER and optional PAYLOAD."
@@ -191,8 +187,7 @@ RAW still has its surrounding newlines; they are trimmed here."
   (dolist (client livelove--clients)
     (livelove--send client frame)))
 
-;; ===============================================================
-;;; Connection lifecycle
+;;;; Connection lifecycle
 
 (defun livelove--on-connect (_server client _message)
   "Register CLIENT when the server accepts a new connection."
@@ -215,8 +210,7 @@ RAW still has its surrounding newlines; they are trimmed here."
       (unless livelove--clients
         (livelove--clear-all-feedback)))))
 
-;; ===============================================================
-;;; Server lifecycle
+;;;; Server lifecycle
 
 (defun livelove--make-server ()
   "Create and return the livelove server process.
@@ -280,8 +274,7 @@ Client connections inherit the filter, sentinel and coding system."
     (message "livelove: server not running (%d buffer(s) tracked)"
              (length livelove--managed-buffers))))
 
-;; ===============================================================
-;;; Live coding: push source for hot reload
+;;;; Live coding: push source for hot reload
 
 (defcustom livelove-update-delay 0.05
   "Seconds to wait after an edit before pushing source to the game.
@@ -338,14 +331,13 @@ The game echoes this string back verbatim, so it must be stable."
         (run-with-timer livelove-update-delay nil #'livelove--flush-dirty)))
 
 (defun livelove--after-change (_beg _end _len)
-  "Buffer-local `after-change-functions' entry.
-Mark overlay positions stale and schedule a source push."
+  "Mark overlay positions stale and schedule a source push after an edit."
   (setq livelove--dirty-positions t)
   (when livelove--clients
     (livelove--schedule-flush (current-buffer))))
 
 (defun livelove--register (buffer)
-  "Start tracking BUFFER: install the change hook and push its source."
+  "Start tracking BUFFER, installing its local hooks and pushing its source."
   (with-current-buffer buffer
     (unless (memq buffer livelove--managed-buffers)
       (push buffer livelove--managed-buffers)
@@ -369,39 +361,32 @@ Mark overlay positions stale and schedule a source push."
 
 (add-hook 'livelove-connect-functions #'livelove--send-all-files)
 
-;; ===============================================================
-;;; Live feedback: render reported values as overlays
+;;;; Live feedback: render reported values as overlays
 
 (defface livelove-value-face '((t :inherit shadow))
   "Face for live variable values shown next to their names.")
 
 (defcustom livelove-show-hints t
   "When non-nil, show live values as inline overlays.
-Toggle interactively with `livelove-toggle-hints'; hiding the hints does
-not stop value reporting, so the values panel keeps updating."
+Hiding them with `livelove-toggle-hints' keeps value reporting on."
   :type 'boolean)
 
 (defcustom livelove-hints-scope 'buffer
-  "Where inline value overlays are shown, to curb clutter in large files.
-`buffer' annotates every occurrence, `line' only the line at point, and
-`defun' only the surrounding function (the whole buffer when point is not
-inside one)."
+  "Where inline value overlays are shown, to reduce clutter in large files.
+Either `buffer', `line' (at point), or `defun' (the enclosing function)."
   :type '(choice (const :tag "Whole buffer" buffer)
                  (const :tag "Current line" line)
                  (const :tag "Current defun" defun)))
 
 (defcustom livelove-align-values 'decimal
   "How to pad live value overlays to reduce width jitter.
-nil shows each value as reported.  `decimal' aligns numeric values on the
-decimal point, padding to the widest integer and fractional parts seen and
-leaving non-numeric values unpadded."
+With `decimal' numeric values align on the decimal point, nil shows them as-is."
   :type '(choice (const :tag "Off" nil)
                  (const :tag "Align on the decimal point" decimal)))
 
 (defcustom livelove-align-max-width nil
   "Maximum columns reserved per side when aligning values, or nil for no cap.
-Caps padding so a one-off huge value cannot inflate every later value's width;
-values wider than the cap are still shown in full."
+Values wider than the cap are still shown in full."
   :type '(choice (const :tag "No cap" nil) natnum))
 
 (defconst livelove--number-regexp "\\`-?[0-9]+\\(\\.[0-9]+\\)?\\'"
@@ -415,9 +400,8 @@ values wider than the cap are still shown in full."
     (clrhash livelove--overlays)))
 
 (defcustom livelove-keep-values-on-disconnect nil
-  "When non-nil, keep value overlays in the buffer after the game disconnects.
-By default the overlays are cleared once the last game disconnects; enable
-this to leave the last-seen values on screen."
+  "When non-nil, keep value overlays after the game disconnects.
+By default they are cleared once the last game disconnects."
   :type 'boolean)
 
 (defun livelove--clear-feedback (buffer)
@@ -431,8 +415,7 @@ this to leave the last-seen values on screen."
 
 (defun livelove--clear-all-feedback ()
   "Clear value overlays and cached values in every managed buffer.
-Runs when the last game disconnects, unless
-`livelove-keep-values-on-disconnect' is non-nil."
+Does nothing when `livelove-keep-values-on-disconnect' is non-nil."
   (unless livelove-keep-values-on-disconnect
     (dolist (buffer livelove--managed-buffers)
       (livelove--clear-feedback buffer))
@@ -440,8 +423,7 @@ Runs when the last game disconnects, unless
 
 (defun livelove--align-decimal (name value)
   "Pad numeric VALUE of variable NAME to the widest width seen for NAME.
-Integers reserve the fractional columns with spaces so the decimal column
-stays aligned; `livelove-align-max-width' caps the reserved columns."
+Integers reserve the fractional columns so the decimal point stays aligned."
   (unless (hash-table-p livelove--label-widths)
     (setq livelove--label-widths (make-hash-table :test 'equal)))
   (let* ((dot (string-search "." value))
@@ -475,8 +457,7 @@ stays aligned; `livelove-align-max-width' caps the reserved columns."
 
 (defun livelove--make-overlay (pos label)
   "Return a value overlay showing LABEL just after POS.
-The overlay is anchored to the character before POS so it evaporates
-automatically when that text is deleted."
+Anchored to the character before POS, it evaporates when that text is deleted."
   (let ((overlay (make-overlay (1- pos) pos)))
     (overlay-put overlay 'evaporate t)
     (overlay-put overlay 'livelove t)
@@ -494,8 +475,8 @@ automatically when that text is deleted."
     overlays))
 
 (defun livelove--scope-bounds ()
-  "Return the (BEG . END) region hints should cover, or nil for the whole buffer.
-The region follows `livelove-hints-scope'."
+  "Return the region hints should cover per `livelove-hints-scope'.
+The result is a (BEG . END) cons, or nil for the whole buffer."
   (pcase livelove-hints-scope
     ('line (cons (line-beginning-position) (line-end-position)))
     ('defun (bounds-of-thing-at-point 'defun))
@@ -515,7 +496,7 @@ REGION is a (BEG . END) cons, or nil for the whole buffer."
         livelove--hint-region region))
 
 (defun livelove--render-values (region)
-  "Update existing overlays in place; scan REGION for newly seen variables.
+  "Update existing overlays in place, scanning REGION for new variables.
 REGION is a (BEG . END) cons, or nil for the whole buffer."
   (let ((beg (or (car region) (point-min)))
         (end (or (cdr region) (point-max))))
@@ -607,14 +588,13 @@ Hiding the hints clears the overlays but keeps value reporting on."
        (livelove--log 'warning "Bad VARS_UPDATE: %s" (error-message-string err))))))
 
 (defun livelove--on-frame (header payload _client)
-  "Render a VARS_UPDATE frame's PAYLOAD; ignore frames with any other HEADER."
+  "Render a VARS_UPDATE frame's PAYLOAD, ignoring any other HEADER."
   (when (equal header "VARS_UPDATE")
     (livelove--handle-vars-update payload)))
 
 (add-hook 'livelove-frame-functions #'livelove--on-frame)
 
-;; ===============================================================
-;;; Live eval (REPL)
+;;;; Live eval (REPL)
 
 (defvar livelove--eval-history nil
   "Minibuffer history for `livelove-eval-expression'.")
@@ -630,8 +610,7 @@ Hiding the hints clears the overlays but keeps value reporting on."
 ;;;###autoload
 (defun livelove-eval-expression (code)
   "Evaluate the Lua CODE in the running game.
-CODE is a Lua expression or statement, read from the minibuffer; the
-result appears in the echo area once the game replies."
+Read CODE from the minibuffer and show the result in the echo area."
   (interactive (list (read-string "LÖVE eval: " nil 'livelove--eval-history)))
   (unless (string-blank-p code)
     (livelove--send-eval code)))
@@ -662,21 +641,20 @@ result appears in the echo area once the game replies."
        (livelove--log 'warning "Bad EVAL_RESULT: %s" (error-message-string err))))))
 
 (defun livelove--on-eval-result (header payload _client)
-  "Show an EVAL_RESULT frame's PAYLOAD; ignore frames with any other HEADER."
+  "Show an EVAL_RESULT frame's PAYLOAD, ignoring any other HEADER."
   (when (equal header "EVAL_RESULT")
     (livelove--handle-eval-result payload)))
 
 (add-hook 'livelove-frame-functions #'livelove--on-eval-result)
 
-;; ===============================================================
-;;; Values panel
+;;;; Values panel
 
 (defconst livelove--values-buffer-name "*livelove-values*"
   "Name of the buffer showing live variable values.")
 
 (defun livelove--values-group-name (buffer)
   "Return the values-panel group label for BUFFER.
-Uses the path relative to the LÖVE project root when available."
+Uses the file name relative to the LÖVE project root when available."
   (let ((file (buffer-file-name buffer)))
     (if file
         (let ((root (with-current-buffer buffer (livelove--love-project-root))))
@@ -744,8 +722,7 @@ Shows every tracked variable and its latest value, grouped by file."
       (tabulated-list-print))
     (pop-to-buffer buffer)))
 
-;; ===============================================================
-;;; Minor mode and project integration
+;;;; Minor mode and project integration
 
 (defcustom livelove-auto-start-server t
   "When non-nil, `livelove-mode' starts and stops the server automatically.
@@ -763,9 +740,8 @@ Used by `global-livelove-mode' to decide where to enable."
 
 (define-minor-mode livelove-mode
   "Live coding for a LÖVE 2D buffer.
-Push this buffer's source to the running game for hot reload, and show the
-values it reports as overlays.  See `global-livelove-mode' to enable this
-across a project automatically."
+Push its source to the game for hot reload and overlay the reported values.
+See `global-livelove-mode' to enable this across a project automatically."
   :lighter " LL"
   (if livelove-mode
       (if (buffer-file-name)
@@ -814,23 +790,20 @@ across a project automatically."
   (interactive)
   (livelove-mode -1))
 
-;; ===============================================================
-;;; Asset hot reload
+;;;; Asset hot reload
 
 (declare-function file-notify-add-watch "filenotify")
 (declare-function file-notify-rm-watch "filenotify")
 
 (defcustom livelove-watch-assets t
   "When non-nil, `livelove-run' watches asset files and pushes changes.
-Files under the project whose extension is in `livelove-asset-extensions'
-are sent as ASSET_FILE_UPDATE frames when they change on disk, so shaders
-and data reload without restarting.  The game must register each asset with
-`livelove.asset'."
+Files whose extension is in `livelove-asset-extensions' are sent as
+ASSET_FILE_UPDATE frames on change, so shaders reload without a restart."
   :type 'boolean)
 
 (defcustom livelove-asset-extensions '("glsl" "frag" "vert" "vs" "fs")
   "File extensions treated as reloadable text assets.
-Only text assets work, binary assets (images, audio) would corrupt the stream."
+Only text assets work, since images or audio would corrupt the stream."
   :type '(repeat string))
 
 (defvar livelove--asset-watches nil
@@ -889,17 +862,15 @@ Hidden directories such as .git are skipped."
     (file-notify-rm-watch desc))
   (setq livelove--asset-watches nil))
 
-;; ===============================================================
-;;; Running the game
+;;;; Running the game
 
 (defcustom livelove-love-command "love"
   "Executable used to launch the LÖVE runtime."
   :type 'string)
 
 (defcustom livelove-link-support-files t
-  "When non-nil, `livelove-run' links the Lua support files into the project.
-The canonical files ship in `livelove-support-dir', symlinks are placed in the
-project root so the game can `require' them."
+  "When non-nil, `livelove-run' symlinks the Lua support files into the project.
+They point at `livelove-support-dir' so the game can require them."
   :type 'boolean)
 
 (defcustom livelove-support-dir
@@ -916,8 +887,7 @@ Defaults to the `lua/' directory shipped alongside this package."
 
 (defun livelove--ensure-support-files (project-dir)
   "Link the Lua support files into PROJECT-DIR from `livelove-support-dir'.
-A real file or a good symlink already there is left alone; only a broken
-symlink is replaced.  Falls back to copying when a symlink cannot be made."
+Existing files and good symlinks are left alone, and copying is a fallback."
   (dolist (file livelove--support-files)
     (let ((target (expand-file-name file livelove-support-dir))
           (link (expand-file-name file project-dir)))
@@ -949,11 +919,10 @@ symlink is replaced.  Falls back to copying when a symlink cannot be made."
 ;;;###autoload
 (defun livelove-run ()
   "Launch the LÖVE game for the current project.
-Starts the livelove server first so the game can connect, then runs
-the runtime in the project root with output in the *love* buffer."
+Start the server first so the game can connect, then run it from the root."
   (interactive)
   (when (process-live-p livelove--game-process)
-    (user-error "livelove: a game is already running (use `livelove-stop')"))
+    (user-error "livelove: A game is already running (use `livelove-stop')"))
   (unless (executable-find livelove-love-command)
     (user-error "livelove: %s not found in PATH" livelove-love-command))
   (setq livelove--live-vars t)
@@ -984,8 +953,7 @@ the runtime in the project root with output in the *love* buffer."
     (message "livelove: no game running"))
   (setq livelove--game-process nil))
 
-;; ===============================================================
-;;; Game control
+;;;; Game control
 
 (defun livelove--send-control (command)
   "Broadcast a GAME_CONTROL COMMAND to every connected game."

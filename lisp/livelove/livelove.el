@@ -102,6 +102,10 @@ HEADER is the frame's first line, PAYLOAD the rest (or nil), CLIENT the process.
   "Hash table mapping a variable name to the (MAX-LEFT . MAX-RIGHT)
 value widths seen, used to keep numeric overlays from jittering.")
 
+(defvar-local livelove--hint-region nil
+  "The (BEG . END) region overlays currently cover, or nil for the whole buffer.
+Used to re-render only when the scoped region changes.")
+
 ;; ===============================================================
 ;;; Logging
 
@@ -347,6 +351,7 @@ Mark overlay positions stale and schedule a source push."
       (push buffer livelove--managed-buffers)
       (add-hook 'after-change-functions #'livelove--after-change nil t)
       (add-hook 'kill-buffer-hook #'livelove--on-kill-buffer nil t)
+      (add-hook 'post-command-hook #'livelove--hints-post-command nil t)
       (livelove--log 'info "Tracking %s" (buffer-file-name))))
   (livelove--send-file-update buffer))
 
@@ -355,7 +360,8 @@ Mark overlay positions stale and schedule a source push."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (remove-hook 'after-change-functions #'livelove--after-change t)
-      (remove-hook 'kill-buffer-hook #'livelove--on-kill-buffer t))
+      (remove-hook 'kill-buffer-hook #'livelove--on-kill-buffer t)
+      (remove-hook 'post-command-hook #'livelove--hints-post-command t))
     (livelove--clear-feedback buffer))
   (setq livelove--managed-buffers (delq buffer livelove--managed-buffers)
         livelove--dirty-buffers (delq buffer livelove--dirty-buffers))
@@ -368,6 +374,21 @@ Mark overlay positions stale and schedule a source push."
 
 (defface livelove-value-face '((t :inherit shadow))
   "Face for live variable values shown next to their names.")
+
+(defcustom livelove-show-hints t
+  "When non-nil, show live values as inline overlays.
+Toggle interactively with `livelove-toggle-hints'; hiding the hints does
+not stop value reporting, so the values panel keeps updating."
+  :type 'boolean)
+
+(defcustom livelove-hints-scope 'buffer
+  "Where inline value overlays are shown, to curb clutter in large files.
+`buffer' annotates every occurrence, `line' only the line at point, and
+`defun' only the surrounding function (the whole buffer when point is not
+inside one)."
+  :type '(choice (const :tag "Whole buffer" buffer)
+                 (const :tag "Current line" line)
+                 (const :tag "Current defun" defun)))
 
 (defcustom livelove-align-values 'decimal
   "How to pad live value overlays to reduce width jitter.
@@ -462,48 +483,98 @@ automatically when that text is deleted."
     (livelove--set-label overlay label)
     overlay))
 
-(defun livelove--scan-name (name value)
-  "Create and return overlays for every occurrence of NAME showing VALUE."
+(defun livelove--scan-name (name value beg end)
+  "Return overlays for each occurrence of NAME between BEG and END showing VALUE."
   (let ((label (livelove--display-value name value))
         (regexp (concat "\\_<" (regexp-quote name) "\\_>"))
         (overlays nil))
-    (goto-char (point-min))
-    (while (re-search-forward regexp nil t)
+    (goto-char beg)
+    (while (re-search-forward regexp end t)
       (push (livelove--make-overlay (match-end 0) label) overlays))
     overlays))
 
-(defun livelove--render-full ()
-  "Rebuild every overlay by scanning the buffer for known variables."
-  (livelove--clear-overlays)
-  (maphash (lambda (name value)
-             (puthash name (livelove--scan-name name value) livelove--overlays))
-           livelove--values)
-  (setq livelove--dirty-positions nil))
+(defun livelove--scope-bounds ()
+  "Return the (BEG . END) region hints should cover, or nil for the whole buffer.
+The region follows `livelove-hints-scope'."
+  (pcase livelove-hints-scope
+    ('line (cons (line-beginning-position) (line-end-position)))
+    ('defun (bounds-of-thing-at-point 'defun))
+    (_ nil)))
 
-(defun livelove--render-values ()
-  "Update existing overlays in place; scan only newly seen variables."
-  (maphash (lambda (name value)
-             (if-let* ((overlays (gethash name livelove--overlays)))
-                 (let ((label (livelove--display-value name value)))
-                   (dolist (overlay overlays)
-                     (livelove--set-label overlay label)))
-               (puthash name (livelove--scan-name name value) livelove--overlays)))
-           livelove--values))
+(defun livelove--render-full (region)
+  "Rebuild every overlay by scanning REGION for known variables.
+REGION is a (BEG . END) cons, or nil for the whole buffer."
+  (livelove--clear-overlays)
+  (let ((beg (or (car region) (point-min)))
+        (end (or (cdr region) (point-max))))
+    (maphash (lambda (name value)
+               (puthash name (livelove--scan-name name value beg end)
+                        livelove--overlays))
+             livelove--values))
+  (setq livelove--dirty-positions nil
+        livelove--hint-region region))
+
+(defun livelove--render-values (region)
+  "Update existing overlays in place; scan REGION for newly seen variables.
+REGION is a (BEG . END) cons, or nil for the whole buffer."
+  (let ((beg (or (car region) (point-min)))
+        (end (or (cdr region) (point-max))))
+    (maphash (lambda (name value)
+               (if-let* ((overlays (gethash name livelove--overlays)))
+                   (let ((label (livelove--display-value name value)))
+                     (dolist (overlay overlays)
+                       (livelove--set-label overlay label)))
+                 (puthash name (livelove--scan-name name value beg end)
+                          livelove--overlays)))
+             livelove--values)))
 
 (defun livelove--render (buffer)
   "Refresh value overlays for BUFFER.
-Rescan positions only when the text changed; otherwise update the
-existing overlays' labels in place."
-  (when (buffer-live-p buffer)
+Rescan positions only when the text changed; otherwise update the existing
+overlays' labels in place.  Does nothing while `livelove-show-hints' is nil."
+  (when (and (buffer-live-p buffer) livelove-show-hints)
     (with-current-buffer buffer
       (unless (hash-table-p livelove--overlays)
         (setq livelove--overlays (make-hash-table :test 'equal)))
       (when (hash-table-p livelove--values)
         (save-excursion
           (without-restriction
-            (if livelove--dirty-positions
-                (livelove--render-full)
-              (livelove--render-values))))))))
+            (let ((region (livelove--scope-bounds)))
+              (if livelove--dirty-positions
+                  (livelove--render-full region)
+                (livelove--render-values region)))))))))
+
+(defun livelove--rescope (buffer)
+  "Re-render BUFFER's hints when the scoped region changed.
+Only acts for the `line' and `defun' scopes while hints are shown."
+  (when (and (buffer-live-p buffer) livelove-show-hints
+             (memq livelove-hints-scope '(line defun)))
+    (with-current-buffer buffer
+      (when (hash-table-p livelove--values)
+        (let ((region (save-excursion
+                        (without-restriction (livelove--scope-bounds)))))
+          (unless (equal region livelove--hint-region)
+            (setq livelove--dirty-positions t)
+            (livelove--render buffer)))))))
+
+(defun livelove--hints-post-command ()
+  "Re-render scoped hints for the current buffer after point moves."
+  (livelove--rescope (current-buffer)))
+
+;;;###autoload
+(defun livelove-toggle-hints ()
+  "Toggle the inline value overlays across every tracked buffer.
+Hiding the hints clears the overlays but keeps value reporting on."
+  (interactive)
+  (setq livelove-show-hints (not livelove-show-hints))
+  (dolist (buffer livelove--managed-buffers)
+    (when (buffer-live-p buffer)
+      (with-current-buffer buffer
+        (if livelove-show-hints
+            (progn (setq livelove--dirty-positions t)
+                   (livelove--render buffer))
+          (livelove--clear-overlays)))))
+  (message "livelove: hints %s" (if livelove-show-hints "on" "off")))
 
 (defun livelove--buffer-for-uri (uri)
   "Return the managed buffer whose identifier is URI, or nil."

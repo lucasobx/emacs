@@ -1,26 +1,63 @@
 ;;; livelove.el --- Live coding bridge for LÖVE 2D  -*- lexical-binding: t; -*-
 
 ;; Author: Lucas
-;; Version: 0.1.0
-;; Package-Requires: ((emacs "31.0"))
+;; Version: 0.1
+;; Package-Requires: ((emacs "30.1"))
 ;; Keywords: games, tools
 
 ;;; Commentary:
 ;;
-;; Usage:
-;; (global-livelove-mode 1) ; auto-enable in Lua buffers of LÖVE projects
-;; or, per buffer: M-x livelove-mode
-;; then run the game with M-x livelove-run.
+;; Live-coding bridge for LÖVE.  It runs a small TCP server that a running
+;; game connects to, and over that link it offers:
 ;;
-;; The game connects to the server once, without retrying, so the server must
-;; be listening before the game starts, `livelove-run' takes care of that order.
-;; Other commands: `livelove-status', `livelove-show-log', `livelove-stop'.
+;; - Hot reload: editing a tracked Lua buffer pushes its source to the game,
+;;   which swaps it in without a restart.
+;; - Live feedback: the latest value of each variable is shown inline next to
+;;   the variable, and gathered in the `*livelove-values*' panel.
+;; - A REPL: evaluate a Lua expression, the region, or the current line in the
+;;   running game and read the result in the echo area.
+;; - Asset hot reload: text assets such as shaders are watched on disk and
+;;   pushed to the game as they change.
+;; - Game control: reset the graphics state, restart the game, or toggle the
+;;   live-feedback instrumentation on the fly.
 ;;
-;; A project needs only its own `main.lua' with the livelove boilerplate (see
-;; the game side): require livelove, then call `livelove.instantupdate' and
-;; `livelove.postdraw'.  `livelove-run' links the Lua support files the game
-;; needs into the project from `livelove-support-dir'; set
+;; Setup:
+;;
+;; Turn on `global-livelove-mode' to enable livelove automatically in the Lua
+;; buffers of a LÖVE project (any directory holding a `main.lua'), or enable it
+;; with `M-x livelove-mode'. Launch the game with `M-x livelove-run', which
+;; starts the server first so the game can connect. `livelove-run' symlinks
+;; the Lua support files into the project from `livelove-support-dir'. Set
 ;; `livelove-link-support-files' to nil to manage them yourself.
+;;
+;; On the game side, `main.lua' needs the livelove boilerplate. A minimal
+;; `main.lua' looks like this:
+;;
+;;     local livelove = require("livelove")
+;;
+;;     function love.update(dt)
+;;       livelove.instantupdate()
+;;     end
+;;
+;;     function love.draw()
+;;       livelove.postdraw()
+;;     end
+;;
+;; Commands:
+;;
+;; - `livelove-run', `livelove-stop' and `livelove-restart' drive the game, and
+;;   `livelove-reset' clears its graphics state without a restart.
+;; - `livelove-eval-expression', `livelove-eval-region' and `livelove-eval-line'
+;;   evaluate Lua in the running game.
+;; - `livelove-values' opens the live values panel, `livelove-toggle-hints'
+;;   hides or shows the inline overlays, and `livelove-toggle-live-vars' turns
+;;   live-feedback reporting on or off.
+;; - `livelove-status' and `livelove-show-log' inspect the server and its log.
+;;
+;; By default the inline overlays annotate every occurrence of a variable in
+;; the buffer. In a large file that gets noisy, so `livelove-hints-scope' can
+;; narrow them to the current line (`line') or the enclosing function (`defun')
+;; rather than the whole buffer (`buffer').
 ;;
 ;;; Code:
 

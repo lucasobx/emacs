@@ -909,7 +909,7 @@ Defaults to the `lua/' directory shipped alongside this package."
   :type 'directory)
 
 (defconst livelove--support-files
-  '("livelove.lua" "MessageProcessor.lua" "instrumenter.lua")
+  '("livelove.lua" "instrumenter.lua")
   "Lua support files linked into a project by `livelove-run'.")
 
 (defun livelove--ensure-support-files (project-dir)

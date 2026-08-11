@@ -263,9 +263,6 @@ local debug_bridge = {
   documents = {}
 }
 
-local MessageProcessor = require("MessageProcessor")
-livelove.processor = MessageProcessor:new({ batch_size = 100 })
-
 assets = {}
 
 function livelove.asset(path, on_update)
@@ -297,9 +294,6 @@ function livelove.init()
   livelove.local_channel = love.thread.newChannel()
   livelove.thread = love.thread.newThread([[
     local socket = require("socket")
-    -- Load the thread message processor
-    local MessageProcessor = require("MessageProcessor")
-    local processor = MessageProcessor:new({ batch_size = 100 })
 
     local channel, local_channel = ...
 
@@ -323,26 +317,9 @@ function livelove.init()
 
         local endpos = buffer:find("\n%-%-%-END%-%-%-\n")
         if endpos then
-          local message = buffer:sub(1, endpos-1)
+          local frame = buffer:sub(1, endpos-1)
           buffer = buffer:sub(endpos + 10)
-
-          -- Add to processor instead of pushing directly
-          local unprocessed = processor:add_message(message)
-          if unprocessed then
-            -- If message couldn't be processed, send it immediately
-            channel:push(unprocessed)
-          end
-        end
-      end
-
-      -- Check if we should send the batch
-      if processor.message_count > 0 and
-      (processor.message_count >= processor.batch_size or
-        (processor.last_send and socket.gettime() - processor.last_send > 0.1)) then
-        -- Send all messages in the current batch
-        local batch = processor:get_batch()
-        for _, msg in ipairs(batch) do
-          channel:push(msg)
+          channel:push(frame)
         end
       end
 

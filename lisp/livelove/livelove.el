@@ -200,7 +200,9 @@ RAW still has its surrounding newlines; they are trimmed here."
           (livelove--prune-clients)
           (livelove--log 'warning "Server stopped unexpectedly"))
       (setq livelove--clients (delq proc livelove--clients))
-      (livelove--log 'info "Client disconnected: %s" (process-name proc)))))
+      (livelove--log 'info "Client disconnected: %s" (process-name proc))
+      (unless livelove--clients
+        (livelove--clear-all-feedback)))))
 
 ;; ===============================================================
 ;;; Server lifecycle
@@ -346,11 +348,8 @@ Mark overlay positions stale and schedule a source push."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (remove-hook 'after-change-functions #'livelove--after-change t)
-      (remove-hook 'kill-buffer-hook #'livelove--on-kill-buffer t)
-      (livelove--clear-overlays)
-      (setq livelove--values nil
-            livelove--label-widths nil
-            livelove--dirty-positions t)))
+      (remove-hook 'kill-buffer-hook #'livelove--on-kill-buffer t))
+    (livelove--clear-feedback buffer))
   (setq livelove--managed-buffers (delq buffer livelove--managed-buffers)
         livelove--dirty-buffers (delq buffer livelove--dirty-buffers))
   (livelove--log 'info "Untracking %s" (buffer-name buffer)))
@@ -386,6 +385,29 @@ values wider than the cap are still shown in full."
     (maphash (lambda (_name overlays) (mapc #'delete-overlay overlays))
              livelove--overlays)
     (clrhash livelove--overlays)))
+
+(defcustom livelove-keep-values-on-disconnect nil
+  "When non-nil, keep value overlays in the buffer after the game disconnects.
+By default the overlays are cleared once the last game disconnects; enable
+this to leave the last-seen values on screen."
+  :type 'boolean)
+
+(defun livelove--clear-feedback (buffer)
+  "Delete BUFFER's value overlays and drop its cached values."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (livelove--clear-overlays)
+      (setq livelove--values nil
+            livelove--label-widths nil
+            livelove--dirty-positions t))))
+
+(defun livelove--clear-all-feedback ()
+  "Clear value overlays and cached values in every managed buffer.
+Runs when the last game disconnects, unless
+`livelove-keep-values-on-disconnect' is non-nil."
+  (unless livelove-keep-values-on-disconnect
+    (dolist (buffer livelove--managed-buffers)
+      (livelove--clear-feedback buffer))))
 
 (defun livelove--align-decimal (name value)
   "Pad numeric VALUE of variable NAME to the widest width seen for NAME.
@@ -646,7 +668,7 @@ across a project automatically."
   "When non-nil, `livelove-run' watches asset files and pushes changes.
 Files under the project whose extension is in `livelove-asset-extensions'
 are sent as ASSET_FILE_UPDATE frames when they change on disk, so shaders
-and data reload without restarting. The game must register each asset with
+and data reload without restarting.  The game must register each asset with
 `livelove.asset'."
   :type 'boolean)
 

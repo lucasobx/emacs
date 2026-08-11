@@ -75,6 +75,10 @@ Set to nil to disable logging entirely."
 (defvar livelove--flush-timer nil
   "Debounce timer coalescing pending FILE_UPDATE sends.")
 
+(defvar livelove--live-vars t
+  "Non-nil when the game should report live variable values.
+Mirrors the game's live_vars flag; reset to t when a game launches.")
+
 (defvar livelove-connect-functions nil
   "Abnormal hook run when a game connects, called with the client process.")
 
@@ -881,6 +885,7 @@ the runtime in the project root with output in the *love* buffer."
     (user-error "livelove: a game is already running (use `livelove-stop')"))
   (unless (executable-find livelove-love-command)
     (user-error "livelove: %s not found in PATH" livelove-love-command))
+  (setq livelove--live-vars t)
   (let ((default-directory (or (livelove--love-project-root)
                                (user-error "livelove: Not inside a LÖVE project"))))
     (when livelove-link-support-files
@@ -907,6 +912,40 @@ the runtime in the project root with output in the *love* buffer."
         (livelove--log 'info "Stopped the game"))
     (message "livelove: no game running"))
   (setq livelove--game-process nil))
+
+;; ===============================================================
+;;; Game control
+
+(defun livelove--send-control (command)
+  "Broadcast a GAME_CONTROL COMMAND to every connected game."
+  (livelove--prune-clients)
+  (unless livelove--clients
+    (user-error "livelove: No game connected"))
+  (livelove--broadcast (livelove--frame "GAME_CONTROL" command))
+  (livelove--log 'debug "Sent GAME_CONTROL: %s" command))
+
+;;;###autoload
+(defun livelove-reset ()
+  "Reset the running game's graphics state (canvas, shader, transforms)."
+  (interactive)
+  (livelove--send-control "reset"))
+
+;;;###autoload
+(defun livelove-toggle-live-vars ()
+  "Toggle live variable reporting in the running game.
+Turning it off stops VARS_UPDATE traffic and the instrumentation overhead."
+  (interactive)
+  (setq livelove--live-vars (not livelove--live-vars))
+  (livelove--send-control
+   (if livelove--live-vars "live_vars_on" "live_vars_off"))
+  (message "livelove: live vars %s" (if livelove--live-vars "on" "off")))
+
+;;;###autoload
+(defun livelove-restart ()
+  "Restart the LÖVE game: stop it and run it again."
+  (interactive)
+  (livelove-stop)
+  (livelove-run))
 
 (provide 'livelove)
 ;;; livelove.el ends here

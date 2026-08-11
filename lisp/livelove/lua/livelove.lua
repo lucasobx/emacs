@@ -1,7 +1,5 @@
 -- Inspired by `lurker`
 
-local live_vars = true
-
 local function lua_encode(...)
     -- Forward declaration for mutual recursion
     local encode_value
@@ -245,6 +243,7 @@ end
 local livelove = { _version = "1.0.0" }
 livelove.buffer = ""
 livelove.global_mode = false
+livelove.live_vars = true
 
 local instrumenter = require("instrumenter")
 
@@ -434,6 +433,19 @@ function livelove.handle_eval(code)
     livelove.local_channel:push("EVAL_RESULT\n" .. reply .. "\n---END---\n")
 end
 
+-- Handle a GAME_CONTROL command sent from the editor.
+function livelove.handle_control(cmd)
+    if cmd == "reset" then
+        livelove.reset()
+    elseif cmd == "live_vars_on" then
+        livelove.live_vars = true
+    elseif cmd == "live_vars_off" then
+        livelove.live_vars = false
+    else
+        livelove.print("Unknown GAME_CONTROL: {1}", { cmd })
+    end
+end
+
 function livelove.instantupdate()
     if livelove.state == "init" then
         livelove.exitinitstate()
@@ -450,6 +462,8 @@ function livelove.instantupdate()
         if path then
             if path == "EVAL" then
                 livelove.handle_eval(content)
+            elseif path == "GAME_CONTROL" then
+                livelove.handle_control(content)
             elseif path:match("ASSET_FILE_UPDATE:(.+)") then
                 path = path:match("ASSET_FILE_UPDATE:(.+)")
                 try_update_asset(path, content)
@@ -463,7 +477,7 @@ function livelove.instantupdate()
         end
     end
 
-  if live_vars then
+  if livelove.live_vars then
     local updates = {}
     local didUpdate = false
 
@@ -710,7 +724,7 @@ function livelove.hotswapinstant(f, content)
 
   local modname = livelove.modname(f)
   local instrumented_content = content
-  if live_vars then
+  if livelove.live_vars then
     instrumented_content = instrumenter.instrument_code(f, content)
   end
   local chunk, err = load(instrumented_content, modname)

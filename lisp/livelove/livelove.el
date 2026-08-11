@@ -311,6 +311,84 @@ Client connections inherit the filter, sentinel and coding system."
     (message "livelove: server not running (%d buffer(s) tracked)"
              (length livelove--managed-buffers))))
 
+;;;; Live-feedback instrumentation
+
+(declare-function treesit-available-p "treesit")
+(declare-function treesit-language-available-p "treesit")
+(declare-function treesit-parser-create "treesit")
+(declare-function treesit-parser-root-node "treesit")
+(declare-function treesit-query-capture "treesit")
+(declare-function treesit-node-child "treesit")
+(declare-function treesit-node-children "treesit")
+(declare-function treesit-node-start "treesit")
+(declare-function treesit-node-end "treesit")
+(declare-function treesit-node-text "treesit")
+
+(defvar livelove--instrument-warned nil
+  "Non-nil once a missing Lua tree-sitter grammar has been reported.")
+
+(defun livelove--lua-string (string)
+  "Return STRING as a double-quoted Lua string literal."
+  (concat "\""
+          (replace-regexp-in-string
+           "[\\\"\n]"
+           (lambda (m) (pcase m ("\n" "\\n") ("\"" "\\\"") (_ "\\\\")))
+           string t t)
+          "\""))
+
+(defun livelove--values-table (names)
+  "Return a Lua table literal binding each of NAMES to its own value.
+Dotted or indexed names become string keys, as they are not valid Lua names."
+  (concat "{"
+          (mapconcat
+           (lambda (name)
+             (if (string-match-p "[.[]" name)
+                 (format "[%s] = %s" (livelove--lua-string name) name)
+               (format "%s = %s" name name)))
+           names ", ")
+          "}"))
+
+(defun livelove--instrument (source uri)
+  "Return SOURCE instrumented so the game reports its assignments for URI.
+Return SOURCE unchanged when the Lua tree-sitter grammar is unavailable."
+  (if (not (and (require 'treesit nil t)
+                (treesit-available-p)
+                (treesit-language-available-p 'lua)))
+      (progn
+        (unless livelove--instrument-warned
+          (setq livelove--instrument-warned t)
+          (livelove--log 'warning
+                         "Lua tree-sitter grammar missing; live feedback off"))
+        source)
+    (with-temp-buffer
+      (insert source)
+      (let ((root (treesit-parser-root-node (treesit-parser-create 'lua)))
+            (edits nil))
+        (dolist (node (mapcar #'cdr
+                              (treesit-query-capture
+                               root '((assignment_statement) @a))))
+          (let ((names (seq-remove
+                        (lambda (n) (string-prefix-p "_" n))
+                        (mapcar (lambda (n) (treesit-node-text n t))
+                                (treesit-node-children
+                                 (treesit-node-child node 0 t) t)))))
+            (when names
+              (push (cons (save-excursion
+                            (goto-char (treesit-node-end node))
+                            (line-end-position))
+                          (format "\n_record_assign(%d, %s)"
+                                  (line-number-at-pos (treesit-node-start node))
+                                  (livelove--values-table names)))
+                    edits))))
+        (dolist (edit (sort edits (lambda (a b) (> (car a) (car b)))))
+          (goto-char (car edit))
+          (insert (cdr edit)))
+        (goto-char (point-min))
+        (insert (format "local _record_assign = function(l, vars) \
+require(\"livelove\").record_result(%s, l, vars) end\n"
+                        (livelove--lua-string uri)))
+        (buffer-string)))))
+
 ;;;; Live coding: push source for hot reload
 
 (defcustom livelove-update-delay 0.05
@@ -329,10 +407,14 @@ The game echoes this string back verbatim, so it must be stable."
     (buffer-substring-no-properties (point-min) (point-max))))
 
 (defun livelove--file-update-frame (buffer)
-  "Return the FILE_UPDATE frame for BUFFER, or nil when it has no file."
+  "Return the FILE_UPDATE frame for BUFFER, or nil when it has no file.
+The source is instrumented for live feedback while `livelove--live-vars'."
   (when-let* ((uri (livelove--buffer-uri buffer)))
-    (livelove--frame (concat "FILE_UPDATE:" uri)
-                     (livelove--buffer-text buffer))))
+    (let ((source (livelove--buffer-text buffer)))
+      (livelove--frame (concat "FILE_UPDATE:" uri)
+                       (if livelove--live-vars
+                           (livelove--instrument source uri)
+                         source)))))
 
 (defun livelove--send-file-update (buffer)
   "Broadcast BUFFER's current source to every connected game."
@@ -909,7 +991,7 @@ Defaults to the `lua/' directory shipped alongside this package."
   :type 'directory)
 
 (defconst livelove--support-files
-  '("livelove.lua" "instrumenter.lua")
+  '("livelove.lua")
   "Lua support files linked into a project by `livelove-run'.")
 
 (defun livelove--ensure-support-files (project-dir)

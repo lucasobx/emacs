@@ -245,8 +245,6 @@ livelove.buffer = ""
 livelove.global_mode = false
 livelove.live_vars = true
 
-local instrumenter = require("instrumenter")
-
 local lovecallbacknames = {
   "update",
   "load",
@@ -688,7 +686,7 @@ function livelove.initwrappers()
 end
 
 function livelove.hotswapinstant(f, content)
-  if f:find("livelove.lua") or f:find("instrumenter.lua") or f:find(".vscode") then
+  if f:find("livelove.lua") or f:find(".vscode") then
     return
   end
 
@@ -700,14 +698,10 @@ function livelove.hotswapinstant(f, content)
   end
 
   local modname = livelove.modname(f)
-  local instrumented_content = content
-  if livelove.live_vars then
-    instrumented_content = instrumenter.instrument_code(f, content)
-  end
-  local chunk, err = load(instrumented_content, modname)
+  local chunk, err = load(content, modname)
   if not chunk then
     livelove.print("Failed to swap '{1}' : {2}", { f, err })
-        io.write(instrumented_content)
+        io.write(content)
         io.flush() -- Make sure it's all sent to stdout
     if livelove.initialized then
       livelove.onerror(err, true)

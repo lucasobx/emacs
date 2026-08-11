@@ -27,8 +27,7 @@
 ;; buffers of a LÖVE project (any directory holding a `main.lua'), or enable it
 ;; with `M-x livelove-mode'. Launch the game with `M-x livelove-run', which
 ;; starts the server first so the game can connect. `livelove-run' symlinks
-;; the Lua support files into the project from `livelove-support-dir'. Set
-;; `livelove-link-support-files' to nil to manage them yourself.
+;; the Lua support files into the project from `livelove-support-dir'.
 ;;
 ;; On the game side, `main.lua' needs the livelove boilerplate. A minimal
 ;; `main.lua' looks like this:
@@ -991,43 +990,36 @@ Hidden directories such as .git are skipped."
   "Executable used to launch the LÖVE runtime."
   :type 'string)
 
-(defcustom livelove-link-support-files t
-  "When non-nil, `livelove-run' symlinks the Lua support files into the project.
-They point at `livelove-support-dir' so the game can require them."
-  :type 'boolean)
-
 (defcustom livelove-support-dir
   (expand-file-name "lua/"
                     (file-name-directory
                      (or load-file-name buffer-file-name default-directory)))
-  "Directory holding the Lua files the game needs at runtime.
+  "Directory holding the Lua client the game needs at runtime.
 Defaults to the `lua/' directory shipped alongside this package."
   :type 'directory)
 
-(defconst livelove--support-files
-  '("livelove.lua")
-  "Lua support files linked into a project by `livelove-run'.")
+(defconst livelove--lua-client "livelove.lua"
+  "Basename of the Lua client linked into a project by `livelove-run'.")
 
-(defun livelove--ensure-support-files (project-dir)
-  "Link the Lua support files into PROJECT-DIR from `livelove-support-dir'.
-Existing files and good symlinks are left alone, and copying is a fallback."
-  (dolist (file livelove--support-files)
-    (let ((target (expand-file-name file livelove-support-dir))
-          (link (expand-file-name file project-dir)))
-      (cond
-       ((not (file-exists-p target))
-        (livelove--log 'warning "Support file missing from package: %s" target))
-       ((file-exists-p link) nil) ; real file or working link: leave it
-       (t
-        (when (file-symlink-p link) ; dangling link: clear it first
-          (delete-file link))
-        (condition-case err
-            (make-symbolic-link target link)
-          (error
-           (livelove--log 'warning "Symlink failed (%s); copying instead"
-                          (error-message-string err))
-           (copy-file target link)))
-        (livelove--log 'info "Linked support file %s" file))))))
+(defun livelove--ensure-lua-client (project-dir)
+  "Link the Lua client into PROJECT-DIR from `livelove-support-dir'.
+An existing file or good symlink is left alone, and copying is a fallback."
+  (let ((target (expand-file-name livelove--lua-client livelove-support-dir))
+        (link (expand-file-name livelove--lua-client project-dir)))
+    (cond
+     ((not (file-exists-p target))
+      (livelove--log 'warning "Lua client missing from package: %s" target))
+     ((file-exists-p link) nil)         ; real file or working link: leave it
+     (t
+      (when (file-symlink-p link)       ; dangling link: clear it first
+        (delete-file link))
+      (condition-case err
+          (make-symbolic-link target link)
+        (error
+         (livelove--log 'warning "Symlink failed (%s); copying instead"
+                        (error-message-string err))
+         (copy-file target link)))
+      (livelove--log 'info "Linked Lua client into %s" project-dir)))))
 
 (defvar livelove--game-process nil
   "The LÖVE process launched by `livelove-run', or nil.")
@@ -1053,8 +1045,7 @@ Start the server first so the game can connect, then run it from the root."
   (let ((default-directory (or (livelove--love-project-root)
                                (user-error "livelove: Not inside a LÖVE project"))))
     (setq livelove--project-root default-directory)
-    (when livelove-link-support-files
-      (livelove--ensure-support-files default-directory))
+    (livelove--ensure-lua-client default-directory)
     (unless (process-live-p livelove--server)
       (livelove-start-server))
     (when livelove-watch-assets

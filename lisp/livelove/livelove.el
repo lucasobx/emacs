@@ -738,6 +738,7 @@ The server starts on first enable and stops when the last buffer is untracked."
 Used by `global-livelove-mode' to decide where to enable."
   :type 'string)
 
+;;;###autoload
 (define-minor-mode livelove-mode
   "Live coding for a LÖVE 2D buffer.
 Push its source to the game for hot reload and overlay the reported values.
@@ -778,17 +779,6 @@ See `global-livelove-mode' to enable this across a project automatically."
 (define-globalized-minor-mode global-livelove-mode
   livelove-mode livelove--maybe-enable
   :group 'livelove)
-
-;;;###autoload
-(defun livelove-track-buffer ()
-  "Turn on `livelove-mode' in the current buffer."
-  (interactive)
-  (livelove-mode 1))
-
-(defun livelove-untrack-buffer ()
-  "Turn off `livelove-mode' in the current buffer."
-  (interactive)
-  (livelove-mode -1))
 
 ;;;; Asset hot reload
 

@@ -111,6 +111,11 @@ Set to nil to disable logging entirely."
 (defvar livelove--flush-timer nil
   "Debounce timer coalescing pending FILE_UPDATE sends.")
 
+(defvar livelove--project-root nil
+  "Root of the LÖVE project of the running game, or nil when none runs.
+Used to send only that project's buffers, so other projects' files never
+reach the wrong game.")
+
 (defvar livelove--live-vars t
   "Non-nil when the game should report live variable values.
 It mirrors the game's live_vars flag and resets to t when a game launches.")
@@ -416,17 +421,26 @@ The source is instrumented for live feedback while `livelove--live-vars'."
                            (livelove--instrument source uri)
                          source)))))
 
+(defun livelove--buffer-in-project-p (buffer)
+  "Return non-nil when BUFFER belongs to the running game's project.
+Every buffer qualifies when no project is active, `livelove--project-root'."
+  (or (null livelove--project-root)
+      (when-let* ((file (buffer-file-name buffer)))
+        (file-in-directory-p file livelove--project-root))))
+
 (defun livelove--send-file-update (buffer)
-  "Broadcast BUFFER's current source to every connected game."
-  (when (and livelove--clients (buffer-live-p buffer))
+  "Broadcast BUFFER's current source to games of the same project."
+  (when (and livelove--clients (buffer-live-p buffer)
+             (livelove--buffer-in-project-p buffer))
     (when-let* ((frame (livelove--file-update-frame buffer)))
       (livelove--broadcast frame)
       (livelove--log 'debug "Sent FILE_UPDATE for %s" (livelove--buffer-uri buffer)))))
 
 (defun livelove--send-all-files (client)
-  "Send every managed buffer's source to CLIENT."
+  "Send the current project's managed buffers' source to CLIENT."
   (dolist (buffer livelove--managed-buffers)
-    (when (buffer-live-p buffer)
+    (when (and (buffer-live-p buffer)
+               (livelove--buffer-in-project-p buffer))
       (when-let* ((frame (livelove--file-update-frame buffer)))
         (livelove--send client frame)))))
 
@@ -1021,7 +1035,8 @@ Existing files and good symlinks are left alone, and copying is a fallback."
 (defun livelove--game-sentinel (proc _event)
   "Clear `livelove--game-process' and asset watches once PROC has exited."
   (unless (process-live-p proc)
-    (setq livelove--game-process nil)
+    (setq livelove--game-process nil
+          livelove--project-root nil)
     (livelove--unwatch-assets)
     (livelove--log 'info "Game exited")))
 
@@ -1037,6 +1052,7 @@ Start the server first so the game can connect, then run it from the root."
   (setq livelove--live-vars t)
   (let ((default-directory (or (livelove--love-project-root)
                                (user-error "livelove: Not inside a LÖVE project"))))
+    (setq livelove--project-root default-directory)
     (when livelove-link-support-files
       (livelove--ensure-support-files default-directory))
     (unless (process-live-p livelove--server)

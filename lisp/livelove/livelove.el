@@ -82,6 +82,9 @@ Set to nil to disable logging entirely."
   "Abnormal hook run for each received frame, with (HEADER PAYLOAD CLIENT).
 HEADER is the frame's first line, PAYLOAD the rest (or nil), CLIENT the process.")
 
+(defvar livelove-values-updated-hook nil
+  "Normal hook run after `livelove--values' changes for any managed buffer.")
+
 (defvar-local livelove--values nil
   "Hash table mapping a variable name to its latest value string.")
 
@@ -407,7 +410,8 @@ Runs when the last game disconnects, unless
 `livelove-keep-values-on-disconnect' is non-nil."
   (unless livelove-keep-values-on-disconnect
     (dolist (buffer livelove--managed-buffers)
-      (livelove--clear-feedback buffer))))
+      (livelove--clear-feedback buffer))
+    (run-hooks 'livelove-values-updated-hook)))
 
 (defun livelove--align-decimal (name value)
   "Pad numeric VALUE of variable NAME to the widest width seen for NAME.
@@ -522,7 +526,8 @@ existing overlays' labels in place."
                (buffer (livelove--buffer-for-uri (alist-get 'uri data))))
           (when buffer
             (livelove--merge-values buffer (alist-get 'updates data))
-            (livelove--render buffer)))
+            (livelove--render buffer)
+            (run-hooks 'livelove-values-updated-hook)))
       (error
        (livelove--log 'warning "Bad VARS_UPDATE: %s" (error-message-string err))))))
 
@@ -587,6 +592,82 @@ result appears in the echo area once the game replies."
     (livelove--handle-eval-result payload)))
 
 (add-hook 'livelove-frame-functions #'livelove--on-eval-result)
+
+;; ===============================================================
+;;; Values panel
+
+(defconst livelove--values-buffer-name "*livelove-values*"
+  "Name of the buffer showing live variable values.")
+
+(defun livelove--values-group-name (buffer)
+  "Return the values-panel group label for BUFFER.
+Uses the path relative to the LÖVE project root when available."
+  (let ((file (buffer-file-name buffer)))
+    (if file
+        (let ((root (with-current-buffer buffer (livelove--love-project-root))))
+          (if root (file-relative-name file root) (file-name-nondirectory file)))
+      (buffer-name buffer))))
+
+(defun livelove--values-cell (value)
+  "Return VALUE as a single-line string safe for a tabulated-list cell."
+  (let ((text (if (stringp value) value (format "%s" value))))
+    (replace-regexp-in-string "\n" " " text)))
+
+(defun livelove--values-groups ()
+  "Return grouped panel rows aggregated over every managed buffer.
+Each group is a source file whose rows are its variables sorted by name."
+  (let ((groups nil))
+    (dolist (buffer livelove--managed-buffers)
+      (when (buffer-live-p buffer)
+        (let ((values (buffer-local-value 'livelove--values buffer)))
+          (when (hash-table-p values)
+            (let ((name (livelove--values-group-name buffer))
+                  (rows nil))
+              (maphash
+               (lambda (var value)
+                 (push (list (cons buffer var)
+                             (vector var (livelove--values-cell value)))
+                       rows))
+               values)
+              (when rows
+                (setq rows (sort rows (lambda (a b)
+                                        (string< (aref (cadr a) 0)
+                                                 (aref (cadr b) 0)))))
+                (push (cons name rows) groups)))))))
+    (nreverse groups)))
+
+(define-derived-mode livelove-values-mode tabulated-list-mode "LL-Values"
+  "Major mode for the live values panel.
+Each row shows a tracked variable and its latest value, grouped by file."
+  (setq tabulated-list-format [("Variable" 24 nil) ("Value" 0 nil)])
+  (setq tabulated-list-groups #'livelove--values-groups)
+  (setq tabulated-list-padding 1)
+  (tabulated-list-init-header))
+
+(defun livelove--values-refresh ()
+  "Reprint the values panel from current state when it is live."
+  (let ((buffer (get-buffer livelove--values-buffer-name)))
+    (when (buffer-live-p buffer)
+      (with-current-buffer buffer
+        (tabulated-list-print t t)))))
+
+(defun livelove--values-on-kill ()
+  "Detach the panel from the update hook when its buffer is killed."
+  (remove-hook 'livelove-values-updated-hook #'livelove--values-refresh))
+
+;;;###autoload
+(defun livelove-values ()
+  "Display the live values panel and keep it updated.
+Shows every tracked variable and its latest value, grouped by file."
+  (interactive)
+  (let ((buffer (get-buffer-create livelove--values-buffer-name)))
+    (with-current-buffer buffer
+      (unless (derived-mode-p 'livelove-values-mode)
+        (livelove-values-mode)
+        (add-hook 'livelove-values-updated-hook #'livelove--values-refresh)
+        (add-hook 'kill-buffer-hook #'livelove--values-on-kill nil t))
+      (tabulated-list-print))
+    (pop-to-buffer buffer)))
 
 ;; ===============================================================
 ;;; Minor mode and project integration

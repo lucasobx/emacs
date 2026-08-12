@@ -930,6 +930,12 @@ Only text assets work, since images or audio would corrupt the stream."
 (defvar livelove--asset-watches nil
   "Active file-notify descriptors for watched asset directories.")
 
+(defvar livelove--dirty-assets nil
+  "Asset files changed on disk and awaiting an ASSET_FILE_UPDATE.")
+
+(defvar livelove--asset-flush-timer nil
+  "Debounce timer coalescing pending ASSET_FILE_UPDATE sends.")
+
 (defun livelove--asset-file-p (file)
   "Return non-nil when FILE's extension is in `livelove-asset-extensions'."
   (when-let* ((ext (file-name-extension file)))
@@ -950,20 +956,42 @@ Hidden directories such as .git are skipped."
                   (not (string-prefix-p
                         "." (file-name-nondirectory (directory-file-name dir)))))))))))
 
+(defun livelove--asset-update-frame (file)
+  "Return the ASSET_FILE_UPDATE frame for FILE, or nil when it is unreadable."
+  (when (file-readable-p file)
+    (livelove--frame (concat "ASSET_FILE_UPDATE:" file)
+                     (with-temp-buffer
+                       (insert-file-contents file)
+                       (buffer-string)))))
+
+(defun livelove--flush-assets ()
+  "Broadcast an ASSET_FILE_UPDATE for every dirty asset file."
+  (setq livelove--asset-flush-timer nil)
+  (let ((files livelove--dirty-assets))
+    (setq livelove--dirty-assets nil)
+    (dolist (file files)
+      (when-let* ((frame (livelove--asset-update-frame file)))
+        (livelove--broadcast frame)
+        (livelove--log 'info "Sent ASSET_FILE_UPDATE for %s" file)))))
+
+(defun livelove--schedule-asset-flush (file)
+  "Mark FILE dirty and re-arm the asset debounce timer.
+This coalesces the burst of file-notify events a single save can emit."
+  (unless (member file livelove--dirty-assets)
+    (push file livelove--dirty-assets))
+  (when (timerp livelove--asset-flush-timer)
+    (cancel-timer livelove--asset-flush-timer))
+  (setq livelove--asset-flush-timer
+        (run-with-timer livelove-update-delay nil #'livelove--flush-assets)))
+
 (defun livelove--on-asset-change (event)
-  "Send an ASSET_FILE_UPDATE for the file named in a file-notify EVENT."
+  "Schedule an ASSET_FILE_UPDATE for the file named in a file-notify EVENT."
   (pcase-let ((`(,_desc ,action ,file ,file1) (append event '(nil))))
     (let ((target (if (and (eq action 'renamed) file1) file1 file)))
       (when (and (memq action '(created changed renamed))
                  (stringp target)
-                 (livelove--asset-file-p target)
-                 (file-readable-p target))
-        (livelove--broadcast
-         (livelove--frame (concat "ASSET_FILE_UPDATE:" target)
-                          (with-temp-buffer
-                            (insert-file-contents target)
-                            (buffer-string))))
-        (livelove--log 'info "Sent ASSET_FILE_UPDATE for %s" target)))))
+                 (livelove--asset-file-p target))
+        (livelove--schedule-asset-flush target)))))
 
 (defun livelove--watch-assets (root)
   "Watch every asset directory under ROOT for changes."
@@ -978,7 +1006,11 @@ Hidden directories such as .git are skipped."
                       dir (error-message-string err))))))
 
 (defun livelove--unwatch-assets ()
-  "Remove every active asset file-notify watch."
+  "Remove every active asset file-notify watch and drop pending updates."
+  (when (timerp livelove--asset-flush-timer)
+    (cancel-timer livelove--asset-flush-timer)
+    (setq livelove--asset-flush-timer nil))
+  (setq livelove--dirty-assets nil)
   (dolist (desc livelove--asset-watches)
     (file-notify-rm-watch desc))
   (setq livelove--asset-watches nil))

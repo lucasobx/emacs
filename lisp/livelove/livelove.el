@@ -18,8 +18,8 @@
 ;;   running game and read the result in the echo area.
 ;; - Asset hot reload: text assets such as shaders are watched on disk and
 ;;   pushed to the game as they change.
-;; - Game control: reset the graphics state, restart the game, or toggle the
-;;   live-feedback instrumentation on the fly.
+;; - Game control: restart the game or toggle the live-feedback
+;;   instrumentation on the fly.
 ;;
 ;; Setup:
 ;;
@@ -44,8 +44,7 @@
 ;;
 ;; Commands:
 ;;
-;; - `livelove-run', `livelove-stop' and `livelove-restart' drive the game, and
-;;   `livelove-reset' clears its graphics state without a restart.
+;; - `livelove-run', `livelove-stop' and `livelove-restart' drive the game.
 ;; - `livelove-eval-expression', `livelove-eval-region' and `livelove-eval-line'
 ;;   evaluate Lua in the running game.
 ;; - `livelove-values' opens the live values panel, `livelove-toggle-hints'
@@ -1078,12 +1077,6 @@ Start the server first so the game can connect, then run it from the root."
     (user-error "livelove: No game connected"))
   (livelove--broadcast (livelove--frame "GAME_CONTROL" command))
   (livelove--log 'debug "Sent GAME_CONTROL: %s" command))
-
-;;;###autoload
-(defun livelove-reset ()
-  "Reset the running game's graphics state (canvas, shader, transforms)."
-  (interactive)
-  (livelove--send-control "reset"))
 
 ;;;###autoload
 (defun livelove-toggle-live-vars ()

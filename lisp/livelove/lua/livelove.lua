@@ -383,9 +383,7 @@ end
 
 -- Handle a GAME_CONTROL command sent from the editor.
 function livelove.handle_control(cmd)
-    if cmd == "reset" then
-        livelove.reset()
-    elseif cmd == "live_vars_on" then
+    if cmd == "live_vars_on" then
         livelove.live_vars = true
     elseif cmd == "live_vars_off" then
         livelove.live_vars = false

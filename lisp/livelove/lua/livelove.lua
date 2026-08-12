@@ -125,9 +125,6 @@ local function json_encode(val)
         ["\r"] = "\\r",
         ["\t"] = "\\t",
       }
-      if c == nil then
-        return "nil"
-      end
       return special[c] or string.format("\\u%04x", c:byte())
     end)
     return '"' .. escaped .. '"'
@@ -187,15 +184,6 @@ local function json_encode(val)
   return encode_value(val)
 end
 
-local function runWithVars(code, variables)
-    -- Create environment with all globals plus custom variables
-    local env = setmetatable(variables, {__index = _G})
-
-    -- Create and run function with environment
-    local fn = load("return " .. code, "sandbox", "t", env)
-    return fn()
-end
-
 -- From `lume`
 local function format(str, vars)
   if not vars then
@@ -208,12 +196,8 @@ local function format(str, vars)
 end
 
 -- From `lume`
-local function trim(str, chars)
-  if not chars then
-    return str:match("^[%s]*(.-)[%s]*$")
-  end
-  chars = patternescape(chars)
-  return str:match("^[" .. chars .. "]*(.-)[" .. chars .. "]*$")
+local function trim(str)
+  return str:match("^[%s]*(.-)[%s]*$")
 end
 
 local function values_equal(v1, v2)
@@ -241,8 +225,6 @@ end
 -- Helpers Above
 
 local livelove = { _version = "1.0.0" }
-livelove.buffer = ""
-livelove.global_mode = false
 livelove.live_vars = true
 
 local lovecallbacknames = {
@@ -278,11 +260,9 @@ end
 
 function livelove.init()
   livelove.print("Initializing livelove")
-  livelove.path = "."
   livelove.preswap = function() end
   livelove.postswap = function() end
   livelove.initialized = true
-  livelove.files = {}
   livelove.funcwrappers = {}
   livelove.lovefuncs = {}
   livelove.state = "init"
@@ -343,13 +323,6 @@ function livelove.exitinitstate()
   end
 end
 
-function livelove.exiterrorstate()
-  livelove.state = "normal"
-  for _, v in pairs(lovecallbacknames) do
-    love[v] = livelove.funcwrappers[v]
-  end
-end
-
 local function get_path_suffixes(full_path)
     local suffixes = {}
     local parts = {}
@@ -395,14 +368,14 @@ function livelove.handle_eval(code)
     end
     local reply
     if not fn then
-        reply = json_encode({ ok = false, error = err })
+        reply = json_encode({ error = err })
     else
         local ok, result = pcall(fn)
         if not ok then
-            reply = json_encode({ ok = false, error = tostring(result) })
+            reply = json_encode({ error = tostring(result) })
         else
             local enc_ok, encoded = pcall(lua_encode, result)
-            reply = json_encode({ ok = true, value = enc_ok and encoded or tostring(result) })
+            reply = json_encode({ value = enc_ok and encoded or tostring(result) })
         end
     end
     livelove.local_channel:push("EVAL_RESULT\n" .. reply .. "\n---END---\n")
@@ -503,29 +476,11 @@ function livelove.instantupdate()
         end
       end
 
-      -- Send all scopes in a single update if there are any changes
+      -- Send the changed variables if there were any.
       if didUpdate then
-        --livelove.print("SCOPE: {1}", {json_encode(updates)})
-        -- Create a single scope for all variables
-        local scope = {
-          variables = updates,
-          range = {
-            start = {
-              line = 0,
-              character = 0
-            },
-            ["end"] = {
-              line = 10000,
-              character = 100000
-            }
-          }
-        }
-
-        local final = {}
-        table.insert(final, scope)
         local msg = string.format(
           "VARS_UPDATE\n%s\n---END---\n",
-          json_encode({ updates = final, uri = uri })
+          json_encode({ updates = { { variables = updates } }, uri = uri })
         )
         livelove.local_channel:push(msg)
       end
@@ -544,8 +499,6 @@ livelove.proposed_content = nil
 livelove.proposed_path = nil
 livelove.had_draw_error = false
 livelove.last_working_files = {}
-livelove.last_working_draw = nil
-livelove.prev_draws = {}
 livelove.healing = false
 
 function livelove.wrap_with_timeout(func, timeout)

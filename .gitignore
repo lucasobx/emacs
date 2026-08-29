@@ -4,6 +4,7 @@ lisp/**/*.elc
 tree-sitter/
 mc-lists.el
 eln-cache/
+livelove/
 devdocs/
 eshell/
 /*.elc

@@ -629,7 +629,7 @@
 
 (use-package livelove
   :ensure nil
-  :load-path "~/.config/emacs/lisp/livelove"
+  :load-path "~/Projects/livelove"
   :hook (lua-ts-mode . global-livelove-mode)
   :custom
   (livelove-align-max-width 8)

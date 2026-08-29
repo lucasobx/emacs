@@ -32,7 +32,6 @@
     (bookmark-default-file       . "bookmarks")
     (project-list-file           . "projects")
     (savehist-file               . "history")
-    (eshell-directory-name       . "eshell/")
     (tramp-persistency-file-name . "tramp")
     (url-configuration-directory . "url/")
     (mc/list-file                . "mc-lists.el")

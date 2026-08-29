@@ -256,8 +256,9 @@
   (popper-reference-buffers
    '("\\*eldoc\\*"
      "\\*marginal notes\\*"
+     "\\*livelove\\*"
      "\\*Ibuffer\\*"
-     "\\*eshell\\*"
+     "\\*ghostel\\*"
      compilation-mode
      inf-ruby-mode
      ibuffer-mode
@@ -498,7 +499,7 @@
           (append consult-buffer-filter
                   '("\\*Async Shell Command\\*" "Output\\*$" "\\*Help\\*" "\\*Messages\\*"
                     "\\*eldoc\\*" "\\*helpful.*\\*" "\\*Ibuffer\\*" "\\*Warnings\\*"
-                    "\\*eshell\\*" "\\*Compile-Log\\*" "*scratch*"
+                    "\\*ghostel\\*" "\\*Compile-Log\\*" "*scratch*"
                     "\\*Async-native-compile-log\\*")))
   ;; prevent dired buffer from surfacing in consult-buffer when hidden by popper.
   (advice-add
@@ -717,34 +718,10 @@
 ;; ===============================================================
 ;;; TERMINAL
 
-(use-package eshell
-  :ensure nil
-  :defer t
-  :custom
-  (eshell-visual-subcommands
-   '(("git" "log" "diff" "show" "help")
-     ("sudo" "dnf")
-     ("docker" "run" "exec" "attach" "top" "logs" "stats" "compose")
-     ("podman" "run" "exec" "attach" "top" "logs" "stats" "compose")))
-  (eshell-scroll-to-bottom-on-input 'this)
-  (eshell-scroll-show-maximum-output nil)
-  (eshell-hist-ignoredups 'erase)
-  (eshell-history-size 100000)
-  (eshell-banner-message ""))
-
-(use-package eshell-snacks
-  :ensure nil
-  :load-path "~/.config/emacs/lisp"
-  :config
-  (eshell-snacks-mode 1))
-
 (use-package ghostel
   :ensure t
   :config
   (add-to-list 'ghostel-eval-cmds '("magit-status-setup-buffer" magit-status-setup-buffer)))
-
-(use-package ghostel-eshell
-  :hook (eshell-load . ghostel-eshell-visual-command-mode))
 
 (use-package ghostel-compile
   :hook (after-init . ghostel-compile-global-mode))

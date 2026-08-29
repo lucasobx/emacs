@@ -132,7 +132,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("C-z"           dired-snacks-zoxide)
   '("C-f"           dired-snacks-find)
   '("C-o"           my/open-line-below)
-  '("C-t"           eshell)
+  '("C-t"           ghostel)
   '("M-<down>"      my/move-text-down)
   '("M-<up>"        my/move-text-up)
   '("M-k"           kill-line)

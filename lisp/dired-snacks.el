@@ -620,6 +620,23 @@ Each copy is renamed with a numbered suffix to avoid clashes."
                      (= (overlay-start ov) start)))
               dired-snacks--subtree-overlays)))
 
+(defun dired-snacks--subtree-absolutize (beg end dir)
+  "Make the file names between BEG and END absolute under DIR.
+DIR is inserted invisibly, so only the base name shows."
+  (save-excursion
+    (goto-char beg)
+    (while (< (point) end)
+      (if-let* ((pos (dired-move-to-filename nil)))
+          (progn
+            (goto-char pos)
+            (insert (propertize dir
+                                'dired-filename t
+                                'invisible 'dired-snacks--subtree-hidden)))
+        ;; Lines without a file name, such as the "total used" line.
+        (put-text-property (pos-bol) (min end (1+ (pos-eol)))
+                           'invisible 'dired-snacks--subtree-hidden))
+      (forward-line 1))))
+
 (defun dired-snacks--subtree-insert ()
   "Insert the directory on this line as an inline subtree."
   (let* ((dir (file-name-as-directory (dired-get-filename nil t)))
@@ -628,20 +645,20 @@ Each copy is renamed with a numbered suffix to avoid clashes."
          (inhibit-read-only t))
     (save-excursion
       (forward-line 1)
-      (let ((beg (point)) end header-end)
-        (dired-insert-directory dir dired-actual-switches nil nil t)
-        (setq end (point))
-        (dired-build-subdir-alist)
-        (save-excursion (goto-char beg) (forward-line 1) (setq header-end (point)))
-        (let ((header (make-overlay beg header-end)))
-          (overlay-put header 'invisible 'dired-snacks--subtree-header)
-          (overlay-put header 'evaporate t)
-          (push header dired-snacks--subtree-overlays))
-        (let ((ov (make-overlay beg end)))
+      (let ((beg (point))
+            (end (point-marker)))
+        (dired-insert-directory dir dired-actual-switches nil nil nil)
+        (set-marker end (point))
+        (dired-snacks--subtree-absolutize beg end dir)
+        ;; Rear-advancing, so that expanding the last entry of this subtree
+        ;; nests inside it instead of landing just past its end.
+        (let ((ov (make-overlay beg end nil nil t)))
           (overlay-put ov 'dired-snacks--subtree depth)
+          (overlay-put ov 'dired-snacks--subtree-dir dir)
           (overlay-put ov 'line-prefix prefix)
           (overlay-put ov 'evaporate t)
           (push ov dired-snacks--subtree-overlays))
+        (set-marker end nil)
         (unless (member dir dired-snacks--subtree-dirs)
           (push dir dired-snacks--subtree-dirs))))
     (run-hooks 'dired-snacks-subtree-after-change-hook)
@@ -656,13 +673,12 @@ Each copy is renamed with a numbered suffix to avoid clashes."
       (when (and (memq o dired-snacks--subtree-overlays)
                  (>= (overlay-start o) beg)
                  (<= (overlay-end o) end))
-        (setq dired-snacks--subtree-overlays (delq o dired-snacks--subtree-overlays))
+        (setq dired-snacks--subtree-overlays (delq o dired-snacks--subtree-overlays)
+              dired-snacks--subtree-dirs
+              (delete (overlay-get o 'dired-snacks--subtree-dir)
+                      dired-snacks--subtree-dirs))
         (delete-overlay o)))
-    (delete-region beg end)
-    (dired-build-subdir-alist)
-    (setq dired-snacks--subtree-dirs
-          (seq-filter (lambda (d) (assoc d dired-subdir-alist))
-                      dired-snacks--subtree-dirs)))
+    (delete-region beg end))
   (run-hooks 'dired-snacks-subtree-after-change-hook)
   (dired-move-to-filename))
 
@@ -680,31 +696,31 @@ Each copy is renamed with a numbered suffix to avoid clashes."
 
 (defun dired-snacks--subtree-reset ()
   "Collapse every tracked subtree."
-  (when dired-snacks--subtree-dirs
+  (when dired-snacks--subtree-overlays
     (let ((inhibit-read-only t))
       ;; deepest first, so a parent is removed only after its children
-      (dolist (dir (sort dired-snacks--subtree-dirs :key #'length :reverse t))
-        (when (assoc dir dired-subdir-alist)
-          (save-excursion
-            (when (dired-goto-subdir dir)
-              (dired-kill-subdir)))))
-      (mapc #'delete-overlay dired-snacks--subtree-overlays)
-      (setq dired-snacks--subtree-overlays nil
-            dired-snacks--subtree-dirs nil))))
+      (dolist (ov (sort dired-snacks--subtree-overlays
+                        :key (lambda (o) (or (overlay-get o 'dired-snacks--subtree) 0))
+                        :reverse t))
+        (when (overlay-buffer ov)
+          (delete-region (overlay-start ov) (overlay-end ov)))
+        (delete-overlay ov)))
+    (setq dired-snacks--subtree-overlays nil
+          dired-snacks--subtree-dirs nil)))
 
 (defun dired-snacks--subtree-setup ()
   "Enable inline subtrees in the current Dired buffer."
   ;; `add-to-invisibility-spec' does not check for duplicates, and setup
   ;; runs again every time the mode is re-enabled.
-  (remove-from-invisibility-spec 'dired-snacks--subtree-header)
-  (add-to-invisibility-spec 'dired-snacks--subtree-header)
+  (remove-from-invisibility-spec 'dired-snacks--subtree-hidden)
+  (add-to-invisibility-spec 'dired-snacks--subtree-hidden)
   (add-hook 'dired-after-readin-hook #'dired-snacks--subtree-reset nil t))
 
 (defun dired-snacks--subtree-teardown ()
   "Disable inline subtrees in the current Dired buffer."
   (remove-hook 'dired-after-readin-hook #'dired-snacks--subtree-reset t)
   (dired-snacks--subtree-reset)
-  (remove-from-invisibility-spec 'dired-snacks--subtree-header))
+  (remove-from-invisibility-spec 'dired-snacks--subtree-hidden))
 
 (defun dired-snacks--subtree-refresh-icons ()
   "Redraw file icons after a subtree change, when `nerd-icons-dired' is on."
@@ -755,10 +771,16 @@ Each copy is renamed with a numbered suffix to avoid clashes."
   "Return STRING with `%' escaped, for use in a mode line construct."
   (string-replace "%" "%%" string))
 
+(defun dired-snacks--directory-at-point ()
+  "Return the directory holding the entry at point, or nil."
+  (if-let* ((file (ignore-errors (dired-get-filename nil t))))
+      (file-name-directory file)
+    (ignore-errors (dired-current-directory))))
+
 (defun dired-snacks--breadcrumb ()
   "Return a breadcrumb for the directory at point, or nil."
   (when (derived-mode-p 'dired-mode)
-    (let* ((dir (or (ignore-errors (dired-current-directory)) default-directory))
+    (let* ((dir (or (dired-snacks--directory-at-point) default-directory))
            (height dired-snacks-breadcrumb-height)
            (sep (propertize (dired-snacks--breadcrumb-quote
                              dired-snacks-breadcrumb-separator)

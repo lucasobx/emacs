@@ -235,7 +235,7 @@
       (display-buffer-in-side-window)
       (side . bottom)
       (slot . 0)
-      (window-height . 0.35))
+      (window-height . 0.5))
      ("\\*Ibuffer\\*"
       (display-buffer-in-side-window)
       (side . bottom)

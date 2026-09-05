@@ -434,12 +434,29 @@
   "When non-nil, opening a file kills the Dired buffer and fills the window."
   :type 'boolean)
 
-(defcustom dired-snacks-external-openers
-  '(("gio" "open")
-    ("xdg-open"))
+(defun dired-snacks--kde-session-p ()
+  "Return non-nil in a KDE Plasma session."
+  (or (and (getenv "KDE_FULL_SESSION") t)
+      (and (member "KDE" (split-string (or (getenv "XDG_CURRENT_DESKTOP") "")
+                                       ":" t))
+           t)))
+
+(defun dired-snacks--system-openers ()
+  "Return the default opener chain for this desktop session.
+Under KDE, `kde-open' comes first, so files are opened through KIO."
+  (append (and (dired-snacks--kde-session-p) '(("kde-open")))
+          '(("gio" "open")
+            ("xdg-open"))))
+
+(defcustom dired-snacks-external-openers (dired-snacks--system-openers)
   "Programs tried, in order, to open a file externally.
 Each entry is (PROGRAM ARG...); the first available PROGRAM is used."
   :type '(repeat (cons string (repeat string))))
+
+(defcustom dired-snacks-single-file-openers '("xdg-open")
+  "Openers that accept only one file per invocation.
+These are called once per file instead of once for the whole batch."
+  :type '(repeat string))
 
 (defcustom dired-snacks-external-app-alist nil
   "File extensions to open in an external application.
@@ -478,6 +495,15 @@ Prefer the mapped program, falling back to the default opener."
         mapped
       (dired-snacks--default-opener))))
 
+(defun dired-snacks--call-opener (opener files)
+  "Open FILES with OPENER, as (PROGRAM ARG...).
+Openers in `dired-snacks-single-file-openers' are called once per file."
+  (pcase-let ((`(,program . ,args) opener))
+    (dolist (batch (if (member program dired-snacks-single-file-openers)
+                       (mapcar #'list files)
+                     (list files)))
+      (apply #'call-process program nil 0 nil (append args batch)))))
+
 (defun dired-snacks--open-external (files)
   "Open each of FILES in its external application.
 Files sharing an opener are passed together in one call."
@@ -487,8 +513,7 @@ Files sharing an opener are passed together in one call."
           (push (expand-file-name file) (alist-get opener groups nil nil #'equal))
         (user-error "No external opener found; install glib2 (gio) or xdg-utils")))
     (pcase-dolist (`(,opener . ,names) groups)
-      (apply #'call-process (car opener) nil 0 nil
-             (append (cdr opener) (nreverse names))))))
+      (dired-snacks--call-opener opener (nreverse names)))))
 
 ;;;###autoload
 (defun dired-snacks-open ()

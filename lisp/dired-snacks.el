@@ -21,6 +21,7 @@
 ;;; Code:
 
 (eval-when-compile
+  (require 'cond-star)
   (require 'dired)
   (require 'dired-aux)
   (require 'dired-x)
@@ -72,7 +73,7 @@
       (if (and (string-match-p "[/~]" input) (file-directory-p expanded))
           expanded
         (when (executable-find "zoxide")
-          (with-temp-buffer
+          (with-work-buffer
             (when (zerop (call-process "zoxide" nil t nil "query" "--" input))
               (let ((dir (string-trim (buffer-string))))
                 (and (file-directory-p dir) dir)))))))))
@@ -299,7 +300,7 @@
   (when (buffer-live-p dired-snacks--find-buffer)
     (with-current-buffer dired-snacks--find-buffer
       (let* ((inhibit-read-only t)
-             (parsed (delq nil (mapcar #'dired-snacks--find-parse details)))
+             (parsed (seq-keep #'dired-snacks--find-parse details))
              (groups (seq-group-by #'car parsed)))
         (widen)
         (remove-overlays nil nil 'dired-snacks--find-icon t)
@@ -327,9 +328,8 @@
     (when-let* ((buf (process-buffer proc)) ((buffer-live-p buf)))
       (let ((details (with-current-buffer buf
                        (split-string (buffer-string) "\n" t))))
-        (condition-case err
-            (dired-snacks--find-render dired-snacks--find-root details)
-          (error (message "find render error: %S" err))))
+        (with-demoted-errors "find render error: %S"
+          (dired-snacks--find-render dired-snacks--find-root details)))
       (kill-buffer buf))))
 
 (defun dired-snacks--find-dispatch (query)
@@ -536,7 +536,7 @@ application; the rest are visited in Emacs, and directories are entered."
                             (and ext (concat "." ext)))
                     dir))
              (file-exists-p candidate))
-      (setq n (1+ n)))
+      (incf n))
     candidate))
 
 (defun dired-snacks--duplicate-file (file)
@@ -646,11 +646,11 @@ Each copy is renamed with a numbered suffix to avoid clashes."
   "Expand the directory at point as an inline subtree, or collapse it."
   (interactive)
   (let ((dir (dired-get-filename nil t)))
-    (cond
+    (cond*
      ((not (and dir (file-directory-p dir)))
       (user-error "Point is not on a directory"))
-     ((dired-snacks--subtree-child-overlay)
-      (dired-snacks--subtree-remove (dired-snacks--subtree-child-overlay)))
+     ((bind-and* (ov (dired-snacks--subtree-child-overlay)))
+      (dired-snacks--subtree-remove ov))
      (t (dired-snacks--subtree-insert)))))
 
 (defun dired-snacks--subtree-reset ()
@@ -658,8 +658,7 @@ Each copy is renamed with a numbered suffix to avoid clashes."
   (when dired-snacks--subtree-dirs
     (let ((inhibit-read-only t))
       ;; deepest first, so a parent is removed only after its children
-      (dolist (dir (sort (copy-sequence dired-snacks--subtree-dirs)
-                         (lambda (a b) (> (length a) (length b)))))
+      (dolist (dir (sort dired-snacks--subtree-dirs :key #'length :reverse t))
         (when (assoc dir dired-subdir-alist)
           (save-excursion
             (when (dired-goto-subdir dir)
@@ -745,7 +744,7 @@ Each copy is renamed with a numbered suffix to avoid clashes."
                                        'face `(:inherit dired-header :height ,height)))
                          (dired-snacks--breadcrumb-segments dir)
                          sep)
-              (when (> dired-snacks-breadcrumb-spacing 0)
+              (when (plusp dired-snacks-breadcrumb-spacing)
                 (propertize " " 'display
                             `(raise ,(- dired-snacks-breadcrumb-spacing))))))))
 
@@ -926,7 +925,7 @@ one Dired pane is on screen."
                     (goto-char (point-min))
                     (let ((n 0))
                       (while (not (eobp))
-                        (when (dired-snacks--mode-line-entry-p) (setq n (1+ n)))
+                        (when (dired-snacks--mode-line-entry-p) (incf n))
                         (forward-line 1))
                       n)))))
     (cdr dired-snacks--mode-line-total-cache)))
@@ -941,7 +940,7 @@ one Dired pane is on screen."
                     (save-excursion
                       (goto-char (point-min))
                       (while (and (<= (point) limit) (not (eobp)))
-                        (when (dired-snacks--mode-line-entry-p) (setq n (1+ n)))
+                        (when (dired-snacks--mode-line-entry-p) (incf n))
                         (forward-line 1)))
                     n))))
     (cdr dired-snacks--mode-line-current-cache)))
@@ -1030,7 +1029,8 @@ one Dired pane is on screen."
              (when (buffer-live-p buf)
                (with-current-buffer buf
                  (unless (or (dired-snacks--mode-line-dir-size-cached dir mtime)
-                             (gethash dir (dired-snacks--mode-line-dir-size-jobs-table)))
+                             (hash-table-contains-p
+                              dir (dired-snacks--mode-line-dir-size-jobs-table)))
                    (dired-snacks--mode-line-dir-size-start dir mtime)))))))))
 
 (defun dired-snacks--mode-line-dir-size-maybe (dir)

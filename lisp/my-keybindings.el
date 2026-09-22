@@ -101,7 +101,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 
 (keymap-unset key-translation-map "C-x 8" t)
 
-(dolist (key '("C-<wheel-down>" "C-<wheel-up>" "C-c ^" "C-z" "C-h" "C-x"))
+(dolist (key '("C-<wheel-down>" "C-<wheel-up>" "C-c ^" "C-z" "C-h" "C-x" "M-g"))
   (keymap-global-unset key t))
 
 (with-eval-after-load 'elisp-mode
@@ -118,6 +118,8 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 
 (my/bind
   '("<f1>"          scratch-buffer)
+  '("<f3>"          magit-status)
+  '("<f4>"          diff-hl-show-hunk)
   '("<f5>"          my/rotate-theme)
   '("C-<backspace>" my/backward-delete)
   '("C-<tab>"       other-window)
@@ -128,7 +130,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("C--"           text-scale-decrease)
   '("C-,"           popper-toggle)
   '("C-<"           popper-cycle)
-  '("C-p"           yank)
+  '("C-v"           yank)
   '("C-z"           dired-snacks-zoxide)
   '("C-f"           dired-snacks-find)
   '("C-o"           my/open-line-below)
@@ -260,11 +262,6 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("C-w w" split-window-below "new window ↓")
   '("C-w v" split-window-right "new window →")
   '("C-w d" delete-window      "close window"))
-
-(wk-add "C-v" "vc")
-(my/bind
- '("C-v d" diff-hl-show-hunk "show diff")
- '("C-v v" magit-status "git status"))
 
 (wk-add "C-x" "")
 (my/bind

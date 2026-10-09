@@ -132,7 +132,7 @@
   ;; faces
   (defvar my/font "TX-02 Condensed")
   (set-face-attribute 'tooltip nil :font my/font)
-  (set-face-attribute 'default nil :font my/font :height 115)
+  (set-face-attribute 'default nil :font my/font :height 110)
   (set-face-attribute 'minibuffer-nonselected nil :background 'unspecified)
 
   ;; misc

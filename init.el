@@ -251,7 +251,7 @@
   :init
   (popper-mode +1)
   :custom
-  (popper-window-height 16)
+  (popper-window-height 20)
   (popper-mode-line "")
   (popper-reference-buffers
    '("\\*eldoc\\*"

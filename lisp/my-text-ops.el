@@ -274,7 +274,7 @@ OPEN and CLOSE are one-character strings."
   (interactive)
   (my/delete-thing 'line))
 
-(defun my/delete-buffer ()
+(defun my/delete-all ()
   "Delete the entire buffer content with visual feedback."
   (interactive)
   (pulse-momentary-highlight-region (point-min) (point-max))
@@ -298,7 +298,7 @@ OPEN and CLOSE are one-character strings."
   (interactive)
   (my/copy-thing 'line))
 
-(defun my/copy-buffer ()
+(defun my/copy-all ()
   "Copy the entire buffer content to the kill ring with visual feedback."
   (interactive)
   (pulse-momentary-highlight-region (point-min) (point-max))
@@ -324,7 +324,7 @@ OPEN and CLOSE are one-character strings."
   (interactive)
   (comment-line 1))
 
-(defun my/toggle-comment-buffer ()
+(defun my/toggle-comment-all ()
   "Toggle comment on the entire buffer."
   (interactive)
   (pulse-momentary-highlight-region (point-min) (point-max))

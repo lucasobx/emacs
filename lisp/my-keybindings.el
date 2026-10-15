@@ -123,6 +123,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("<f5>"          my/rotate-theme)
   '("C-<backspace>" my/backward-delete)
   '("C-<tab>"       other-window)
+  '("C-b"           consult-buffer)
   '("C-0"           my/wrap-parens)
   '("C-]"           my/wrap-brackets)
   '("C-k"           kill-buffer-and-window)
@@ -169,19 +170,19 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("0" my/delete-inside-parens   "delete inside ()")
   '("]" my/delete-inside-brackets "delete inside []")
   '("s" my/delete-symbol      "delete symbol")
-  '("b" my/delete-buffer      "delete buffer")
   '("d" my/delete-line        "delete line")
-  '("w" my/delete-word        "delete word"))
+  '("w" my/delete-word        "delete word")
+  '("." my/delete-all         "delete all"))
 
 (wk-add "C-y" "copy")
 (my/bind-sub my/copy-map "C-y"
   '("p" my/copy-paragraph       "copy paragraph")
   '("s" my/copy-symbol          "copy symbol")
-  '("b" my/copy-buffer          "copy buffer")
   '("w" my/copy-word            "copy word")
   '("y" my/copy-line            "copy line")
   '("0" my/copy-inside-parens   "inside ()")
-  '("]" my/copy-inside-brackets "inside []"))
+  '("]" my/copy-inside-brackets "inside []")
+  '("." my/copy-all             "copy all"))
 
 ;; ===============================================================
 ;;; PREFIX GROUPS
@@ -189,8 +190,8 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 (wk-add "C-;" "comment")
 (my/bind
   '("C-; p" my/toggle-comment-paragraph "paragraph")
-  '("C-; b" my/toggle-comment-buffer    "buffer")
-  '("C-; ;" my/toggle-comment-line      "line"))
+  '("C-; ;" my/toggle-comment-line      "line")
+  '("C-; ." my/toggle-comment-all       "all"))
 
 ;; line-block counts (1-9): delete/copy/comment/select
 (dotimes (i 9)
@@ -249,12 +250,6 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("C-q s" my/select-symbol    "select symbol")
   '("C-q b" mark-whole-buffer   "select buffer")
   '("C-q q" my/select-line      "select line"))
-
-(wk-add "C-b" "buffer")
-(my/bind
-  '("C-b b" consult-buffer    "switch to buffer")
-  '("C-b s" my/system-buffers "system buffers")
-  '("C-b k" kill-buffer       "kill buffer"))
 
 (wk-add "C-w" "window")
 (my/bind

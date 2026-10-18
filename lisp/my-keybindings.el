@@ -113,6 +113,10 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   (dolist (key '("C-c <left>" "C-c <right>"))
     (keymap-unset winner-mode-map key t)))
 
+(with-eval-after-load 'org
+  (dolist (key '("M-<left>" "M-<right>"))
+    (keymap-unset org-mode-map key t)))
+
 ;; ===============================================================
 ;;; GLOBAL
 

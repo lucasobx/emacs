@@ -721,7 +721,9 @@
 (use-package ghostel
   :ensure t
   :config
-  (add-to-list 'ghostel-eval-cmds '("magit-status-setup-buffer" magit-status-setup-buffer)))
+  (add-to-list 'ghostel-eval-cmds '("magit-status-setup-buffer" magit-status-setup-buffer))
+  (define-key ghostel-semi-char-mode-map [remap my/backward-delete]
+              (lambda () (interactive) (ghostel-send-key "backspace" "meta"))))
 
 (use-package ghostel-compile
   :hook (after-init . ghostel-compile-global-mode))

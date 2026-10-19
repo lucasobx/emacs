@@ -12,6 +12,7 @@
 
 (defun my/move-text--move (n)
   "Move the current line or selected lines by N lines."
+  (undo-auto-amalgamate)
   (let* ((region (use-region-p))
          (rbeg (if region (region-beginning) (point)))
          (rend (if region (region-end) (point)))

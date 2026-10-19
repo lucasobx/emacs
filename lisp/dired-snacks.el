@@ -890,7 +890,7 @@ one Dired pane is on screen."
 ;;; mode-line
 
 (defcustom dired-snacks-mode-line-show-size t
-  "When non-nil, show the size of the entry at point."
+  "When non-nil, show the size of the file at point, or a directory's items."
   :type 'boolean)
 
 (defcustom dired-snacks-mode-line-show-time t
@@ -909,8 +909,8 @@ one Dired pane is on screen."
   "Width reserved for the entry counter, so it never shifts."
   :type 'integer)
 
-(defcustom dired-snacks-mode-line-size-width 8
-  "Width reserved for the entry size, so it never shifts."
+(defcustom dired-snacks-mode-line-size-width 10
+  "Width reserved for the size or item count, so it never shifts."
   :type 'integer)
 
 (defcustom dired-snacks-mode-line-time-format "%Y-%m-%d %H:%M"
@@ -923,25 +923,8 @@ one Dired pane is on screen."
 (defvar-local dired-snacks--mode-line-attr-cache nil
   "Cached attributes of the entry at point.")
 
-(defvar-local dired-snacks--mode-line-dir-size-cache nil
-  "Cached recursive directory sizes, a hash of DIR to (MTIME . SIZE).")
-
-(defvar-local dired-snacks--mode-line-dir-size-jobs nil
-  "Directories with a `du' process in flight.")
-
-(defcustom dired-snacks-mode-line-size-placeholder "…"
-  "Text shown while a directory's size is being computed."
-  :type 'string)
-
-(defcustom dired-snacks-mode-line-size-idle-delay 0.2
-  "Idle time before a directory's size starts computing."
-  :type 'number)
-
-(defvar-local dired-snacks--mode-line-dir-size-timer nil
-  "Idle timer that starts the pending `du' computation.")
-
-(defvar dired-snacks--mode-line-du-program 'unset
-  "Cached file name of `du', or `unset' before it is looked up.")
+(defvar-local dired-snacks--mode-line-items-cache nil
+  "Cached (DIR MTIME . COUNT) of the last directory counted.")
 
 (defvar-local dired-snacks--mode-line-total-cache nil
   "Cached count of the entries in this listing.")
@@ -1009,103 +992,30 @@ one Dired pane is on screen."
               (cons key (file-attributes name)))))
     (cdr dired-snacks--mode-line-attr-cache)))
 
-(defun dired-snacks--mode-line-du-program ()
-  "Return the file name of `du', or nil when it is unavailable."
-  (when (eq dired-snacks--mode-line-du-program 'unset)
-    (setq dired-snacks--mode-line-du-program (executable-find "du")))
-  dired-snacks--mode-line-du-program)
-
-(defun dired-snacks--mode-line-dir-size-cache-table ()
-  "Return this buffer's directory-size cache, creating it if needed."
-  (or dired-snacks--mode-line-dir-size-cache
-      (setq dired-snacks--mode-line-dir-size-cache (make-hash-table :test 'equal))))
-
-(defun dired-snacks--mode-line-dir-size-jobs-table ()
-  "Return this buffer's `du' job table, creating it if needed."
-  (or dired-snacks--mode-line-dir-size-jobs
-      (setq dired-snacks--mode-line-dir-size-jobs (make-hash-table :test 'equal))))
-
-(defun dired-snacks--mode-line-dir-size-cached (dir mtime)
-  "Return DIR's cached size when still fresh for MTIME, else nil."
-  (when-let* ((cache dired-snacks--mode-line-dir-size-cache)
-              (hit (gethash dir cache))
-              ((time-equal-p (car hit) mtime)))
-    (cdr hit)))
-
-(defun dired-snacks--mode-line-dir-size-start (dir mtime)
-  "Spawn an async `du' for DIR, caching its size tagged with MTIME."
-  (let* ((dired-buf (current-buffer))
-         (out (generate-new-buffer " *dired-snacks-du*"))
-         (proc (make-process
-                :name "dired-snacks-du"
-                :buffer out
-                :noquery t
-                :connection-type 'pipe
-                :command (list (dired-snacks--mode-line-du-program)
-                               "--summarize" "--bytes"
-                               (expand-file-name dir))
-                :sentinel
-                (lambda (proc event)
-                  (when (memq (process-status proc) '(exit signal))
-                    (let ((size (and (string-prefix-p "finished" event)
-                                     (with-current-buffer out
-                                       (goto-char (point-min))
-                                       (and (re-search-forward
-                                             "\\`[[:space:]]*\\([0-9]+\\)" nil t)
-                                            (string-to-number (match-string 1)))))))
-                      (when (buffer-live-p dired-buf)
-                        (with-current-buffer dired-buf
-                          (remhash dir (dired-snacks--mode-line-dir-size-jobs-table))
-                          (when size
-                            (puthash dir (cons mtime size)
-                                     (dired-snacks--mode-line-dir-size-cache-table)))
-                          (force-mode-line-update t)))
-                      (when (buffer-live-p out) (kill-buffer out))))))))
-    (puthash dir proc (dired-snacks--mode-line-dir-size-jobs-table))))
-
-(defun dired-snacks--mode-line-dir-size-schedule (dir mtime)
-  "Start DIR's `du' after a short idle, tagging the result with MTIME."
-  (when (timerp dired-snacks--mode-line-dir-size-timer)
-    (cancel-timer dired-snacks--mode-line-dir-size-timer))
-  (let ((buf (current-buffer)))
-    (setq dired-snacks--mode-line-dir-size-timer
-          (run-with-idle-timer
-           dired-snacks-mode-line-size-idle-delay nil
-           (lambda ()
-             (when (buffer-live-p buf)
-               (with-current-buffer buf
-                 (unless (or (dired-snacks--mode-line-dir-size-cached dir mtime)
-                             (hash-table-contains-p
-                              dir (dired-snacks--mode-line-dir-size-jobs-table)))
-                   (dired-snacks--mode-line-dir-size-start dir mtime)))))))))
-
-(defun dired-snacks--mode-line-dir-size-maybe (dir)
-  "Schedule a `du' for DIR when it is a local directory lacking a fresh size."
-  (when (and (dired-snacks--mode-line-du-program)
-             (not (file-remote-p dir))
-             (file-directory-p dir))
-    (let ((mtime (file-attribute-modification-time (file-attributes dir))))
-      (unless (dired-snacks--mode-line-dir-size-cached dir mtime)
-        (dired-snacks--mode-line-dir-size-schedule dir mtime)))))
+(defun dired-snacks--mode-line-items (dir mtime)
+  "Return the number of items in DIR, whose modification time is MTIME."
+  (pcase-let ((`(,d ,m . ,n) dired-snacks--mode-line-items-cache))
+    (if (and (equal d dir) (time-equal-p m mtime))
+        n
+      (let ((n (ignore-errors
+                 (length (directory-files dir nil directory-files-no-dot-files-regexp t)))))
+        (setq dired-snacks--mode-line-items-cache (cons dir (cons mtime n)))
+        n))))
 
 (defun dired-snacks--mode-line-size ()
-  "Return the size of the entry at point, or nil.
-Directories are measured recursively."
+  "Return the size of the file at point, or a directory's items, or nil."
   (when dired-snacks-mode-line-show-size
     (when-let* ((attrs (dired-snacks--mode-line-file-attrs)))
-      (let* ((dirp (eq (file-attribute-type attrs) t))
-             (size (cond
-                    ((not dirp) (file-attribute-size attrs))
-                    ((not (dired-snacks--mode-line-du-program))
-                     (file-attribute-size attrs))
-                    (t (dired-snacks--mode-line-dir-size-cached
-                        (dired-get-filename nil t)
-                        (file-attribute-modification-time attrs)))))
-             (text (string-pad (if size
-                                   (file-size-human-readable size)
-                                 dired-snacks-mode-line-size-placeholder)
-                               dired-snacks-mode-line-size-width nil t)))
-        (concat "  " (propertize text 'face 'shadow))))))
+      (let ((text (if (eq (file-attribute-type attrs) t)
+                      (pcase (dired-snacks--mode-line-items
+                              (dired-get-filename nil t)
+                              (file-attribute-modification-time attrs))
+                        ('nil "")
+                        (1 "1 item")
+                        (n (format "%d items" n)))
+                    (file-size-human-readable (file-attribute-size attrs)))))
+        (concat "  " (propertize (string-pad text dired-snacks-mode-line-size-width nil t)
+                                 'face 'shadow))))))
 
 (defun dired-snacks--mode-line-time ()
   "Return the modification time of the entry at point, or nil."
@@ -1180,8 +1090,6 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (let ((name (dired-get-filename nil t)))
     (unless (equal name dired-snacks--mode-line-last-file)
       (setq dired-snacks--mode-line-last-file name)
-      (when (and dired-snacks-mode-line-show-size name)
-        (dired-snacks--mode-line-dir-size-maybe name))
       (force-mode-line-update))))
 
 (defun dired-snacks--mode-line-setup ()
@@ -1191,8 +1099,6 @@ The omit indicator and the sort criterion are dropped when space runs out."
 
 (defun dired-snacks--mode-line-teardown ()
   "Give this Dired buffer the usual mode line back."
-  (when (timerp dired-snacks--mode-line-dir-size-timer)
-    (cancel-timer dired-snacks--mode-line-dir-size-timer))
   (kill-local-variable 'mode-line-format)
   (remove-hook 'post-command-hook #'dired-snacks--mode-line-refresh t)
   (force-mode-line-update))

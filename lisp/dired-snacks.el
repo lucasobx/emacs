@@ -1135,19 +1135,18 @@ Directories are measured recursively."
 
 (defun dired-snacks--sort-criterion (switches)
   "Return the sort criterion named by the `ls' SWITCHES."
-  (let ((parts (split-string switches)))
-    (cond
-     ((member "--sort=none" parts) "none")
-     ((member "--sort=time" parts) "time")
-     ((member "--sort=size" parts) "size")
-     ((member "--sort=version" parts) "version")
-     ((member "--sort=extension" parts) "type")
-     ((member "--sort=width" parts) "width")
-     ((string-match-p "\\(?:\\`\\| \\)-[a-zA-Z]*t" switches) "time")
-     ((string-match-p "\\(?:\\`\\| \\)-[a-zA-Z]*S" switches) "size")
-     ((string-match-p "\\(?:\\`\\| \\)-[a-zA-Z]*X" switches) "type")
-     ((string-match-p "\\(?:\\`\\| \\)-[a-zA-Z]*v" switches) "version")
-     (t "name"))))
+  (let ((crit "name"))
+    (dolist (switch (split-string switches) crit)
+      (cond
+       ((string-prefix-p "--sort=" switch)
+        (setq crit (pcase (string-remove-prefix "--sort=" switch)
+                     ("extension" "type")
+                     (word word))))
+       ((string-match-p "\\`-[^-]" switch)
+        (dolist (c (string-to-list (substring switch 1)))
+          (setq crit (alist-get c '((?t . "time") (?S . "size") (?X . "type")
+                                    (?v . "version") (?U . "none"))
+                                crit))))))))
 
 (defun dired-snacks--mode-line-sort ()
   "Return the sort criterion of this listing, or nil."

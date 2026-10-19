@@ -46,12 +46,23 @@
   (newline-and-indent))
 
 (defun my/beginning-of-line ()
-  "Go to first non-whitespace char, or column 0 if already there."
+  "Go to the start of the visual line, then the indentation, then column 0."
   (interactive "^")
   (let ((origin (point)))
-    (back-to-indentation)
+    (when visual-line-mode (beginning-of-visual-line))
+    (when (or (= origin (point)) (= (point) (pos-bol)))
+      (goto-char origin)
+      (back-to-indentation)
+      (when (= origin (point))
+        (beginning-of-line)))))
+
+(defun my/end-of-line ()
+  "Go to the end of the visual line, then to the end of the line."
+  (interactive "^")
+  (let ((origin (point)))
+    (when visual-line-mode (end-of-visual-line))
     (when (= origin (point))
-      (beginning-of-line))))
+      (end-of-line))))
 
 ;; ===============================================================
 ;;; DELIMITER BOUNDS

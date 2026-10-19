@@ -165,7 +165,7 @@
 
   :bind
   ("M-d"       . dired-jump)
-  ("M-<right>" . end-of-line)
+  ("M-<right>" . my/end-of-line)
   ("M-<left>"  . my/beginning-of-line)
   ("RET"       . newline-and-indent))
 

@@ -256,8 +256,8 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("C-q p" my/select-paragraph "select paragraph")
   '("C-q 0" my/select-inside-parens "select in parens")
   '("C-q s" my/select-symbol    "select symbol")
-  '("C-q b" mark-whole-buffer   "select buffer")
-  '("C-q q" my/select-line      "select line"))
+  '("C-q q" my/select-line      "select line")
+  '("C-q ." mark-whole-buffer   "select all"))
 
 (my/wk-add "C-w" "window")
 (my/bind

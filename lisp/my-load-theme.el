@@ -11,9 +11,12 @@
 
 ;;; Code:
 
+(declare-function consult-theme "consult")
+(defvar consult-themes)
+
 (defcustom my/theme nil
-  "Theme loaded at startup and saved across sessions, or nil for none.
-Chosen with `my/select-theme' or `my/rotate-theme'."
+  "Theme loaded at startup, or nil for none.
+It tracks the last theme enabled and is saved whenever it changes."
   :type '(choice (const :tag "None" nil) (symbol :tag "Theme"))
   :group 'faces)
 
@@ -28,15 +31,14 @@ Chosen with `my/select-theme' or `my/rotate-theme'."
   "Disable active themes and load THEME."
   (mapc #'disable-theme custom-enabled-themes)
   (load-theme theme :no-confirm)
-  (setq my/theme theme)
   (message "Theme: %s" theme))
 
 (defun my/select-theme ()
-  "Interactively select and load a theme."
+  "Pick a theme from `my/theme-list', previewing each one."
   (interactive)
-  (let ((choice (completing-read "Theme: " (my/theme-list) nil t)))
-    (unless (string-empty-p choice)
-      (my/load-theme (intern choice)))))
+  (require 'consult)
+  (let ((consult-themes (my/theme-list)))
+    (call-interactively #'consult-theme)))
 
 (defun my/rotate-theme ()
   "Load the next theme in `my/theme-list'."
@@ -49,7 +51,7 @@ Chosen with `my/select-theme' or `my/rotate-theme'."
         (my/load-theme (nth next themes))))))
 
 (defun my/theme--restore ()
-  "Load the saved `my/theme', warning if it can no longer be found."
+  "Load the saved `my/theme', reporting it if it can no longer be loaded."
   (when my/theme
     (condition-case err
         (my/load-theme my/theme)
@@ -58,14 +60,23 @@ Chosen with `my/select-theme' or `my/rotate-theme'."
       (error (message "Could not load saved theme `%s': %s"
                       my/theme (error-message-string err))))))
 
-(defun my/theme--persist ()
-  "Save `my/theme' for the next session."
-  (when my/theme
-    (customize-save-variable 'my/theme my/theme)))
+(defun my/theme--track (theme)
+  "Set `my/theme' to THEME, if it is an installed theme, and schedule a save."
+  (when (memq theme (custom-available-themes))
+    (setq my/theme theme)
+    (add-hook 'post-command-hook #'my/theme--save)))
 
-;; restore the saved theme after startup, and persist it on exit.
+(defun my/theme--save ()
+  "Save `my/theme' if it changed, once the minibuffer is closed.
+Waiting skips the themes that `consult-theme' only previews."
+  (unless (active-minibuffer-window)
+    (remove-hook 'post-command-hook #'my/theme--save)
+    (unless (equal my/theme (eval (car (get 'my/theme 'saved-value)) t))
+      (customize-save-variable 'my/theme my/theme))))
+
+;; track every theme change, and restore the saved theme after startup.
+(add-hook 'enable-theme-functions #'my/theme--track)
 (add-hook 'after-init-hook #'my/theme--restore)
-(add-hook 'kill-emacs-hook #'my/theme--persist)
 
 (provide 'my-load-theme)
 ;;; my-load-theme.el ends here

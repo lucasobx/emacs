@@ -10,7 +10,6 @@
 
 ;;; Code:
 
-(declare-function dired-snacks-duplicate "dired-snacks")
 (defvar winner-mode-map)
 (defvar ruby-ts-mode-map)
 (defvar dired-mode-map)
@@ -20,8 +19,8 @@
 ;;; SETUP
 
 (require 'which-key)
-(defalias 'wk-add #'which-key-add-key-based-replacements)
-(defalias 'wk-add-map #'which-key-add-keymap-based-replacements)
+(defalias 'my/wk-add #'which-key-add-key-based-replacements)
+(defalias 'my/wk-add-map #'which-key-add-keymap-based-replacements)
 
 (defvar my/override-map (make-sparse-keymap))
 (define-minor-mode my/override-mode
@@ -51,14 +50,14 @@
     (seq-let (key command desc) binding
       (keymap-set my/override-map key command)
       (cond ((eq desc t) (my/wk-hide key))
-            (desc         (wk-add key desc))))))
+            (desc         (my/wk-add key desc))))))
 
 (defun my/bind-local (keymap &rest bindings)
   "Bind each (KEY COMMAND [DESC]) in BINDINGS in KEYMAP."
   (dolist (binding bindings)
     (seq-let (key command desc) binding
       (keymap-set keymap key command)
-      (when desc (wk-add-map keymap key desc)))))
+      (when desc (my/wk-add-map keymap key desc)))))
 
 (defun my/bind-sub (map prefix &rest bindings)
   "Bind each (KEY COMMAND [DESC]) in BINDINGS in prefix MAP.
@@ -68,14 +67,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
       (keymap-set map key command)
       (let ((full (concat prefix " " key)))
         (cond ((eq desc t) (my/wk-hide full))
-              (desc         (wk-add full desc)))))))
-
-(defun my/duplicate-dwim ()
-  "Duplicate the file at point in Dired, or the line/region elsewhere."
-  (interactive)
-  (if (derived-mode-p 'dired-mode)
-      (dired-snacks-duplicate)
-    (duplicate-dwim)))
+              (desc         (my/wk-add full desc)))))))
 
 ;; ===============================================================
 ;;; COMMANDS
@@ -153,7 +145,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("M-u"           upcase-dwim)
   '("M-m"           mark-paragraph)
   '("M-l"           downcase-dwim)
-  '("M-p"           my/duplicate-dwim)
+  '("M-p"           duplicate-dwim)
   '("M-c"           capitalize-dwim))
 
 ;; ===============================================================
@@ -175,7 +167,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 (keymap-set my/override-map "C-d" (my/region-aware-prefix my/delete-map #'kill-region))
 (keymap-set my/override-map "C-y" (my/region-aware-prefix my/copy-map #'kill-ring-save))
 
-(wk-add "C-d" "delete")
+(my/wk-add "C-d" "delete")
 (my/bind-sub my/delete-map "C-d"
   '("p" my/delete-paragraph   "delete paragraph")
   '("0" my/delete-inside-parens   "delete inside ()")
@@ -185,7 +177,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("w" my/delete-word        "delete word")
   '("." my/delete-all         "delete all"))
 
-(wk-add "C-y" "copy")
+(my/wk-add "C-y" "copy")
 (my/bind-sub my/copy-map "C-y"
   '("p" my/copy-paragraph       "copy paragraph")
   '("s" my/copy-symbol          "copy symbol")
@@ -198,7 +190,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 ;; ===============================================================
 ;;; PREFIX GROUPS
 
-(wk-add "C-;" "comment")
+(my/wk-add "C-;" "comment")
 (my/bind
   '("C-; p" my/toggle-comment-paragraph "paragraph")
   '("C-; ;" my/toggle-comment-line      "line")
@@ -214,19 +206,19 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
     (my/bind-sub my/copy-map "C-y"
                  (list (number-to-string n) (intern (format "my/copy-lines-%d" n)) t))))
 
-(wk-add "C-r" "replace")
+(my/wk-add "C-r" "replace")
 (my/bind
   '("C-r r" replace-string "replace string")
   '("C-r q" query-replace  "query replace"))
 
-(wk-add "C-." "cursors")
+(my/wk-add "C-." "cursors")
 (my/bind
   '("C-. m" mc/mark-all-in-region      "cursor region")
   '("C-. l" mc/edit-lines              "cursor lines")
   '("C-. ." mc/mark-next-like-this     "cursor next")
   '("C-. /" mc/mark-previous-like-this "cursor prev"))
 
-(wk-add "C-s" "search")
+(my/wk-add "C-s" "search")
 (my/bind
   '("C-s f" find-file           "find-file")
   '("C-s h" consult-outline     "heading")
@@ -237,7 +229,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("C-s n" nerd-icons-insert   "icons")
   '("C-s s" consult-line        "line"))
 
-(wk-add "C-e" "emacs")
+(my/wk-add "C-e" "emacs")
 (my/bind
   '("C-e s" tramp-revert-buffer-with-sudo "sudo edit")
   '("C-e e" save-buffer       "save buffer")
@@ -245,7 +237,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("C-e i" my/find-init-file "init.el")
   '("C-e r" restart-emacs     "restart"))
 
-(wk-add "C-h" "help")
+(my/wk-add "C-h" "help")
 (my/bind
   '("C-h h" helpful-at-point "help at point")
   '("C-h f" helpful-function "desc function")
@@ -254,7 +246,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("C-h K" describe-keymap  "desc keymap")
   '("C-h d" devdocs-lookup   "devdocs"))
 
-(wk-add "C-q" "select")
+(my/wk-add "C-q" "select")
 (my/bind
   '("C-q p" my/select-paragraph "select paragraph")
   '("C-q 0" my/select-inside-parens "select in parens")
@@ -262,14 +254,14 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("C-q b" mark-whole-buffer   "select buffer")
   '("C-q q" my/select-line      "select line"))
 
-(wk-add "C-w" "window")
+(my/wk-add "C-w" "window")
 (my/bind
   '("C-w f" window-layout-flip-topdown "flip window ↑↓")
   '("C-w w" split-window-below "new window ↓")
   '("C-w v" split-window-right "new window →")
   '("C-w d" delete-window      "close window"))
 
-(wk-add "C-x" "")
+(my/wk-add "C-x" "")
 (my/bind
   '("C-x <right>" next-buffer     t)
   '("C-x <left>"  previous-buffer t)
@@ -279,7 +271,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 ;; ===============================================================
 ;;; MODE-LOCAL
 
-(wk-add-map prog-mode-map "C-l" "lsp")
+(my/wk-add-map prog-mode-map "C-l" "lsp")
 (my/bind-local prog-mode-map
   '("C-l n" eglot-rename     "rename symbol")
   '("C-l e" consult-flycheck "list errors"))
@@ -301,7 +293,8 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
     '("M-d"      dired-create-directory)
     '("M-s"      dired-snacks-split)
     '("M-<left>" dired-up-directory)
-    '("M-."      dired-omit-mode)))
+    '("M-."      dired-omit-mode)
+    '("<remap> <duplicate-dwim>" dired-snacks-duplicate)))
 
 (with-eval-after-load 'org
   (my/bind-local org-mode-map

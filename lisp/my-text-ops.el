@@ -37,6 +37,8 @@
      (t
       (backward-delete-char-untabify 1)))))
 
+(put 'my/backward-delete 'delete-selection 'supersede)
+
 (defun my/open-line-below ()
   "Create a new line below and move to it."
   (interactive)
@@ -192,7 +194,7 @@ OPEN and CLOSE are one-character strings."
 (defun my/delete-inside (bounds-fn)
   "Delete content inside delimiter using BOUNDS-FN with visual feedback."
   (let ((bounds (save-excursion (funcall bounds-fn))))
-    (when bounds
+    (when (and bounds (< (car bounds) (cdr bounds)))
       (pulse-momentary-highlight-region (car bounds) (cdr bounds))
       (sit-for 0.15)
       (kill-region (car bounds) (cdr bounds)))))
@@ -208,7 +210,7 @@ OPEN and CLOSE are one-character strings."
 (defun my/copy-inside (bounds-fn)
   "Copy content inside delimiter using BOUNDS-FN with visual feedback."
   (let ((bounds (save-excursion (funcall bounds-fn))))
-    (when bounds
+    (when (and bounds (< (car bounds) (cdr bounds)))
       (pulse-momentary-highlight-region (car bounds) (cdr bounds))
       (kill-ring-save (car bounds) (cdr bounds))
       (message "Copied region"))))
@@ -251,10 +253,10 @@ OPEN and CLOSE are one-character strings."
          (sit-for 0.15)
          (let ((preceded-by-space (save-excursion
                                     (goto-char (car bounds))
-                                    (looking-back "\\s-" 1)))
+                                    (looking-back "[ \t]" 1)))
                (followed-by-space (save-excursion
                                     (goto-char (cdr bounds))
-                                    (looking-at "\\s-"))))
+                                    (looking-at "[ \t]"))))
            (delete-region (car bounds) (cdr bounds))
            (cond
             (followed-by-space (delete-char 1))

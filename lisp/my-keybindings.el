@@ -85,6 +85,13 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   (interactive)
   (find-file (locate-user-emacs-file "init.el")))
 
+(defun my/kill-buffer-and-window ()
+  "Kill the current buffer, and its window when that can be deleted."
+  (interactive)
+  (if (eq (window-deletable-p) t)
+      (kill-buffer-and-window)
+    (kill-current-buffer)))
+
 (defun my/system-buffers ()
   "Switch to a system buffer."
   (interactive)
@@ -130,7 +137,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("C-b"           consult-buffer)
   '("C-0"           my/wrap-parens)
   '("C-]"           my/wrap-brackets)
-  '("C-k"           kill-buffer-and-window)
+  '("C-k"           my/kill-buffer-and-window)
   '("C-="           text-scale-increase)
   '("C--"           text-scale-decrease)
   '("C-,"           popper-toggle)
@@ -277,7 +284,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("C-l n" eglot-rename     "rename symbol")
   '("C-l e" consult-flycheck "list errors"))
 
-(with-eval-after-load 'inf-ruby
+(with-eval-after-load 'ruby-ts-mode
   (my/bind-local ruby-ts-mode-map
     '("C-l b" ruby-send-buffer "send buffer")
     '("C-l s" ruby-send-region "send region")

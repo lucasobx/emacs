@@ -709,17 +709,22 @@ DIR is inserted invisibly, so only the base name shows."
     (setq dired-snacks--subtree-overlays nil
           dired-snacks--subtree-dirs nil)))
 
+(defun dired-snacks--subtree-after-readin ()
+  "Collapse every tracked subtree after Dired reads the whole listing."
+  (unless (buffer-narrowed-p)
+    (dired-snacks--subtree-reset)))
+
 (defun dired-snacks--subtree-setup ()
   "Enable inline subtrees in the current Dired buffer."
   ;; `add-to-invisibility-spec' does not check for duplicates, and setup
   ;; runs again every time the mode is re-enabled.
   (remove-from-invisibility-spec 'dired-snacks--subtree-hidden)
   (add-to-invisibility-spec 'dired-snacks--subtree-hidden)
-  (add-hook 'dired-after-readin-hook #'dired-snacks--subtree-reset nil t))
+  (add-hook 'dired-after-readin-hook #'dired-snacks--subtree-after-readin nil t))
 
 (defun dired-snacks--subtree-teardown ()
   "Disable inline subtrees in the current Dired buffer."
-  (remove-hook 'dired-after-readin-hook #'dired-snacks--subtree-reset t)
+  (remove-hook 'dired-after-readin-hook #'dired-snacks--subtree-after-readin t)
   (dired-snacks--subtree-reset)
   (remove-from-invisibility-spec 'dired-snacks--subtree-hidden))
 

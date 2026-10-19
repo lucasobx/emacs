@@ -363,10 +363,6 @@
   (dired-mode . dired-omit-mode)
   (dired-mode . hl-line-mode))
 
-(use-package wdired
-  :ensure nil
-  :commands (wdired-change-to-wdired-mode))
-
 (use-package dired-snacks
   :ensure nil
   :load-path "~/.config/emacs/lisp"

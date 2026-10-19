@@ -349,47 +349,59 @@ OPEN and CLOSE are one-character strings."
 ;;; LINE BLOCKS
 
 (defun my/line-block-bounds (n)
-  "Return bounds (BEG . END) for the current line plus N lines below it."
-  (cons (pos-bol)
-        (save-excursion (forward-line (1+ n)) (point))))
+  "Return bounds (BEG . END) for the current line plus N lines below it.
+A negative N counts lines above it instead."
+  (if (natnump n)
+      (cons (pos-bol)
+            (save-excursion (forward-line (1+ n)) (point)))
+    (cons (save-excursion (forward-line n) (point))
+          (save-excursion (forward-line 1) (point)))))
 
 (defun my/delete-lines (n)
-  "Delete the current line plus N lines below it, with visual feedback."
+  "Delete the current line plus N lines below it, with visual feedback.
+A negative N counts lines above it instead."
   (let ((bounds (my/line-block-bounds n)))
     (pulse-momentary-highlight-region (car bounds) (cdr bounds))
     (sit-for 0.15)
     (kill-region (car bounds) (cdr bounds))))
 
 (defun my/copy-lines (n)
-  "Copy the current line plus N lines below it, with visual feedback."
+  "Copy the current line plus N lines below it, with visual feedback.
+A negative N counts lines above it instead."
   (let ((bounds (my/line-block-bounds n)))
     (pulse-momentary-highlight-region (car bounds) (cdr bounds))
     (kill-ring-save (car bounds) (cdr bounds))
-    (message "Copied %d lines" (1+ n))))
+    (message "Copied %d lines" (1+ (abs n)))))
 
 (defun my/comment-lines (n)
-  "Toggle comment on the current line plus N lines below it."
+  "Toggle comment on the current line plus N lines below it.
+A negative N counts lines above it instead."
   (let ((bounds (my/line-block-bounds n)))
     (pulse-momentary-highlight-region (car bounds) (cdr bounds))
     (sit-for 0.05)
     (comment-or-uncomment-region (car bounds) (cdr bounds))))
 
 (defun my/select-lines (n)
-  "Select the current line plus N lines below it."
+  "Select the current line plus N lines below it.
+A negative N counts lines above it instead."
   (my/select-bounds (my/line-block-bounds n)))
 
 (defmacro my/define-line-counts (helper)
-  "Define commands HELPER-1 .. HELPER-9 calling HELPER with N (1-9)."
+  "Define commands HELPER-1 .. HELPER-9 and HELPER-up-1 .. HELPER-up-9.
+They call HELPER with N or -N, for N lines below or above the current one."
   (let ((verb (capitalize (substring (symbol-name helper)
                                      (length "my/") (- (length "-lines"))))))
     `(progn
-       ,@(mapcar
+       ,@(mapcan
           (lambda (n)
-            `(defun ,(intern (format "%s-%d" helper n)) ()
-               ,(format "%s the current line plus %d line%s below it."
-                        verb n (if (= n 1) "" "s"))
-               (interactive)
-               (,helper ,n)))
+            (mapcar
+             (lambda (up)
+               `(defun ,(intern (format (if up "%s-up-%d" "%s-%d") helper n)) ()
+                  ,(format "%s the current line plus %d line%s %s it."
+                           verb n (if (= n 1) "" "s") (if up "above" "below"))
+                  (interactive)
+                  (,helper ,(if up (- n) n))))
+             '(nil t)))
           (number-sequence 1 9)))))
 
 (my/define-line-counts my/delete-lines)

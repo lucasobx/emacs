@@ -196,15 +196,17 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("C-; ;" my/toggle-comment-line      "line")
   '("C-; ." my/toggle-comment-all       "all"))
 
-;; line-block counts (1-9): delete/copy/comment/select
+;; line-block counts (1-9): delete/copy/comment/select, below or above (<up> N)
 (dotimes (i 9)
   (let ((n (1+ i)))
-    (my/bind (list (format "C-; %d" n) (intern (format "my/comment-lines-%d" n)) t))
-    (my/bind (list (format "C-q %d" n) (intern (format "my/select-lines-%d" n)) t))
-    (my/bind-sub my/delete-map "C-d"
-                 (list (number-to-string n) (intern (format "my/delete-lines-%d" n)) t))
-    (my/bind-sub my/copy-map "C-y"
-                 (list (number-to-string n) (intern (format "my/copy-lines-%d" n)) t))))
+    (pcase-dolist (`(,key ,name) '(("" "") ("<up> " "up-")))
+      (my/bind (list (format "C-; %s%d" key n) (intern (format "my/comment-lines-%s%d" name n)) t))
+      (my/bind (list (format "C-q %s%d" key n) (intern (format "my/select-lines-%s%d" name n)) t))
+      (my/bind-sub my/delete-map "C-d"
+                   (list (format "%s%d" key n) (intern (format "my/delete-lines-%s%d" name n)) t))
+      (my/bind-sub my/copy-map "C-y"
+                   (list (format "%s%d" key n) (intern (format "my/copy-lines-%s%d" name n)) t)))))
+(my/wk-hide "C-; <up>" "C-q <up>" "C-d <up>" "C-y <up>")
 
 (my/wk-add "C-r" "replace")
 (my/bind

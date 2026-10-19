@@ -41,6 +41,7 @@
 (declare-function dired-unmark-all-marks "dired")
 (declare-function dired-find-file "dired")
 (declare-function dired-goto-file "dired")
+(declare-function dired-advertise "dired")
 (declare-function dired-add-file "dired-aux")
 (declare-function dired--find-file "dired")
 (declare-function dired-kill-subdir "dired-aux")
@@ -869,7 +870,9 @@ DIR is inserted invisibly, so only the base name shows."
          ;; Hiding `dired-buffers' makes Dired build a fresh buffer instead
          ;; of returning the one already on screen.
          (buf (let ((dired-buffers nil)) (dired-noselect dir))))
-    (with-current-buffer buf (dired-snacks--split-mark))
+    (with-current-buffer buf
+      (dired-advertise)
+      (dired-snacks--split-mark))
     (if side
         (let ((display-buffer-overriding-action
                `(display-buffer-in-side-window
@@ -885,12 +888,13 @@ FILE is the file or directory being visited.  ORIG is the advised
 function, called unchanged unless FILE is a directory and more than
 one Dired pane is on screen."
   (if (and (file-directory-p file) (cdr (dired-snacks--windows)))
-      (let ((dired-buffers nil)
-            (pane dired-snacks--split-pane))
+      (let ((pane dired-snacks--split-pane))
         ;; Marks leave the buffer modified, and `find-alternate-file' asks
         ;; before discarding it.
         (set-buffer-modified-p nil)
-        (dired--find-file #'find-alternate-file file)
+        (let ((dired-buffers nil))
+          (dired--find-file #'find-alternate-file file))
+        (dired-advertise)
         (when pane (dired-snacks--split-mark)))
     (funcall orig file)))
 

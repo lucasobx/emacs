@@ -947,42 +947,49 @@ one Dired pane is on screen."
   "Cached count of the entries in this listing.")
 
 (defvar-local dired-snacks--mode-line-current-cache nil
-  "Cached index of the entry at point.")
+  "Cached count of the entries above a line, as (TICK BOL . N).")
 
 (defun dired-snacks--mode-line-entry-p ()
   "Return non-nil when the current line holds an entry."
   (when-let* ((name (dired-get-filename 'no-dir t)))
     (not (member name '("." "..")))))
 
+(defun dired-snacks--mode-line-count (beg end)
+  "Return the number of entries on the lines starting from BEG before END."
+  (save-excursion
+    (goto-char beg)
+    (let ((n 0))
+      (while (< (point) end)
+        (when (dired-snacks--mode-line-entry-p) (incf n))
+        (forward-line 1))
+      n)))
+
 (defun dired-snacks--mode-line-total ()
   "Return the number of visible files and directories."
   (let ((tick (buffer-chars-modified-tick)))
     (unless (eql tick (car dired-snacks--mode-line-total-cache))
       (setq dired-snacks--mode-line-total-cache
-            (cons tick
-                  (save-excursion
-                    (goto-char (point-min))
-                    (let ((n 0))
-                      (while (not (eobp))
-                        (when (dired-snacks--mode-line-entry-p) (incf n))
-                        (forward-line 1))
-                      n)))))
+            (cons tick (dired-snacks--mode-line-count (point-min) (point-max)))))
     (cdr dired-snacks--mode-line-total-cache)))
 
 (defun dired-snacks--mode-line-current ()
   "Return the position of the entry at point in the listing."
-  (let ((key (cons (pos-bol) (buffer-chars-modified-tick))))
-    (unless (equal key (car dired-snacks--mode-line-current-cache))
-      (setq dired-snacks--mode-line-current-cache
-            (cons key
-                  (let ((limit (car key)) (n 0))
-                    (save-excursion
-                      (goto-char (point-min))
-                      (while (and (<= (point) limit) (not (eobp)))
-                        (when (dired-snacks--mode-line-entry-p) (incf n))
-                        (forward-line 1)))
-                    n))))
-    (cdr dired-snacks--mode-line-current-cache)))
+  (let ((tick (buffer-chars-modified-tick))
+        (bol (pos-bol)))
+    (pcase-let* ((`(,old-tick ,old-bol . ,n) dired-snacks--mode-line-current-cache)
+                 (from-top (- bol (point-min)))
+                 (from-end (- (point-max) bol))
+                 (from-last (and (eql tick old-tick) (abs (- bol old-bol)))))
+      (setq n (cond ((and from-last (<= from-last (min from-top from-end)))
+                     (if (< old-bol bol)
+                         (+ n (dired-snacks--mode-line-count old-bol bol))
+                       (- n (dired-snacks--mode-line-count bol old-bol))))
+                    ((<= from-top from-end)
+                     (dired-snacks--mode-line-count (point-min) bol))
+                    (t (- (dired-snacks--mode-line-total)
+                          (dired-snacks--mode-line-count bol (point-max))))))
+      (setq dired-snacks--mode-line-current-cache (cons tick (cons bol n)))
+      (if (dired-snacks--mode-line-entry-p) (1+ n) n))))
 
 (defun dired-snacks--mode-line-index ()
   "Return the entry counter, as current over total."

@@ -108,8 +108,9 @@
                                  'face 'shadow 'cursor t))))))
 
 (defun dired-snacks--zoxide-file-name-capf ()
-  "Completion-at-point function for literal file names."
-  (list (minibuffer-prompt-end) (point) #'completion-file-name-table))
+  "Completion-at-point function for literal directory names."
+  (list (minibuffer-prompt-end) (point) #'completion-file-name-table
+        :predicate #'file-directory-p))
 
 (defun dired-snacks--zoxide-inhibit-preview ()
   "Inhibit `completion-preview' unless the input is a literal file name."

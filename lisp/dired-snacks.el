@@ -407,7 +407,7 @@ Kill the process buffer once PROC ends."
     (let ((display-buffer-overriding-action
            (and side `(display-buffer-in-side-window
                        (side . ,side) (slot . ,(or slot 0))))))
-      (display-buffer buf))
+      (display-buffer buf '(display-buffer-same-window)))
     (let ((query nil))
       (unwind-protect
           (progn
@@ -829,6 +829,22 @@ DIR is inserted invisibly, so only the base name shows."
 ;; ===============================================================
 ;;; split
 
+(defcustom dired-snacks-side-window nil
+  "When non-nil, show Dired in a bottom side window, half the frame high.
+Split panes then open beside each other."
+  :type 'boolean)
+
+(defun dired-snacks--side-window-p (buffer &rest _)
+  "Return non-nil if BUFFER is a Dired buffer for the side window."
+  (and dired-snacks-side-window
+       (buffer-match-p '(derived-mode . dired-mode) buffer)))
+
+(defconst dired-snacks--side-window-rule
+  '(dired-snacks--side-window-p
+    (display-buffer-in-side-window)
+    (side . bottom) (slot . 0) (window-height . 0.5))
+  "The `display-buffer-alist' entry behind `dired-snacks-side-window'.")
+
 (defun dired-snacks--windows ()
   "Return the list of windows showing a Dired buffer."
   (seq-filter (lambda (w)
@@ -841,10 +857,14 @@ DIR is inserted invisibly, so only the base name shows."
 (defun dired-snacks-quit ()
   "Close this Dired pane, selecting the other one when there is one."
   (interactive)
-  (let ((others (remq (selected-window) (dired-snacks--windows))))
-    (if dired-snacks--split-pane
-        (kill-current-buffer)
-      (quit-window))
+  (let ((win (selected-window))
+        (others (remq (selected-window) (dired-snacks--windows))))
+    (if (not dired-snacks--split-pane)
+        (quit-window)
+      (kill-current-buffer)
+      ;; A side window closes with its buffer; a split one has to be deleted.
+      (when (and (window-live-p win) (eq (window-deletable-p win) t))
+        (delete-window win)))
     (when-let* ((w (seq-find #'window-live-p others)))
       (select-window w))))
 
@@ -861,7 +881,8 @@ DIR is inserted invisibly, so only the base name shows."
 
 ;;;###autoload
 (defun dired-snacks-split ()
-  "Open a second Dired in the current directory, beside this one."
+  "Open a second Dired in the current directory.
+It opens beside this one in a wide or side window, else below it."
   (interactive)
   (let* ((dir default-directory)
          (win (selected-window))
@@ -878,7 +899,9 @@ DIR is inserted invisibly, so only the base name shows."
                  (side . ,side)
                  (slot . ,(1+ (or (window-parameter win 'window-slot) 0))))))
           (select-window (display-buffer buf)))
-      (select-window (split-window-right))
+      (select-window (if (window-splittable-p win t)
+                         (split-window-right)
+                       (split-window-below)))
       (switch-to-buffer buf))))
 
 (defun dired-snacks--find-isolated (orig file)
@@ -1144,6 +1167,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (add-hook 'dired-mode-hook #'dired-snacks--setup)
   (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (advice-add 'dired--find-possibly-alternative-file :around #'dired-snacks--find-isolated)
+  (add-to-list 'display-buffer-alist dired-snacks--side-window-rule)
   (dired-snacks--map-buffers #'dired-snacks--setup))
 
 (defun dired-snacks--disable ()
@@ -1153,6 +1177,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (remove-hook 'dired-mode-hook #'dired-snacks--setup)
   (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (advice-remove 'dired--find-possibly-alternative-file #'dired-snacks--find-isolated)
+  (setq display-buffer-alist (delete dired-snacks--side-window-rule display-buffer-alist))
   (dired-snacks--map-buffers #'dired-snacks--teardown))
 
 ;;;###autoload

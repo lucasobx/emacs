@@ -232,11 +232,6 @@
       (side . bottom)
       (slot . 0)
       (window-height . 0.5))
-     ((derived-mode . dired-mode)
-      (display-buffer-in-side-window)
-      (side . bottom)
-      (slot . 0)
-      (window-height . 0.5))
      ("\\*Ibuffer\\*"
       (display-buffer-in-side-window)
       (side . bottom)
@@ -373,6 +368,7 @@
   (dired-snacks-mode-line-show-omit nil)
   (dired-snacks-mode-line-show-size t)
   (dired-snacks-open-full-window t)
+  (dired-snacks-side-window nil)
   (dired-snacks-external-app-alist
    '((("mkv" "mp4" "webm" "avi" "mov" "mpg" "m4v") "vlc")
      (("mp3" "flac" "wav" "ogg" "opus" "m4a" "aac") "vlc")

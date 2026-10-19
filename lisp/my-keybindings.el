@@ -206,7 +206,10 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
                    (list (format "%s%d" key n) (intern (format "my/delete-lines-%s%d" name n)) t))
       (my/bind-sub my/copy-map "C-y"
                    (list (format "%s%d" key n) (intern (format "my/copy-lines-%s%d" name n)) t)))))
-(my/wk-hide "C-; <up>" "C-q <up>" "C-d <up>" "C-y <up>")
+;; every key under <up> is hidden
+(dolist (key '("C-; <up>" "C-q <up>" "C-d <up>" "C-y <up>"))
+  (my/wk-hide key)
+  (push (concat "\\`" (regexp-quote key) "\\'") which-key-inhibit-regexps))
 
 (my/wk-add "C-r" "replace")
 (my/bind

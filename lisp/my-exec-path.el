@@ -10,13 +10,17 @@
 
 ;;; Code:
 
+(defconst my/exec-path--delimiter "__MY_EXEC_PATH__"
+  "Delimiter around PATH in the shell output, to skip startup-file noise.")
+
 (defun my/exec-path--command (shell)
   "Return the (PROGRAM . ARGS) list that prints PATH for SHELL, or nil."
-  (pcase shell
-    ("fish" (list "fish" "-c" "string join : $PATH"))
-    ("bash" (list "bash" "-l" "-i" "-c" "printenv PATH"))
-    ("zsh"  (list "zsh"  "-l" "-i" "-c" "printenv PATH"))
-    (_ nil)))
+  (let ((print (format "printf '%s%%s%s' " my/exec-path--delimiter my/exec-path--delimiter)))
+    (pcase shell
+      ("fish" (list "fish" "-c" (concat print "(string join : $PATH)")))
+      ("bash" (list "bash" "-l" "-i" "-c" (concat print "\"$PATH\"")))
+      ("zsh"  (list "zsh"  "-l" "-i" "-c" (concat print "\"$PATH\"")))
+      (_ nil))))
 
 (defun my/exec-path-from-shell ()
   "Sync the variable `exec-path' and PATH with the login shell, asynchronously."
@@ -27,7 +31,7 @@
         (message ">>> exec-path: unsupported shell `%s'" shell)
       (let ((output "")
             (stderr (generate-new-buffer " *my-exec-path-stderr*")))
-        ;; `make-process' signals synchronously when the shell is missin,
+        ;; `make-process' signals synchronously when the shell is missing,
         ;; clean up the stderr buffer instead of leaking it in that case.
         (condition-case err
             (make-process
@@ -41,17 +45,17 @@
              :sentinel
              (lambda (_proc event)
                (unwind-protect
-                   (cond
-                    ((string-prefix-p "finished" event)
-                     (let ((path (string-trim output)))
-                       (if (string-empty-p path)
-                           (lwarn 'my/exec-path :warning "empty PATH from `%s'" shell)
+                   (let ((delimiter (regexp-quote my/exec-path--delimiter)))
+                     (cond
+                      ((not (string-prefix-p "finished" event))
+                       (message ">>> exec-path: `%s' failed: %s" shell (string-trim event)))
+                      ((string-match (concat delimiter "\\(.+?\\)" delimiter) output)
+                       (let ((path (match-string 1 output)))
                          (setenv "PATH" path)
                          (setq exec-path (append (remq nil (parse-colon-path path))
-                                                 (list exec-directory))))))
-                    ((string-match-p "\\`\\(?:exited abnormally\\|failed\\)" event)
-                     (lwarn 'my/exec-path :warning
-                            "`%s' failed to report PATH: %s" shell (string-trim event))))
+                                                 (list exec-directory)))))
+                      (t
+                       (message ">>> exec-path: no PATH in the output of `%s'" shell))))
                  (when (buffer-live-p stderr) (kill-buffer stderr)))))
           (error
            (when (buffer-live-p stderr) (kill-buffer stderr))

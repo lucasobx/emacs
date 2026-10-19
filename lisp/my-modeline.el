@@ -19,7 +19,7 @@
 
 (defun my/shorten-vc-mode (vc)
   "Return a shortened VC mode string."
-  (let* ((vc (replace-regexp-in-string "^ Git[:@-]"
+  (let* ((vc (replace-regexp-in-string "^ Git[-:@!?]"
                                        (if (char-displayable-p ?\uE0A0)
                                            "\uE0A0 " "git: ")
                                        vc)))
@@ -45,11 +45,16 @@
   "Cached vc segment for the current buffer.")
 
 (defun my/vcs--in-worktree-p ()
-  "Return non-nil if the current file is in a Git worktree."
+  "Return non-nil if the current file is in a linked Git worktree."
   (when-let* ((dir (and buffer-file-name
                         (not (file-remote-p buffer-file-name))
-                        (locate-dominating-file buffer-file-name ".git"))))
-    (file-regular-p (expand-file-name ".git" dir))))
+                        (locate-dominating-file buffer-file-name ".git")))
+              (git (expand-file-name ".git" dir)))
+    ;; Submodules have a .git file too, but it points into .git/modules/.
+    (and (file-regular-p git)
+         (with-temp-buffer
+           (insert-file-contents git)
+           (search-forward "/worktrees/" nil t)))))
 
 (defun my/mode-line-update-vcs (&rest _)
   "Update the cached vc mode-line segment."
@@ -63,7 +68,6 @@
                                 (propertize " WT" 'face 'warning))))
             (concat branch worktree)))))
 
-(add-hook 'find-file-hook #'my/mode-line-update-vcs 90)
 (add-hook 'after-save-hook #'my/mode-line-update-vcs)
 (advice-add 'vc-refresh-state :after #'my/mode-line-update-vcs)
 
@@ -107,16 +111,20 @@
 
 (defun my/flycheck-update-mode-line (status)
   "Update the cached Flycheck segment for STATUS."
-  (when (and (eq status 'finished) (bound-and-true-p flycheck-mode))
-    (pcase-let ((`(,error ,warning ,info) (my/flycheck-count-errors)))
-      (setq my/flycheck-mode-line
-            `(" "
-              (:propertize ,(number-to-string error)   face flycheck-error-list-error)
-              (:propertize " " display (space :width 0.3))
-              (:propertize ,(number-to-string warning) face flycheck-error-list-warning)
-              (:propertize " " display (space :width 0.3))
-              (:propertize ,(number-to-string info)    face flycheck-error-list-info)
-              "")))))
+  (pcase status
+    ('finished
+     (when (bound-and-true-p flycheck-mode)
+       (pcase-let ((`(,error ,warning ,info) (my/flycheck-count-errors)))
+         (setq my/flycheck-mode-line
+               `(" "
+                 (:propertize ,(number-to-string error)   face flycheck-error-list-error)
+                 (:propertize " " display (space :width 0.3))
+                 (:propertize ,(number-to-string warning) face flycheck-error-list-warning)
+                 (:propertize " " display (space :width 0.3))
+                 (:propertize ,(number-to-string info)    face flycheck-error-list-info))))))
+    ;; Flycheck clears its errors here, so drop the stale counts.
+    ((or 'errored 'no-checker)
+     (setq my/flycheck-mode-line nil))))
 
 (with-eval-after-load 'flycheck
   (add-hook 'flycheck-status-changed-functions #'my/flycheck-update-mode-line)
@@ -128,8 +136,8 @@
                 (:propertize " " display (raise -0.1)) ; bottom padding
                 (:propertize
                  (:eval (if (char-displayable-p ?λ) "λ " " ") face font-lock-keyword-face))
-                (:propertize
-                 ("" mode-line-client mode-line-modified))
+                mode-line-client
+                mode-line-modified
                 mode-line-frame-identification
                 mode-line-buffer-identification
                 "  "

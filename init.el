@@ -36,7 +36,6 @@
   ;; startup & ui
   (display-fill-column-indicator-warning nil)
   (warning-minimum-level :emergency)
-  (mode-line-percent-position nil)
   (ring-bell-function 'ignore)
   (initial-scratch-message "")
   (inhibit-startup-message t)

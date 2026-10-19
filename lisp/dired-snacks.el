@@ -41,6 +41,7 @@
 (declare-function dired-unmark-all-marks "dired")
 (declare-function dired-find-file "dired")
 (declare-function dired-goto-file "dired")
+(declare-function dired-goto-next-file "dired")
 (declare-function dired-advertise "dired")
 (declare-function dired-add-file "dired-aux")
 (declare-function dired--find-file "dired")
@@ -278,19 +279,6 @@
             (overlay-put ov 'before-string (propertize str 'display str))))
         (forward-line 1)))))
 
-(defun dired-snacks--find-goto (file)
-  "Move point to FILE."
-  (goto-char (point-min))
-  (let ((found nil))
-    (while (and (not found) (not (eobp)))
-      (when (dired-move-to-filename nil)
-        (let ((this (dired-get-filename nil t)))
-          (when (and this (file-equal-p this file))
-            (setq found t))))
-      (unless found (forward-line 1)))
-    (when found (dired-move-to-filename))
-    found))
-
 (defun dired-snacks--find-insert-groups (groups)
   "Insert GROUPS as Dired subdir listings."
   (let ((first t))
@@ -324,9 +312,7 @@
         (dired-snacks--find-icon-subdirs)
         (goto-char (point-min))
         (when (and parsed (null (cdr parsed)))
-          (let ((target (expand-file-name (nth 1 (car parsed))
-                                          (nth 0 (car parsed)))))
-            (dired-snacks--find-goto target)))))))
+          (dired-goto-next-file))))))
 
 (defun dired-snacks--find-sentinel (proc event)
   "Render PROC's results when EVENT indicates completion.
@@ -542,8 +528,7 @@ application; the rest are visited in Emacs, and directories are entered."
            (list file))))
      ((and dired-snacks-open-full-window
            (not (file-directory-p file)))
-      (kill-buffer (current-buffer))
-      (find-file file))
+      (find-alternate-file file))
      (t
       (dired-find-file)))))
 
@@ -593,10 +578,7 @@ application; the rest are visited in Emacs, and directories are entered."
   "Duplicate the marked files, or the file at point.
 Each copy is renamed with a numbered suffix to avoid clashes."
   (interactive)
-  (let* ((files (dired-get-marked-files nil nil nil t))
-         (single (eq (car files) t))
-         (copies (mapcar #'dired-snacks--duplicate-file
-                         (if single (cdr files) files))))
+  (let ((copies (mapcar #'dired-snacks--duplicate-file (dired-get-marked-files))))
     (when copies
       (dired-goto-file (car copies))
       (message "Duplicated %d file%s"
@@ -903,9 +885,6 @@ function, called unchanged unless FILE is a directory and more than
 one Dired pane is on screen."
   (if (and (file-directory-p file) (cdr (dired-snacks--windows)))
       (let ((pane dired-snacks--split-pane))
-        ;; Marks leave the buffer modified, and `find-alternate-file' asks
-        ;; before discarding it.
-        (set-buffer-modified-p nil)
         (let ((dired-buffers nil))
           (dired--find-file #'find-alternate-file file))
         (dired-advertise)
@@ -1229,8 +1208,8 @@ The omit indicator and the sort criterion are dropped when space runs out."
   "Install the buffer-local features in the current Dired buffer."
   (dired-snacks--subtree-setup)
   (dired-snacks--breadcrumb-setup)
-  ;; `dired-mode-hook' runs before the listing exists, so a buffer that
-  ;; already has one needs decorating right now.
+  ;; A buffer that already has a listing needs decorating now.  From
+  ;; `dired-mode-hook' there is none yet, and this does nothing.
   (dired-snacks--breadcrumb-decorate)
   (dired-snacks--mode-line-setup)
   (dired-snacks--quit-mode 1))
@@ -1246,10 +1225,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   "Install the passive features."
   (add-hook 'find-file-hook #'dired-snacks--zoxide-add-default-directory)
   (add-hook 'dired-mode-hook #'dired-snacks--zoxide-add-default-directory)
-  (add-hook 'dired-mode-hook #'dired-snacks--subtree-setup)
-  (add-hook 'dired-mode-hook #'dired-snacks--breadcrumb-setup)
-  (add-hook 'dired-mode-hook #'dired-snacks--mode-line-setup)
-  (add-hook 'dired-mode-hook #'dired-snacks--quit-mode)
+  (add-hook 'dired-mode-hook #'dired-snacks--setup)
   (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (advice-add 'dired--find-possibly-alternative-file :around #'dired-snacks--find-isolated)
   (dired-snacks--map-buffers #'dired-snacks--setup))
@@ -1258,10 +1234,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   "Remove the passive features."
   (remove-hook 'find-file-hook #'dired-snacks--zoxide-add-default-directory)
   (remove-hook 'dired-mode-hook #'dired-snacks--zoxide-add-default-directory)
-  (remove-hook 'dired-mode-hook #'dired-snacks--subtree-setup)
-  (remove-hook 'dired-mode-hook #'dired-snacks--breadcrumb-setup)
-  (remove-hook 'dired-mode-hook #'dired-snacks--mode-line-setup)
-  (remove-hook 'dired-mode-hook #'dired-snacks--quit-mode)
+  (remove-hook 'dired-mode-hook #'dired-snacks--setup)
   (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (advice-remove 'dired--find-possibly-alternative-file #'dired-snacks--find-isolated)
   (dired-snacks--map-buffers #'dired-snacks--teardown))

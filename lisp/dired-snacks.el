@@ -324,14 +324,17 @@
             (dired-snacks--find-goto target)))))))
 
 (defun dired-snacks--find-sentinel (proc event)
-  "Render PROC's results when EVENT indicates completion, then clean up."
-  (when (string-prefix-p "finished" event)
-    (when-let* ((buf (process-buffer proc)) ((buffer-live-p buf)))
+  "Render PROC's results when EVENT indicates completion.
+Kill the process buffer once PROC ends."
+  (when-let* (((memq (process-status proc) '(exit signal)))
+              (buf (process-buffer proc))
+              ((buffer-live-p buf)))
+    (when (string-prefix-p "finished" event)
       (let ((details (with-current-buffer buf
                        (split-string (buffer-string) "\n" t))))
         (with-demoted-errors "find render error: %S"
-          (dired-snacks--find-render dired-snacks--find-root details)))
-      (kill-buffer buf))))
+          (dired-snacks--find-render dired-snacks--find-root details))))
+    (kill-buffer buf)))
 
 (defun dired-snacks--find-dispatch (query)
   "Kill any running search and start an async `fd' for QUERY."

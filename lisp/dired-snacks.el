@@ -1099,8 +1099,9 @@ one Dired pane is on screen."
                    (dired-snacks--mode-line-dir-size-start dir mtime)))))))))
 
 (defun dired-snacks--mode-line-dir-size-maybe (dir)
-  "Schedule a `du' for DIR when it is a directory lacking a fresh size."
+  "Schedule a `du' for DIR when it is a local directory lacking a fresh size."
   (when (and (dired-snacks--mode-line-du-program)
+             (not (file-remote-p dir))
              (file-directory-p dir))
     (let ((mtime (file-attribute-modification-time (file-attributes dir))))
       (unless (dired-snacks--mode-line-dir-size-cached dir mtime)

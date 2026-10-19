@@ -268,7 +268,7 @@ OPEN and CLOSE are one-character strings."
                (followed-by-space (save-excursion
                                     (goto-char (cdr bounds))
                                     (looking-at "[ \t]"))))
-           (delete-region (car bounds) (cdr bounds))
+           (kill-new (filter-buffer-substring (car bounds) (cdr bounds) t))
            (cond
             (followed-by-space (delete-char 1))
             (preceded-by-space (delete-char -1))))))))

@@ -137,12 +137,20 @@ OPEN and CLOSE are one-character strings."
 ;; ===============================================================
 ;;; SELECTION
 
-(defun my/select-bounds (bounds)
-  "Activate a region spanning BOUNDS, a cons cell of (START . END)."
+(defun my/select-bounds (bounds &optional backward)
+  "Select BOUNDS (START . END) with point at END, or at START if BACKWARD.
+Shifted motions extend the selection."
   (when bounds
-    (goto-char (car bounds))
-    (set-mark (cdr bounds))
-    (activate-mark)))
+    (set-mark (if backward (cdr bounds) (car bounds)))
+    (goto-char (if backward (car bounds) (cdr bounds)))
+    (activate-mark)
+    (setq-local shift-select-mode 'permanent)
+    (add-hook 'deactivate-mark-hook #'my/select--restore nil t)))
+
+(defun my/select--restore ()
+  "Restore normal shift selection after a region from `my/select-bounds'."
+  (kill-local-variable 'shift-select-mode)
+  (remove-hook 'deactivate-mark-hook #'my/select--restore t))
 
 ;; select thing at point
 (defmacro my/define-select (name thing)
@@ -389,7 +397,7 @@ A negative N counts lines above it instead."
 (defun my/select-lines (n)
   "Select the current line plus N lines below it.
 A negative N counts lines above it instead."
-  (my/select-bounds (my/line-block-bounds n)))
+  (my/select-bounds (my/line-block-bounds n) (< n 0)))
 
 (defmacro my/define-line-counts (helper)
   "Define commands HELPER-1 .. HELPER-9 and HELPER-up-1 .. HELPER-up-9.

@@ -47,6 +47,7 @@
 (declare-function dired-kill-subdir "dired-aux")
 (declare-function dired-hide-subdir "dired-aux")
 (declare-function dired-omit-mode "dired-x")
+(declare-function dired-omit-expunge "dired-x")
 (declare-function browse-url-file-url "browse-url")
 
 (declare-function nerd-icons-dired--refresh "nerd-icons-dired")
@@ -660,6 +661,10 @@ DIR is inserted invisibly, so only the base name shows."
         (dired-insert-directory dir dired-actual-switches nil nil nil)
         (set-marker end (point))
         (dired-snacks--subtree-absolutize beg end dir)
+        (when (bound-and-true-p dired-omit-mode)
+          (let ((dired-omit-size-limit nil)
+                (dired-omit-verbose nil))
+            (dired-omit-expunge)))
         ;; Rear-advancing, so that expanding the last entry of this subtree
         ;; nests inside it instead of landing just past its end.
         (let ((ov (make-overlay beg end nil nil t)))

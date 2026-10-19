@@ -43,6 +43,7 @@
   (echo-keystrokes 0.1)
   (use-short-answers t)
   (use-dialog-box nil)
+  (cursor-type 'bar)
 
   ;; line numbers
   (display-line-numbers-type 'relative)

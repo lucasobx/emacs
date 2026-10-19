@@ -598,9 +598,6 @@ Each copy is renamed with a numbered suffix to avoid clashes."
 (defvar-local dired-snacks--subtree-overlays nil
   "Subtree overlays in this buffer.")
 
-(defvar-local dired-snacks--subtree-dirs nil
-  "Directories currently expanded as subtrees.")
-
 (defun dired-snacks--subtree-depth-at (pos)
   "Return the depth of the innermost subtree covering POS, or 0 if none."
   (let ((depth 0))
@@ -655,13 +652,10 @@ DIR is inserted invisibly, so only the base name shows."
         ;; nests inside it instead of landing just past its end.
         (let ((ov (make-overlay beg end nil nil t)))
           (overlay-put ov 'dired-snacks--subtree depth)
-          (overlay-put ov 'dired-snacks--subtree-dir dir)
           (overlay-put ov 'line-prefix prefix)
           (overlay-put ov 'evaporate t)
           (push ov dired-snacks--subtree-overlays))
-        (set-marker end nil)
-        (unless (member dir dired-snacks--subtree-dirs)
-          (push dir dired-snacks--subtree-dirs))))
+        (set-marker end nil)))
     (run-hooks 'dired-snacks-subtree-after-change-hook)
     (dired-move-to-filename)))
 
@@ -674,10 +668,7 @@ DIR is inserted invisibly, so only the base name shows."
       (when (and (memq o dired-snacks--subtree-overlays)
                  (>= (overlay-start o) beg)
                  (<= (overlay-end o) end))
-        (setq dired-snacks--subtree-overlays (delq o dired-snacks--subtree-overlays)
-              dired-snacks--subtree-dirs
-              (delete (overlay-get o 'dired-snacks--subtree-dir)
-                      dired-snacks--subtree-dirs))
+        (setq dired-snacks--subtree-overlays (delq o dired-snacks--subtree-overlays))
         (delete-overlay o)))
     (delete-region beg end))
   (run-hooks 'dired-snacks-subtree-after-change-hook)
@@ -706,8 +697,7 @@ DIR is inserted invisibly, so only the base name shows."
         (when (overlay-buffer ov)
           (delete-region (overlay-start ov) (overlay-end ov)))
         (delete-overlay ov)))
-    (setq dired-snacks--subtree-overlays nil
-          dired-snacks--subtree-dirs nil)))
+    (setq dired-snacks--subtree-overlays nil)))
 
 (defun dired-snacks--subtree-after-readin ()
   "Collapse every tracked subtree after Dired reads the whole listing."

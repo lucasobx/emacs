@@ -82,18 +82,18 @@ For delimiters lacking list syntax; balances nesting but ignores strings."
           (save-excursion
             (while (and (not start) (re-search-backward re nil t))
               (cond
-               ((eq (char-after) close) (setq depth (1+ depth)))
+               ((eq (char-after) close) (incf depth))
                ((zerop depth) (setq start (1+ (point))))
-               (t (setq depth (1- depth))))))))
+               (t (decf depth)))))))
       (when start
         (goto-char start)
         (let ((depth 0) end)
           (while (and (not end) (re-search-forward re nil t))
             (let ((c (char-before)))
               (cond
-               ((eq c open) (setq depth (1+ depth)))
+               ((eq c open) (incf depth))
                ((zerop depth) (setq end (1- (point))))
-               (t (setq depth (1- depth))))))
+               (t (decf depth)))))
           (when end (cons start end)))))))
 
 (defun my/inside--bounds (open close)
@@ -159,21 +159,18 @@ OPEN and CLOSE are one-character strings."
 
 (defmacro my/define-wrap (suffix open close)
   "Define a command that wraps text with OPEN and CLOSE, identified by SUFFIX."
-  `(defun ,(intern (format "my/wrap-%s" suffix)) ()
-     ,(format "Wrap the region, or the symbol at point, with %s%s." open close)
-     (interactive)
-     (let ((bounds (if (use-region-p)
-                       (cons (region-beginning) (region-end))
-                     (and (memq (char-syntax (or (char-after) ?\s)) '(?w ?_))
-                          (bounds-of-thing-at-point 'symbol)))))
-       (when bounds
-         (let ((beg (car bounds))
-               (end (cdr bounds)))
-           (save-excursion
-             (goto-char end) (insert ,close)
-             (goto-char beg) (insert ,open))
-           (pulse-momentary-highlight-region beg (+ end (length ,open) (length ,close)))
-           (when (use-region-p) (deactivate-mark)))))))
+  `(defun ,(intern (format "my/wrap-%s" suffix)) (beg end)
+     ,(format "Wrap the text from BEG to END, or the symbol at point, with %s%s." open close)
+     (interactive "R")
+     (unless beg
+       (when-let* ((bounds (and (memq (char-syntax (or (char-after) ?\s)) '(?w ?_))
+                                (bounds-of-thing-at-point 'symbol))))
+         (setq beg (car bounds) end (cdr bounds))))
+     (when beg
+       (save-excursion
+         (goto-char end) (insert ,close)
+         (goto-char beg) (insert ,open))
+       (pulse-momentary-highlight-region beg (+ end (length ,open) (length ,close))))))
 
 (my/define-wrap parens   "(" ")")
 (my/define-wrap brackets "[" "]")

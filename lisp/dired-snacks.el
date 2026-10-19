@@ -550,11 +550,14 @@ application; the rest are visited in Emacs, and directories are entered."
 ;; ===============================================================
 ;;; duplicate
 
-(defun dired-snacks--numbered-stem (base)
-  "Return BASE without a trailing -N suffix."
-  (if (string-match "\\`\\(.+?\\)-[0-9]+\\'" base)
-      (match-string 1 base)
-    base))
+(defun dired-snacks--numbered-stem (base ext dir)
+  "Return BASE without a trailing -N if that name, plus EXT, exists in DIR."
+  (let ((stem (and (string-match "\\`\\(.+?\\)-[0-9]+\\'" base)
+                   (match-string 1 base))))
+    (if (and stem (file-exists-p
+                   (expand-file-name (concat stem (and ext (concat "." ext))) dir)))
+        stem
+      base)))
 
 (defun dired-snacks--unique-copy-name (file)
   "Return an absolute, free name for a numbered copy of FILE."
@@ -563,7 +566,7 @@ application; the rest are visited in Emacs, and directories are entered."
          (node (file-name-nondirectory file))
          (ext  (unless (file-directory-p file) (file-name-extension node)))
          (base (if ext (file-name-sans-extension node) node))
-         (stem (dired-snacks--numbered-stem base))
+         (stem (dired-snacks--numbered-stem base ext dir))
          (n 1)
          candidate)
     (while (progn

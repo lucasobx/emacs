@@ -236,6 +236,9 @@
 (defvar dired-snacks--find-root nil
   "Root directory of the current search.")
 
+(defvar dired-snacks--find-query nil
+  "Query of the latest search started.")
+
 (defun dired-snacks--find-fd-args (query dir)
   "Return the `fd' arguments to search for QUERY under DIR."
   (append '("--color=never" "--list-details" "--hidden" "--no-ignore"
@@ -338,6 +341,7 @@ Kill the process buffer once PROC ends."
 
 (defun dired-snacks--find-dispatch (query)
   "Kill any running search and start an async `fd' for QUERY."
+  (setq dired-snacks--find-query query)
   (when (and dired-snacks--find-proc
              (process-live-p dired-snacks--find-proc))
     (delete-process dired-snacks--find-proc))
@@ -366,15 +370,16 @@ Kill the process buffer once PROC ends."
           (run-with-timer dired-snacks-find-debounce nil
                           #'dired-snacks--find-dispatch query))))
 
-(defun dired-snacks--find-cleanup ()
-  "Tear down the live-search timer and process."
+(defun dired-snacks--find-cleanup (&optional keep-proc)
+  "Tear down the live-search timer and, unless KEEP-PROC, the process."
   (when (timerp dired-snacks--find-timer)
     (cancel-timer dired-snacks--find-timer))
-  (when (and dired-snacks--find-proc
-             (process-live-p dired-snacks--find-proc))
-    (delete-process dired-snacks--find-proc))
-  (setq dired-snacks--find-timer nil
-        dired-snacks--find-proc nil))
+  (unless keep-proc
+    (when (and dired-snacks--find-proc
+               (process-live-p dired-snacks--find-proc))
+      (delete-process dired-snacks--find-proc))
+    (setq dired-snacks--find-proc nil))
+  (setq dired-snacks--find-timer nil))
 
 ;;;###autoload
 (defun dired-snacks-find ()
@@ -388,8 +393,10 @@ Kill the process buffer once PROC ends."
          (bufname (format "*find: %s*" (abbreviate-file-name root)))
          (buf (progn (when (get-buffer bufname) (kill-buffer bufname))
                      (get-buffer-create bufname))))
+    (dired-snacks--find-cleanup)
     (setq dired-snacks--find-buffer buf
-          dired-snacks--find-root root)
+          dired-snacks--find-root root
+          dired-snacks--find-query nil)
     (with-current-buffer buf
       (let ((inhibit-read-only t))
         (erase-buffer)
@@ -407,29 +414,28 @@ Kill the process buffer once PROC ends."
            (and side `(display-buffer-in-side-window
                        (side . ,side) (slot . ,(or slot 0))))))
       (display-buffer buf))
-    (let ((confirmed nil))
+    (let ((query nil))
       (unwind-protect
           (progn
-            (condition-case nil
-                (progn
-                  (minibuffer-with-setup-hook
-                      (lambda ()
-                        (add-hook 'after-change-functions
-                                  #'dired-snacks--find-schedule nil t)
-                        (add-hook 'minibuffer-exit-hook
-                                  #'dired-snacks--find-cleanup nil t))
-                    (read-from-minibuffer
-                     (format "Find name under %s: "
-                             (abbreviate-file-name root))))
-                  (setq confirmed t))
-              (quit nil))
-            (if confirmed
+            (setq query
+                  (condition-case nil
+                      (minibuffer-with-setup-hook
+                          (lambda ()
+                            (add-hook 'after-change-functions
+                                      #'dired-snacks--find-schedule nil t))
+                        (read-from-minibuffer
+                         (format "Find name under %s: "
+                                 (abbreviate-file-name root))))
+                    (quit nil)))
+            (if query
                 (when (buffer-live-p buf)
+                  (unless (equal query dired-snacks--find-query)
+                    (dired-snacks--find-dispatch query))
                   (if-let* ((win (get-buffer-window buf)))
                       (select-window win)
                     (pop-to-buffer buf)))
               (when (buffer-live-p buf) (kill-buffer buf))))
-        (dired-snacks--find-cleanup)))))
+        (dired-snacks--find-cleanup query)))))
 
 ;; ===============================================================
 ;;; open

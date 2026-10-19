@@ -110,7 +110,6 @@
   ;; modes
   (minibuffer-electric-default-mode 1)
   (minibuffer-depth-indicate-mode 1)
-  (global-visual-line-mode 1)
   (global-auto-revert-mode 1)
   (delete-selection-mode 1)
   (file-name-shadow-mode 1)
@@ -128,6 +127,8 @@
                      (emacs-init-time) (length package-activated-list))))
   (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
   (add-hook 'prog-mode-hook #'display-line-numbers-mode)
+  (dolist (hook '(prog-mode-hook text-mode-hook conf-mode-hook))
+    (add-hook hook #'visual-line-mode))
 
   ;; faces
   (defvar my/font "TX-02 Condensed")
@@ -677,7 +678,6 @@
   (org-ellipsis " ∷")
   :hook
   (org-mode . turn-off-auto-fill)
-  (org-mode . visual-line-mode)
   (org-mode . org-indent-mode)
   (org-mode . hl-line-mode)
   :config

@@ -81,10 +81,16 @@
               (let ((dir (string-trim (buffer-string))))
                 (and (file-directory-p dir) dir)))))))))
 
+(defvar dired-snacks--zoxide-last-dir nil
+  "Directory most recently registered in the zoxide database.")
+
 (defun dired-snacks--zoxide-add (dir)
-  "Register DIR in the zoxide database."
+  "Register DIR in the zoxide database, unless it was the last one added."
   (when (and dir (executable-find "zoxide"))
-    (call-process "zoxide" nil 0 nil "add" "--" (expand-file-name dir))))
+    (let ((dir (file-name-as-directory (expand-file-name dir))))
+      (unless (equal dir dired-snacks--zoxide-last-dir)
+        (setq dired-snacks--zoxide-last-dir dir)
+        (call-process "zoxide" nil 0 nil "add" "--" dir)))))
 
 (defun dired-snacks--zoxide-add-default-directory ()
   "Register `default-directory' in the zoxide database."

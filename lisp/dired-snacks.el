@@ -534,7 +534,9 @@ application; the rest are visited in Emacs, and directories are entered."
            (list file))))
      ((and dired-snacks-open-full-window
            (not (file-directory-p file)))
-      (find-alternate-file file))
+      (let ((buf (find-file-noselect file)))
+        (kill-buffer (current-buffer))
+        (switch-to-buffer buf)))
      (t
       (dired-find-file)))))
 

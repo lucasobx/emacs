@@ -20,7 +20,7 @@
   (delete-region (point) (progn (backward-word 1) (point))))
 
 (defun my/backward-delete ()
-  "Delete a word, a character, or whitespace, backward."
+  "Delete a word, a run of non-word characters, a newline, or whitespace, backward."
   (interactive)
   (let ((c (char-before)))
     (cond
@@ -33,7 +33,12 @@
      ;; other horizontal whitespace: collapse it backward
      ((memq c '(?\s ?\t))
       (delete-horizontal-space t))
-     ;; anything else (punctuation, newline, start of buffer): one character
+     ((and c (/= c ?\n))
+      (delete-region (min (1- (point))
+                          (save-excursion (skip-syntax-backward "^w " (pos-bol))
+                                          (point)))
+                     (point)))
+     ;; newline or start of buffer: one character
      (t
       (backward-delete-char-untabify 1)))))
 

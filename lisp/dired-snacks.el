@@ -859,16 +859,12 @@ DIR is inserted invisibly, so only the base name shows."
     (when-let* ((w (seq-find #'window-live-p others)))
       (select-window w))))
 
-(defun dired-snacks--quit-setup ()
-  "Make q close this Dired pane."
-  (let ((map (make-sparse-keymap)))
-    (set-keymap-parent map dired-mode-map)
-    (keymap-set map "q" #'dired-snacks-quit)
-    (use-local-map map)))
+(defvar-keymap dired-snacks--quit-mode-map
+  "<remap> <quit-window>" #'dired-snacks-quit)
 
-(defun dired-snacks--quit-teardown ()
-  "Give the current Dired buffer its usual keymap back."
-  (use-local-map dired-mode-map))
+(define-minor-mode dired-snacks--quit-mode
+  "Make q close this Dired pane."
+  :keymap dired-snacks--quit-mode-map)
 
 (defun dired-snacks--split-mark ()
   "Mark the current buffer as a split pane."
@@ -1232,14 +1228,14 @@ The omit indicator and the sort criterion are dropped when space runs out."
   ;; already has one needs decorating right now.
   (dired-snacks--breadcrumb-decorate)
   (dired-snacks--mode-line-setup)
-  (dired-snacks--quit-setup))
+  (dired-snacks--quit-mode 1))
 
 (defun dired-snacks--teardown ()
   "Remove the buffer-local features from the current Dired buffer."
   (dired-snacks--subtree-teardown)
   (dired-snacks--breadcrumb-teardown)
   (dired-snacks--mode-line-teardown)
-  (dired-snacks--quit-teardown))
+  (dired-snacks--quit-mode -1))
 
 (defun dired-snacks--enable ()
   "Install the passive features."
@@ -1248,7 +1244,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (add-hook 'dired-mode-hook #'dired-snacks--subtree-setup)
   (add-hook 'dired-mode-hook #'dired-snacks--breadcrumb-setup)
   (add-hook 'dired-mode-hook #'dired-snacks--mode-line-setup)
-  (add-hook 'dired-mode-hook #'dired-snacks--quit-setup)
+  (add-hook 'dired-mode-hook #'dired-snacks--quit-mode)
   (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (advice-add 'dired--find-possibly-alternative-file :around #'dired-snacks--find-isolated)
   (dired-snacks--map-buffers #'dired-snacks--setup))
@@ -1260,7 +1256,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (remove-hook 'dired-mode-hook #'dired-snacks--subtree-setup)
   (remove-hook 'dired-mode-hook #'dired-snacks--breadcrumb-setup)
   (remove-hook 'dired-mode-hook #'dired-snacks--mode-line-setup)
-  (remove-hook 'dired-mode-hook #'dired-snacks--quit-setup)
+  (remove-hook 'dired-mode-hook #'dired-snacks--quit-mode)
   (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (advice-remove 'dired--find-possibly-alternative-file #'dired-snacks--find-isolated)
   (dired-snacks--map-buffers #'dired-snacks--teardown))

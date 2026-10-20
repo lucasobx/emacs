@@ -162,10 +162,22 @@ Shifted motions extend the selection."
 
 (my/define-select my/select-word      word)
 (my/define-select my/select-symbol    symbol)
-(my/define-select my/select-line      line)
 (my/define-select my/select-paragraph paragraph)
 (my/define-select my/select-defun     defun)
 (my/define-select my/select-sexp      sexp)
+
+(defun my/select-line ()
+  "Select the current line without its leading and trailing blanks."
+  (interactive)
+  (let ((end (save-excursion
+               (goto-char (pos-eol))
+               (skip-chars-backward " \t")
+               (point))))
+    (my/select-bounds (cons (save-excursion
+                              (goto-char (pos-bol))
+                              (skip-chars-forward " \t" end)
+                              (point))
+                            end))))
 
 ;; select content inside delimiters
 (defmacro my/define-select-inside (name bounds-fn)

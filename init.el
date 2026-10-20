@@ -131,9 +131,9 @@
     (add-hook hook #'visual-line-mode))
 
   ;; faces
-  (defvar my/font "TX-02 Condensed")
-  (set-face-attribute 'tooltip nil :font my/font)
-  (set-face-attribute 'default nil :font my/font :height 110)
+  (defvar my/font "TX-02")
+  (set-face-attribute 'tooltip nil :family my/font :width 'condensed)
+  (set-face-attribute 'default nil :family my/font :width 'condensed :height 110)
   (set-face-attribute 'minibuffer-nonselected nil :background 'unspecified)
 
   ;; misc

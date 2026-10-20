@@ -136,7 +136,6 @@
                 (:propertize " " display (raise -0.1)) ; bottom padding
                 (:propertize
                  (:eval (if (char-displayable-p ?λ) "λ " " ") face font-lock-keyword-face))
-                mode-line-client
                 mode-line-modified
                 mode-line-frame-identification
                 mode-line-buffer-identification

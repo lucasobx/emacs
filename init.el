@@ -36,6 +36,7 @@
   ;; startup & ui
   (display-fill-column-indicator-warning nil)
   (warning-minimum-level :emergency)
+  (server-client-instructions nil)
   (ring-bell-function 'ignore)
   (initial-scratch-message "")
   (inhibit-startup-message t)

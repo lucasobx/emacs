@@ -122,10 +122,6 @@
   (recentf-mode 1)
 
   ;; hooks
-  (add-hook 'emacs-startup-hook
-          (lambda ()
-            (message "Loaded in %s with %d packages."
-                     (emacs-init-time) (length package-activated-list))))
   (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
   (add-hook 'prog-mode-hook #'display-line-numbers-mode)
   (dolist (hook '(prog-mode-hook text-mode-hook conf-mode-hook))

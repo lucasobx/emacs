@@ -727,7 +727,7 @@
     (let* ((frame (selected-frame))
            (action '(display-buffer-full-frame))
            (display-buffer-overriding-action action)
-           (buffer (ghostel-create nil action)))
+           (buffer (ghostel-create "*ghostel-frame*" action)))
       (set-frame-parameter frame 'my/ghostel-buffer buffer)
       (with-current-buffer buffer
         (add-hook 'ghostel-exit-functions

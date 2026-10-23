@@ -703,13 +703,18 @@ Each level is two columns wide, with a line under the parent's indicator."
       (propertize " " 'display `(space :align-to (,(* 2 (1+ level)) . width)))))
    (number-sequence 0 (1- depth))))
 
+(defun dired-snacks--subtree-dot-p ()
+  "Return non-nil if the current line lists the . or .. entry."
+  (member (dired-get-filename 'no-dir t) '("." "..")))
+
 (defun dired-snacks--subtree-directory-p ()
-  "Return non-nil if the current line lists a directory."
-  (save-excursion
-    (beginning-of-line)
-    (or (looking-at-p dired-re-dir)
-        (and (looking-at-p dired-re-sym)
-             (file-directory-p (dired-get-filename nil t))))))
+  "Return non-nil if the current line lists a directory that can be expanded."
+  (and (not (dired-snacks--subtree-dot-p))
+       (save-excursion
+         (beginning-of-line)
+         (or (looking-at-p dired-re-dir)
+             (and (looking-at-p dired-re-sym)
+                  (file-directory-p (dired-get-filename nil t)))))))
 
 (defun dired-snacks--subtree-draw-indicators (beg end)
   "Draw the subtree indicators on the lines between BEG and END."
@@ -746,6 +751,15 @@ DIR is inserted invisibly, so only the base name shows."
                            'invisible 'dired-snacks--subtree-hidden))
       (forward-line 1))))
 
+(defun dired-snacks--subtree-delete-dots (beg end)
+  "Delete the . and .. entries between BEG and END."
+  (save-excursion
+    (goto-char beg)
+    (while (< (point) end)
+      (if (dired-snacks--subtree-dot-p)
+          (delete-region (pos-bol) (1+ (pos-eol)))
+        (forward-line 1)))))
+
 (defun dired-snacks--subtree-insert ()
   "Insert the directory on this line as an inline subtree."
   (let* ((dir (file-name-as-directory (dired-get-filename nil t)))
@@ -760,6 +774,7 @@ DIR is inserted invisibly, so only the base name shows."
         (dired-insert-directory dir dired-actual-switches nil nil nil)
         (set-marker end (point))
         (dired-snacks--subtree-absolutize beg end dir)
+        (dired-snacks--subtree-delete-dots beg end)
         (when (bound-and-true-p dired-omit-mode)
           (let ((dired-omit-size-limit nil)
                 (dired-omit-verbose nil))
@@ -796,13 +811,12 @@ DIR is inserted invisibly, so only the base name shows."
 (defun dired-snacks-subtree-toggle ()
   "Expand the directory at point as an inline subtree, or collapse it."
   (interactive)
-  (let ((dir (dired-get-filename nil t)))
-    (cond*
-     ((not (and dir (file-directory-p dir)))
-      (user-error "Point is not on a directory"))
-     ((bind-and* (ov (dired-snacks--subtree-child-overlay)))
-      (dired-snacks--subtree-remove ov))
-     (t (dired-snacks--subtree-insert)))))
+  (cond*
+   ((not (dired-snacks--subtree-directory-p))
+    (user-error "No directory to expand on this line"))
+   ((bind-and* (ov (dired-snacks--subtree-child-overlay)))
+    (dired-snacks--subtree-remove ov))
+   (t (dired-snacks--subtree-insert))))
 
 (defun dired-snacks--subtree-reset ()
   "Collapse every tracked subtree."

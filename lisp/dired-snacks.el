@@ -595,13 +595,19 @@ Each copy is renamed with a numbered suffix to avoid clashes."
 ;; ===============================================================
 ;;; subtree
 
-(defcustom dired-snacks-subtree-line-prefix "  "
-  "Indentation added per nesting level in a subtree."
-  :type 'string)
+(defcustom dired-snacks-subtree-indicators '("+ " . "- ")
+  "Strings shown before directories, as (COLLAPSED . EXPANDED)."
+  :type '(cons (string :tag "Collapsed") (string :tag "Expanded")))
 
 (defcustom dired-snacks-subtree-after-change-hook nil
   "Hook run after a subtree is expanded or collapsed."
   :type 'hook)
+
+(defface dired-snacks-subtree-indicator '((t :inherit shadow))
+  "Face for the subtree indicators.")
+
+(defface dired-snacks-subtree-guide '((t :inherit shadow :inverse-video t))
+  "Face for the subtree guide lines.")
 
 (defvar-local dired-snacks--subtree-overlays nil
   "Subtree overlays in this buffer.")
@@ -621,6 +627,43 @@ Each copy is renamed with a numbered suffix to avoid clashes."
                      (overlay-get ov 'dired-snacks--subtree)
                      (= (overlay-start ov) start)))
               dired-snacks--subtree-overlays)))
+
+(defun dired-snacks--subtree-line-prefix (depth)
+  "Return the `line-prefix' for a subtree at DEPTH.
+Each level is two columns wide, with a line under the parent's indicator."
+  (mapconcat
+   (lambda (level)
+     (concat
+      (propertize " " 'display `(space :align-to (,(+ (* 2 level) 1.5) . width)))
+      (propertize " " 'display '(space :width (1)) 'face 'dired-snacks-subtree-guide)
+      (propertize " " 'display `(space :align-to (,(* 2 (1+ level)) . width)))))
+   (number-sequence 0 (1- depth))))
+
+(defun dired-snacks--subtree-directory-p ()
+  "Return non-nil if the current line lists a directory."
+  (save-excursion
+    (beginning-of-line)
+    (or (looking-at-p dired-re-dir)
+        (and (looking-at-p dired-re-sym)
+             (file-directory-p (dired-get-filename nil t))))))
+
+(defun dired-snacks--subtree-draw-indicators (beg end)
+  "Draw the subtree indicators on the lines between BEG and END."
+  (remove-overlays beg end 'dired-snacks--subtree-indicator t)
+  (let ((blank (make-string (string-width (car dired-snacks-subtree-indicators)) ?\s)))
+    (save-excursion
+      (goto-char beg)
+      (while (< (point) end)
+        (when-let* ((pos (dired-move-to-filename)))
+          (let ((indicator (cond ((not (dired-snacks--subtree-directory-p)) blank)
+                                 ((dired-snacks--subtree-child-overlay)
+                                  (cdr dired-snacks-subtree-indicators))
+                                 (t (car dired-snacks-subtree-indicators))))
+                (ov (make-overlay (1- pos) pos)))
+            (overlay-put ov 'dired-snacks--subtree-indicator t)
+            (overlay-put ov 'evaporate t)
+            (overlay-put ov 'display (propertize indicator 'face 'dired-snacks-subtree-indicator))))
+        (forward-line 1)))))
 
 (defun dired-snacks--subtree-absolutize (beg end dir)
   "Make the file names between BEG and END absolute under DIR.
@@ -643,7 +686,8 @@ DIR is inserted invisibly, so only the base name shows."
   "Insert the directory on this line as an inline subtree."
   (let* ((dir (file-name-as-directory (dired-get-filename nil t)))
          (depth (1+ (dired-snacks--subtree-depth-at (point))))
-         (prefix (apply #'concat (make-list depth dired-snacks-subtree-line-prefix)))
+         (prefix (dired-snacks--subtree-line-prefix depth))
+         (parent (pos-bol))
          (inhibit-read-only t))
     (save-excursion
       (forward-line 1)
@@ -663,6 +707,7 @@ DIR is inserted invisibly, so only the base name shows."
           (overlay-put ov 'line-prefix prefix)
           (overlay-put ov 'evaporate t)
           (push ov dired-snacks--subtree-overlays))
+        (dired-snacks--subtree-draw-indicators parent end)
         (set-marker end nil)))
     (run-hooks 'dired-snacks-subtree-after-change-hook)
     (dired-move-to-filename)))
@@ -679,6 +724,7 @@ DIR is inserted invisibly, so only the base name shows."
         (setq dired-snacks--subtree-overlays (delq o dired-snacks--subtree-overlays))
         (delete-overlay o)))
     (delete-region beg end))
+  (dired-snacks--subtree-draw-indicators (pos-bol) (pos-eol))
   (run-hooks 'dired-snacks-subtree-after-change-hook)
   (dired-move-to-filename))
 
@@ -708,14 +754,13 @@ DIR is inserted invisibly, so only the base name shows."
     (setq dired-snacks--subtree-overlays nil)))
 
 (defun dired-snacks--subtree-after-readin ()
-  "Collapse every tracked subtree after Dired reads the whole listing."
+  "Collapse every subtree on a full readin, then draw the indicators."
   (unless (buffer-narrowed-p)
-    (dired-snacks--subtree-reset)))
+    (dired-snacks--subtree-reset))
+  (dired-snacks--subtree-draw-indicators (point-min) (point-max)))
 
 (defun dired-snacks--subtree-setup ()
   "Enable inline subtrees in the current Dired buffer."
-  ;; `add-to-invisibility-spec' does not check for duplicates, and setup
-  ;; runs again every time the mode is re-enabled.
   (remove-from-invisibility-spec 'dired-snacks--subtree-hidden)
   (add-to-invisibility-spec 'dired-snacks--subtree-hidden)
   (add-hook 'dired-after-readin-hook #'dired-snacks--subtree-after-readin nil t))
@@ -724,6 +769,7 @@ DIR is inserted invisibly, so only the base name shows."
   "Disable inline subtrees in the current Dired buffer."
   (remove-hook 'dired-after-readin-hook #'dired-snacks--subtree-after-readin t)
   (dired-snacks--subtree-reset)
+  (remove-overlays nil nil 'dired-snacks--subtree-indicator t)
   (remove-from-invisibility-spec 'dired-snacks--subtree-hidden))
 
 (defun dired-snacks--subtree-refresh-icons ()
@@ -1149,6 +1195,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (dired-snacks--breadcrumb-setup)
   ;; A buffer that already has a listing needs decorating now.  From
   ;; `dired-mode-hook' there is none yet, and this does nothing.
+  (dired-snacks--subtree-draw-indicators (point-min) (point-max))
   (dired-snacks--breadcrumb-decorate)
   (dired-snacks--mode-line-setup)
   (dired-snacks--quit-mode 1))

@@ -360,12 +360,11 @@
   :ensure nil
   :load-path "~/.config/emacs/lisp"
   :custom
-  (dired-snacks-subtree-line-prefix "  ")
   (dired-snacks-mode-line-show-time nil)
   (dired-snacks-mode-line-show-omit nil)
   (dired-snacks-mode-line-show-size t)
   (dired-snacks-open-full-window t)
-  (dired-snacks-side-window nil)
+  (dired-snacks-side-window t)
   (dired-snacks-external-app-alist
    '((("mkv" "mp4" "webm" "avi" "mov" "mpg" "m4v") "vlc")
      (("mp3" "flac" "wav" "ogg" "opus" "m4a" "aac") "vlc")

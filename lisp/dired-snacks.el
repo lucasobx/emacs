@@ -238,6 +238,14 @@
   "Seconds of idle input before the live search refreshes."
   :type 'number)
 
+(defcustom dired-snacks-find-max-results 2000
+  "Maximum number of results shown by a search."
+  :type 'natnum)
+
+(defcustom dired-snacks-find-min-length 2
+  "Minimum number of characters before a search runs."
+  :type 'natnum)
+
 (defvar dired-snacks--find-proc nil
   "Current live-search `fd' process, or nil.")
 
@@ -253,10 +261,14 @@
 (defvar dired-snacks--find-query nil
   "Query of the latest search started.")
 
+(defvar dired-snacks--find-results nil
+  "Last complete `fd' results, as (QUERY . ENTRIES), or nil.")
+
 (defun dired-snacks--find-fd-args (query dir)
   "Return the `fd' arguments to search for QUERY under DIR."
-  (append '("--color=never" "--list-details" "--hidden" "--no-ignore"
-            "--type" "f" "--fixed-strings" "--ignore-case")
+  (append `("--color=never" "--list-details" "--hidden" "--no-ignore"
+            "--type" "f" "--fixed-strings" "--ignore-case"
+            "--batch-size" ,(number-to-string (1+ dired-snacks-find-max-results)))
           (mapcan (lambda (d) (list "--exclude" d))
                   dired-snacks-find-prune-dirs)
           (list "--" query (expand-file-name dir))))
@@ -300,18 +312,17 @@
       (dolist (entry (cdr group))
         (insert "  " (nth 2 entry) "\n")))))
 
-(defun dired-snacks--find-render (root details)
-  "Render DETAILS under ROOT as a Dired buffer."
+(defun dired-snacks--find-render (root entries)
+  "Render ENTRIES from `dired-snacks--find-parse' under ROOT as a Dired buffer."
   (when (buffer-live-p dired-snacks--find-buffer)
     (with-current-buffer dired-snacks--find-buffer
-      (let* ((inhibit-read-only t)
-             (parsed (seq-keep #'dired-snacks--find-parse details))
-             (groups (seq-group-by #'car parsed)))
+      (let ((inhibit-read-only t)
+            (groups (seq-group-by #'car entries)))
         (widen)
         (remove-overlays nil nil 'dired-snacks--find-icon t)
         (erase-buffer)
         (setq-local default-directory (file-name-as-directory root))
-        (if (null parsed)
+        (if (null entries)
             (insert "  " (directory-file-name root) ":\n"
                     "  total used in directory 0\n\n"
                     "  (no matches)\n")
@@ -322,31 +333,74 @@
           (run-hooks 'dired-after-readin-hook))
         (dired-snacks--find-icon-subdirs)
         (goto-char (point-min))
-        (when (and parsed (null (cdr parsed)))
+        (when (and entries (null (cdr entries)))
           (dired-goto-next-file))))))
 
-(defun dired-snacks--find-sentinel (proc event)
-  "Render PROC's results when EVENT indicates completion.
-Kill the process buffer once PROC ends."
-  (when-let* (((memq (process-status proc) '(exit signal)))
+(defun dired-snacks--find-show (query entries)
+  "Render ENTRIES, the `fd' results for QUERY, up to the maximum."
+  (let ((max dired-snacks-find-max-results))
+    (if (length> entries max)
+        (progn
+          (setq dired-snacks--find-results nil
+                entries (take max entries))
+          (message "find: showing the first %d results" max))
+      (setq dired-snacks--find-results (cons query entries)))
+    (dired-snacks--find-render dired-snacks--find-root entries)))
+
+(defun dired-snacks--find-refinable-p (query)
+  "Return non-nil if the last `fd' results include every match for QUERY."
+  (when-let* ((last (car dired-snacks--find-results)))
+    (string-search (downcase last) (downcase query))))
+
+(defun dired-snacks--find-refine (query)
+  "Return the entries of the last `fd' results whose names match QUERY."
+  (let ((case-fold-search t)
+        (regexp (regexp-quote query)))
+    (seq-filter (lambda (entry) (string-match-p regexp (nth 1 entry)))
+                (cdr dired-snacks--find-results))))
+
+(defun dired-snacks--find-filter (proc output)
+  "Insert OUTPUT of PROC, stopping it once there are more results than shown."
+  (when (buffer-live-p (process-buffer proc))
+    (with-current-buffer (process-buffer proc)
+      (goto-char (point-max))
+      (insert output)
+      (when (save-excursion
+              (goto-char (point-min))
+              (and (zerop (forward-line dired-snacks-find-max-results))
+                   (search-forward "\n" nil t)))
+        (process-put proc 'dired-snacks--cut t)
+        (delete-process proc)))))
+
+(defun dired-snacks--find-sentinel (proc event query)
+  "Show the results of PROC, a search for QUERY, when EVENT ends it.
+Drop them if a newer search has started."
+  (when-let* ((_ (memq (process-status proc) '(exit signal)))
               (buf (process-buffer proc))
-              ((buffer-live-p buf)))
-    (when (string-prefix-p "finished" event)
-      (let ((details (with-current-buffer buf
-                       (split-string (buffer-string) "\n" t))))
+              (_ (buffer-live-p buf)))
+    (when (and (or (string-prefix-p "finished" event)
+                   (process-get proc 'dired-snacks--cut))
+               (equal query dired-snacks--find-query))
+      (let ((entries (with-current-buffer buf
+                       (seq-keep #'dired-snacks--find-parse
+                                 (split-string (buffer-string) "\n" t)))))
         (with-demoted-errors "find render error: %S"
-          (dired-snacks--find-render dired-snacks--find-root details))))
+          (dired-snacks--find-show query entries))))
     (kill-buffer buf)))
 
 (defun dired-snacks--find-dispatch (query)
-  "Kill any running search and start an async `fd' for QUERY."
+  "Show the results for QUERY, stopping any running search."
   (setq dired-snacks--find-query query)
   (when (and dired-snacks--find-proc
              (process-live-p dired-snacks--find-proc))
     (delete-process dired-snacks--find-proc))
   (cond
-   ((string-empty-p query)
+   ((or (string-empty-p query)
+        (length< query dired-snacks-find-min-length))
     (dired-snacks--find-render dired-snacks--find-root nil))
+   ((dired-snacks--find-refinable-p query)
+    (dired-snacks--find-render dired-snacks--find-root
+                               (dired-snacks--find-refine query)))
    ((not (executable-find "fd"))
     (message "find: the `fd' program is required for live search"))
    (t
@@ -357,7 +411,9 @@ Kill the process buffer once PROC ends."
                  :connection-type 'pipe
                  :command (cons "fd" (dired-snacks--find-fd-args
                                       query dired-snacks--find-root))
-                 :sentinel #'dired-snacks--find-sentinel)))
+                 :filter #'dired-snacks--find-filter
+                 :sentinel (lambda (proc event)
+                             (dired-snacks--find-sentinel proc event query)))))
       (setq dired-snacks--find-proc proc)))))
 
 (defun dired-snacks--find-schedule (&rest _)
@@ -395,7 +451,8 @@ Kill the process buffer once PROC ends."
     (dired-snacks--find-cleanup)
     (setq dired-snacks--find-buffer buf
           dired-snacks--find-root root
-          dired-snacks--find-query nil)
+          dired-snacks--find-query nil
+          dired-snacks--find-results nil)
     (with-current-buffer buf
       (let ((inhibit-read-only t))
         (erase-buffer)

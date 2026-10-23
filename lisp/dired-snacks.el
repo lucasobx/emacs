@@ -31,6 +31,9 @@
   (require 'completion-preview)
   (require 'filenotify))
 
+;; `with-work-buffer' needs subr-x at run time.
+(require 'subr-x)
+
 (declare-function dired-get-filename "dired")
 (declare-function dired-get-marked-files "dired")
 (declare-function dired-get-file-for-visit "dired")

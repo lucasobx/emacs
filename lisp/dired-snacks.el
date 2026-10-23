@@ -389,32 +389,33 @@ Drop them if a newer search has started."
     (kill-buffer buf)))
 
 (defun dired-snacks--find-dispatch (query)
-  "Show the results for QUERY, stopping any running search."
-  (setq dired-snacks--find-query query)
-  (when (and dired-snacks--find-proc
-             (process-live-p dired-snacks--find-proc))
-    (delete-process dired-snacks--find-proc))
-  (cond
-   ((or (string-empty-p query)
-        (length< query dired-snacks-find-min-length))
-    (dired-snacks--find-render dired-snacks--find-root nil))
-   ((dired-snacks--find-refinable-p query)
-    (dired-snacks--find-render dired-snacks--find-root
-                               (dired-snacks--find-refine query)))
-   ((not (executable-find "fd"))
-    (message "find: the `fd' program is required for live search"))
-   (t
-    (let ((proc (make-process
-                 :name "find-fd"
-                 :buffer (generate-new-buffer " *find-fd*")
-                 :noquery t
-                 :connection-type 'pipe
-                 :command (cons "fd" (dired-snacks--find-fd-args
-                                      query dired-snacks--find-root))
-                 :filter #'dired-snacks--find-filter
-                 :sentinel (lambda (proc event)
-                             (dired-snacks--find-sentinel proc event query)))))
-      (setq dired-snacks--find-proc proc)))))
+  "Show the results for QUERY, replacing any other running search."
+  (unless (equal query dired-snacks--find-query)
+    (setq dired-snacks--find-query query)
+    (when (and dired-snacks--find-proc
+               (process-live-p dired-snacks--find-proc))
+      (delete-process dired-snacks--find-proc))
+    (cond
+     ((or (string-empty-p query)
+          (length< query dired-snacks-find-min-length))
+      (dired-snacks--find-render dired-snacks--find-root nil))
+     ((dired-snacks--find-refinable-p query)
+      (dired-snacks--find-render dired-snacks--find-root
+                                 (dired-snacks--find-refine query)))
+     ((not (executable-find "fd"))
+      (message "find: the `fd' program is required for live search"))
+     (t
+      (let ((proc (make-process
+                   :name "find-fd"
+                   :buffer (generate-new-buffer " *find-fd*")
+                   :noquery t
+                   :connection-type 'pipe
+                   :command (cons "fd" (dired-snacks--find-fd-args
+                                        query dired-snacks--find-root))
+                   :filter #'dired-snacks--find-filter
+                   :sentinel (lambda (proc event)
+                               (dired-snacks--find-sentinel proc event query)))))
+        (setq dired-snacks--find-proc proc))))))
 
 (defun dired-snacks--find-schedule (&rest _)
   "Schedule a search after minibuffer input settles."
@@ -483,8 +484,7 @@ Drop them if a newer search has started."
                     (quit nil)))
             (if query
                 (when (buffer-live-p buf)
-                  (unless (equal query dired-snacks--find-query)
-                    (dired-snacks--find-dispatch query))
+                  (dired-snacks--find-dispatch query)
                   (if-let* ((win (get-buffer-window buf)))
                       (select-window win)
                     (pop-to-buffer buf)))
@@ -1008,7 +1008,9 @@ priority among the files below it."
 (defun dired-snacks--vc-after-readin ()
   "Mark the new entries with the last known states, then refresh them."
   (dired-snacks--vc-draw)
-  (dired-snacks--vc-refresh))
+  (unless (and (eq (current-buffer) dired-snacks--find-buffer)
+               dired-snacks--vc-states)
+    (dired-snacks--vc-refresh)))
 
 (defun dired-snacks--vc-setup ()
   "Enable the Git marks in the current Dired buffer."

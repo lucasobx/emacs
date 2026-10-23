@@ -461,10 +461,8 @@ Drop them if a newer search has started."
       (let ((inhibit-read-only t))
         (erase-buffer)
         (setq-local default-directory (file-name-as-directory root))
-        ;; Keep this synthetic listing out of `dired-buffers', or Dired would
-        ;; later hand it back as the buffer for ROOT.
         (let ((dired-buffers nil)) (dired-mode root)))
-      (when (bound-and-true-p dired-omit-mode) (dired-omit-mode -1))
+      (setq-local dired-omit-mode nil)
       (let ((map (make-sparse-keymap)))
         (set-keymap-parent map dired-mode-map)
         (keymap-set map "q" #'kill-current-buffer)

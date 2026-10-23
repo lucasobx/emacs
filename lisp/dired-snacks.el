@@ -17,6 +17,7 @@
 ;; breadcrumb - show the current directory in the header line
 ;; split      - second Dired pane with independent navigation
 ;; mode-line  - per-buffer mode line with size, time, sort, position
+;; columns    - size, time and permissions at the right edge
 ;; copy-uri   - copy files as file:// URIs to the clipboard
 
 ;;; Code:
@@ -45,6 +46,7 @@
 (declare-function dired-goto-file "dired")
 (declare-function dired-goto-next-file "dired")
 (declare-function dired-advertise "dired")
+(declare-function dired-hide-details-mode "dired")
 (declare-function dired-add-file "dired-aux")
 (declare-function dired--find-file "dired")
 (declare-function dired-kill-subdir "dired-aux")
@@ -1323,28 +1325,40 @@ one Dired pane is on screen."
               (cons key (file-attributes name)))))
     (cdr dired-snacks--mode-line-attr-cache)))
 
+(defconst dired-snacks--items-limit 10000
+  "Number of items past which a directory is not counted further.")
+
 (defun dired-snacks--mode-line-items (dir mtime)
   "Return the number of items in DIR, whose modification time is MTIME."
   (pcase-let ((`(,d ,m . ,n) dired-snacks--mode-line-items-cache))
     (if (and (equal d dir) (time-equal-p m mtime))
         n
       (let ((n (ignore-errors
-                 (length (directory-files dir nil directory-files-no-dot-files-regexp t)))))
+                 (length (directory-files dir nil directory-files-no-dot-files-regexp t
+                                          (1+ dired-snacks--items-limit))))))
         (setq dired-snacks--mode-line-items-cache (cons dir (cons mtime n)))
         n))))
+
+(defun dired-snacks--size-text (file attrs)
+  "Return the size of FILE from its ATTRS, or its number of items if a directory."
+  (let* ((type (file-attribute-type attrs))
+         (dir-attrs (cond ((eq type t) attrs)
+                          ((and (stringp type) (file-directory-p file))
+                           (file-attributes (file-truename file))))))
+    (if (not dir-attrs)
+        (file-size-human-readable (file-attribute-size attrs))
+      (let ((n (dired-snacks--mode-line-items
+                file (file-attribute-modification-time dir-attrs))))
+        (cond ((not n) "-")
+              ((> n dired-snacks--items-limit)
+               (format "%d+" dired-snacks--items-limit))
+              (t (number-to-string n)))))))
 
 (defun dired-snacks--mode-line-size ()
   "Return the size of the file at point, or a directory's items, or nil."
   (when dired-snacks-mode-line-show-size
     (when-let* ((attrs (dired-snacks--mode-line-file-attrs)))
-      (let ((text (if (eq (file-attribute-type attrs) t)
-                      (pcase (dired-snacks--mode-line-items
-                              (dired-get-filename nil t)
-                              (file-attribute-modification-time attrs))
-                        ('nil "")
-                        (1 "1 item")
-                        (n (format "%d items" n)))
-                    (file-size-human-readable (file-attribute-size attrs)))))
+      (let ((text (dired-snacks--size-text (dired-get-filename nil t) attrs)))
         (concat "  " (propertize (string-pad text dired-snacks-mode-line-size-width nil t)
                                  'face 'shadow))))))
 
@@ -1441,12 +1455,127 @@ The omit indicator and the sort criterion are dropped when space runs out."
       (when (derived-mode-p 'dired-mode) (funcall fn)))))
 
 ;; ===============================================================
+;;; columns
+
+(defcustom dired-snacks-hide-details t
+  "When non-nil, turn on `dired-hide-details-mode' in Dired buffers."
+  :type 'boolean)
+
+(defcustom dired-snacks-columns '(size time)
+  "Columns shown at the right edge while details are hidden, in this order."
+  :type '(set (const permissions) (const size) (const time)))
+
+(defcustom dired-snacks-columns-time-format "%Y-%m-%d %H:%M"
+  "Format of the time column, as for `format-time-string'."
+  :type 'string)
+
+(defface dired-snacks-column '((t :inherit shadow))
+  "Face for the columns at the right edge.")
+
+(defconst dired-snacks--columns-size-width 6
+  "Width of the size column, so that the columns line up.")
+
+(defvar-local dired-snacks--columns-highlighted nil
+  "Columns overlay drawn with the `hl-line' face, or nil.")
+
+(defun dired-snacks--column-text (column file attrs)
+  "Return the text of COLUMN for FILE, whose attributes are ATTRS."
+  (pcase column
+    ('permissions (file-attribute-modes attrs))
+    ('size (string-pad (dired-snacks--size-text file attrs)
+                       dired-snacks--columns-size-width nil t))
+    ('time (format-time-string dired-snacks-columns-time-format
+                               (file-attribute-modification-time attrs)))))
+
+(defun dired-snacks--columns-hl-line ()
+  "Return the overlay of `hl-line-mode' in this buffer, or nil."
+  (seq-find (lambda (ov) (and (overlayp ov) (overlay-buffer ov)))
+            (list (bound-and-true-p hl-line-overlay)
+                  (bound-and-true-p global-hl-line-overlay))))
+
+(defun dired-snacks--columns-paint (ov hl)
+  "Show the columns of OV, with the face of the `hl-line' overlay HL if non-nil."
+  (let ((string (overlay-get ov 'dired-snacks--columns-string)))
+    (when hl
+      (setq string (copy-sequence string))
+      (add-face-text-property 0 (length string) (overlay-get hl 'face) t string)
+      (setq dired-snacks--columns-highlighted ov))
+    (overlay-put ov 'after-string string)))
+
+(defun dired-snacks--columns-follow-hl-line (&rest _)
+  "Move the `hl-line' face to the columns of the highlighted line."
+  (let* ((hl (dired-snacks--columns-hl-line))
+         (ov (and hl (seq-find (lambda (o) (overlay-get o 'dired-snacks--columns))
+                               (overlays-at (overlay-start hl))))))
+    (unless (eq ov dired-snacks--columns-highlighted)
+      (when-let* ((old dired-snacks--columns-highlighted)
+                  (_ (overlay-buffer old)))
+        (dired-snacks--columns-paint old nil))
+      (setq dired-snacks--columns-highlighted nil)
+      (when ov
+        (dired-snacks--columns-paint ov hl)))))
+
+(defun dired-snacks--columns-draw (beg end)
+  "Draw the columns on the lines between BEG and END."
+  (save-excursion
+    (setq beg (progn (goto-char beg) (pos-bol))
+          end (progn (goto-char end) (min (1+ (pos-eol)) (point-max))))
+    (remove-overlays beg end 'dired-snacks--columns t)
+    (when (and dired-hide-details-mode
+               dired-snacks-columns
+               (not (file-remote-p default-directory)))
+      (let ((hl (dired-snacks--columns-hl-line)))
+        (goto-char beg)
+        (while (< (point) end)
+          (when-let* ((_ (not (invisible-p (point))))
+                      (file (dired-get-filename nil t))
+                      (attrs (file-attributes file)))
+            (let ((text (concat "  " (mapconcat (lambda (column)
+                                                  (dired-snacks--column-text column file attrs))
+                                                dired-snacks-columns "  ")))
+                  (ov (make-overlay (pos-bol) (pos-eol))))
+              (overlay-put ov 'dired-snacks--columns t)
+              (overlay-put ov 'evaporate t)
+              (overlay-put ov 'dired-snacks--columns-string
+                           (concat (propertize " " 'display
+                                               `(space :align-to
+                                                       (- right (,(1+ (string-width text)) . width))))
+                                   (propertize text 'face 'dired-snacks-column)))
+              (dired-snacks--columns-paint
+               ov (and hl (= (overlay-start hl) (pos-bol)) hl))))
+          (forward-line 1))))
+    `(jit-lock-bounds ,beg . ,end)))
+
+(defun dired-snacks--columns-setup ()
+  "Show the columns in the current Dired buffer."
+  (when dired-snacks-hide-details
+    (dired-hide-details-mode 1))
+  (when dired-snacks-columns
+    (setq-local truncate-lines t))
+  (add-hook 'dired-hide-details-mode-hook #'jit-lock-refontify nil t)
+  (add-hook 'post-command-hook #'dired-snacks--columns-follow-hl-line 90 t)
+  (add-hook 'window-selection-change-functions #'dired-snacks--columns-follow-hl-line nil t)
+  (jit-lock-register #'dired-snacks--columns-draw)
+  (jit-lock-refontify))
+
+(defun dired-snacks--columns-teardown ()
+  "Remove the columns from the current Dired buffer."
+  (jit-lock-unregister #'dired-snacks--columns-draw)
+  (remove-hook 'dired-hide-details-mode-hook #'jit-lock-refontify t)
+  (remove-hook 'post-command-hook #'dired-snacks--columns-follow-hl-line t)
+  (remove-hook 'window-selection-change-functions #'dired-snacks--columns-follow-hl-line t)
+  (remove-overlays nil nil 'dired-snacks--columns t)
+  (kill-local-variable 'truncate-lines)
+  (setq dired-snacks--columns-highlighted nil))
+
+;; ===============================================================
 ;;; minor mode
 
 (defun dired-snacks--setup ()
   "Install the buffer-local features in the current Dired buffer."
   (dired-snacks--subtree-setup)
   (dired-snacks--vc-setup)
+  (dired-snacks--columns-setup)
   (dired-snacks--breadcrumb-setup)
   ;; A buffer that already has a listing needs decorating now.  From
   ;; `dired-mode-hook' there is none yet, and this does nothing.
@@ -1461,6 +1590,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   "Remove the buffer-local features from the current Dired buffer."
   (dired-snacks--subtree-teardown)
   (dired-snacks--vc-teardown)
+  (dired-snacks--columns-teardown)
   (dired-snacks--breadcrumb-teardown)
   (dired-snacks--mode-line-teardown)
   (dired-snacks--quit-mode -1))
@@ -1491,9 +1621,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
 
 ;;;###autoload
 (define-minor-mode dired-snacks-mode
-  "Toggle the passive Dired enhancements globally.
-The commands work on their own; this mode adds the breadcrumb, the
-Git marks, the Dired mode line, the split panes and the zoxide history."
+  "Toggle the dired-snacks features applied to every Dired buffer."
   :global t
   (if dired-snacks-mode
       (dired-snacks--enable)

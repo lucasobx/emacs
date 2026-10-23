@@ -340,7 +340,6 @@
 (use-package dired
   :ensure nil
   :custom
-  (dired-listing-switches "-lah --almost-all --group-directories-first --sort=extension")
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-movement-style 'bounded-files)
   (dired-recursive-deletes 'always)
@@ -352,7 +351,6 @@
   (dired-free-space nil)
   (dired-dwim-target t)
   :hook
-  (dired-mode . dired-hide-details-mode)
   (dired-mode . dired-omit-mode)
   (dired-mode . hl-line-mode))
 
@@ -362,8 +360,9 @@
   :custom
   (dired-snacks-mode-line-show-time nil)
   (dired-snacks-mode-line-show-omit nil)
-  (dired-snacks-mode-line-show-size t)
+  (dired-snacks-mode-line-show-size nil)
   (dired-snacks-open-full-window t)
+  (dired-snacks-columns '(size))
   (dired-snacks-side-window t)
   (dired-snacks-external-app-alist
    '((("mkv" "mp4" "webm" "avi" "mov" "mpg" "m4v") "vlc")

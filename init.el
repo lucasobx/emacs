@@ -759,7 +759,6 @@
   :custom
   (magit-section-visibility-indicators nil)
   :config
-  (magit-process-apply-ansi-colors t)
   (keymap-set transient-map "<escape>" #'transient-quit-one))
 
 (use-package diff-hl

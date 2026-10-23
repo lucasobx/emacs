@@ -48,7 +48,6 @@
 (declare-function dired-advertise "dired")
 (declare-function dired-hide-details-mode "dired")
 (declare-function dired-add-file "dired-aux")
-(declare-function dired--find-file "dired")
 (declare-function dired-kill-subdir "dired-aux")
 (declare-function dired-hide-subdir "dired-aux")
 (declare-function dired-omit-mode "dired-x")
@@ -1141,9 +1140,20 @@ Split panes then open beside each other."
   (and dired-snacks-side-window
        (buffer-match-p '(derived-mode . dired-mode) buffer)))
 
+(defun dired-snacks--display-in-side-pane (buffer alist)
+  "Show BUFFER in the selected window if it is a Dired side window.
+ALIST is the action alist of `display-buffer'."
+  (let ((window (selected-window)))
+    (when (and (not (cdr (assq 'inhibit-same-window alist)))
+               (window-parameter window 'window-side)
+               (with-current-buffer (window-buffer window)
+                 (derived-mode-p 'dired-mode)))
+      (set-window-buffer window buffer)
+      window)))
+
 (defconst dired-snacks--side-window-rule
   '(dired-snacks--side-window-p
-    (display-buffer-in-side-window)
+    (dired-snacks--display-in-side-pane display-buffer-in-side-window)
     (side . bottom) (slot . 0) (window-height . 0.5))
   "The `display-buffer-alist' entry behind `dired-snacks-side-window'.")
 
@@ -1153,18 +1163,14 @@ Split panes then open beside each other."
                 (eq (buffer-local-value 'major-mode (window-buffer w)) 'dired-mode))
               (window-list)))
 
-(defvar-local dired-snacks--split-pane nil
-  "Non-nil in a Dired buffer opened as a split pane.")
-
 (defun dired-snacks-quit ()
   "Close this Dired pane, selecting the other one when there is one."
   (interactive)
   (let ((win (selected-window))
         (others (remq (selected-window) (dired-snacks--windows))))
-    (if (not dired-snacks--split-pane)
+    (if (not (window-parameter win 'dired-snacks-pane))
         (quit-window)
       (kill-current-buffer)
-      ;; A side window closes with its buffer; a split one has to be deleted.
       (when (and (window-live-p win) (eq (window-deletable-p win) t))
         (delete-window win)))
     (when-let* ((w (seq-find #'window-live-p others)))
@@ -1177,10 +1183,6 @@ Split panes then open beside each other."
   "Make q close this Dired pane."
   :keymap dired-snacks--quit-mode-map)
 
-(defun dired-snacks--split-mark ()
-  "Mark the current buffer as a split pane."
-  (setq-local dired-snacks--split-pane t))
-
 ;;;###autoload
 (defun dired-snacks-split ()
   "Open a second Dired in the current directory.
@@ -1189,12 +1191,9 @@ It opens beside this one in a wide or side window, else below it."
   (let* ((dir default-directory)
          (win (selected-window))
          (side (window-parameter win 'window-side))
-         ;; Hiding `dired-buffers' makes Dired build a fresh buffer instead
-         ;; of returning the one already on screen.
          (buf (let ((dired-buffers nil)) (dired-noselect dir))))
     (with-current-buffer buf
-      (dired-advertise)
-      (dired-snacks--split-mark))
+      (dired-advertise))
     (if side
         (let ((display-buffer-overriding-action
                `(display-buffer-in-side-window
@@ -1204,20 +1203,42 @@ It opens beside this one in a wide or side window, else below it."
       (select-window (if (window-splittable-p win t)
                          (split-window-right)
                        (split-window-below)))
-      (switch-to-buffer buf))))
+      (switch-to-buffer buf))
+    (set-window-parameter nil 'dired-snacks-pane t)))
 
-(defun dired-snacks--find-isolated (orig file)
-  "Keep Dired panes independent when entering directories.
-FILE is the file or directory being visited.  ORIG is the advised
-function, called unchanged unless FILE is a directory and more than
-one Dired pane is on screen."
-  (if (and (file-directory-p file) (cdr (dired-snacks--windows)))
-      (let ((pane dired-snacks--split-pane))
-        (let ((dired-buffers nil))
-          (dired--find-file #'find-alternate-file file))
-        (dired-advertise)
-        (when pane (dired-snacks--split-mark)))
-    (funcall orig file)))
+(defun dired-snacks--give-own-buffer (window buffer)
+  "Show in WINDOW a Dired buffer of its own for the listing of BUFFER."
+  (let* ((file (with-current-buffer buffer
+                 (save-excursion
+                   (goto-char (window-point window))
+                   (dired-get-filename nil t))))
+         (own (let ((dired-buffers (seq-remove (lambda (entry)
+                                                 (and (buffer-live-p (cdr entry))
+                                                      (get-buffer-window (cdr entry) t)))
+                                               dired-buffers)))
+                (with-current-buffer buffer
+                  (dired-noselect dired-directory dired-actual-switches)))))
+    (with-current-buffer own
+      (dired-advertise))
+    (set-window-buffer window own)
+    (when file
+      (set-window-point window (with-current-buffer own
+                                 (save-excursion
+                                   (or (dired-goto-file file) (point-min))))))))
+
+(defun dired-snacks--isolate-panes ()
+  "Give each window its own Dired buffer while the frame has a split pane."
+  (let ((windows (window-list nil 'no-minibuf)))
+    (when (seq-find (lambda (w) (window-parameter w 'dired-snacks-pane)) windows)
+      (pcase-dolist (`(,buffer . ,shared) (seq-group-by #'window-buffer windows))
+        (when (and (cdr shared)
+                   (rassq buffer dired-buffers)
+                   (stringp (buffer-local-value 'dired-directory buffer)))
+          (let ((keep (or (seq-find (lambda (w) (eq (window-old-buffer w) buffer)) shared)
+                          (car shared))))
+            (dolist (w (remq keep shared))
+              (with-demoted-errors "dired-snacks: %S"
+                (dired-snacks--give-own-buffer w buffer)))))))))
 
 ;; ===============================================================
 ;;; mode-line
@@ -1577,8 +1598,6 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (dired-snacks--vc-setup)
   (dired-snacks--columns-setup)
   (dired-snacks--breadcrumb-setup)
-  ;; A buffer that already has a listing needs decorating now.  From
-  ;; `dired-mode-hook' there is none yet, and this does nothing.
   (dired-snacks--subtree-draw-indicators (point-min) (point-max))
   (dired-snacks--breadcrumb-decorate)
   (unless (zerop (buffer-size))
@@ -1603,7 +1622,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--vc-draw)
   (add-hook 'after-save-hook #'dired-snacks--vc-after-save)
-  (advice-add 'dired--find-possibly-alternative-file :around #'dired-snacks--find-isolated)
+  (add-hook 'post-command-hook #'dired-snacks--isolate-panes)
   (add-to-list 'display-buffer-alist dired-snacks--side-window-rule)
   (dired-snacks--map-buffers #'dired-snacks--setup))
 
@@ -1615,7 +1634,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--vc-draw)
   (remove-hook 'after-save-hook #'dired-snacks--vc-after-save)
-  (advice-remove 'dired--find-possibly-alternative-file #'dired-snacks--find-isolated)
+  (remove-hook 'post-command-hook #'dired-snacks--isolate-panes)
   (setq display-buffer-alist (delete dired-snacks--side-window-rule display-buffer-alist))
   (dired-snacks--map-buffers #'dired-snacks--teardown))
 

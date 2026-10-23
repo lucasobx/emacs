@@ -746,7 +746,6 @@ DIR is inserted invisibly, so only the base name shows."
             (insert (propertize dir
                                 'dired-filename t
                                 'invisible 'dired-snacks--subtree-hidden)))
-        ;; Lines without a file name, such as the "total used" line.
         (put-text-property (pos-bol) (min end (1+ (pos-eol)))
                            'invisible 'dired-snacks--subtree-hidden))
       (forward-line 1))))
@@ -771,7 +770,8 @@ DIR is inserted invisibly, so only the base name shows."
       (forward-line 1)
       (let ((beg (point))
             (end (point-marker)))
-        (dired-insert-directory dir dired-actual-switches nil nil nil)
+        (let ((dired-free-space nil))
+          (dired-insert-directory dir dired-actual-switches nil nil nil))
         (set-marker end (point))
         (dired-snacks--subtree-absolutize beg end dir)
         (dired-snacks--subtree-delete-dots beg end)
@@ -779,8 +779,6 @@ DIR is inserted invisibly, so only the base name shows."
           (let ((dired-omit-size-limit nil)
                 (dired-omit-verbose nil))
             (dired-omit-expunge)))
-        ;; Rear-advancing, so that expanding the last entry of this subtree
-        ;; nests inside it instead of landing just past its end.
         (let ((ov (make-overlay beg end nil nil t)))
           (overlay-put ov 'dired-snacks--subtree depth)
           (overlay-put ov 'line-prefix prefix)
@@ -822,7 +820,6 @@ DIR is inserted invisibly, so only the base name shows."
   "Collapse every tracked subtree."
   (when dired-snacks--subtree-overlays
     (let ((inhibit-read-only t))
-      ;; deepest first, so a parent is removed only after its children
       (dolist (ov (sort dired-snacks--subtree-overlays
                         :key (lambda (o) (or (overlay-get o 'dired-snacks--subtree) 0))
                         :reverse t))

@@ -479,9 +479,7 @@ Drop them if a newer search has started."
                           (lambda ()
                             (add-hook 'after-change-functions
                                       #'dired-snacks--find-schedule nil t))
-                        (read-from-minibuffer
-                         (format "Find name under %s: "
-                                 (abbreviate-file-name root))))
+                        (read-from-minibuffer "Find files: "))
                     (quit nil)))
             (if query
                 (when (buffer-live-p buf)

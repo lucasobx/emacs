@@ -13,6 +13,7 @@
 ;; open       - smart RET for opening files in external apps
 ;; duplicate  - duplicate marked files with auto-numbered names
 ;; subtree    - expand directories inline without leaving the buffer
+;; vc         - mark the Git state of each entry in the fringe
 ;; breadcrumb - show the current directory in the header line
 ;; split      - second Dired pane with independent navigation
 ;; mode-line  - per-buffer mode line with size, time, sort, position
@@ -26,7 +27,8 @@
   (require 'dired-aux)
   (require 'dired-x)
   (require 'browse-url)
-  (require 'completion-preview))
+  (require 'completion-preview)
+  (require 'filenotify))
 
 (declare-function dired-get-filename "dired")
 (declare-function dired-get-marked-files "dired")
@@ -50,6 +52,9 @@
 (declare-function dired-omit-mode "dired-x")
 (declare-function dired-omit-expunge "dired-x")
 (declare-function browse-url-file-url "browse-url")
+(declare-function file-notify-add-watch "filenotify")
+(declare-function file-notify-rm-watch "filenotify")
+(declare-function file-notify-valid-p "filenotify")
 
 (declare-function nerd-icons-dired--refresh "nerd-icons-dired")
 (declare-function nerd-icons-dired-mode "nerd-icons-dired")
@@ -778,6 +783,198 @@ DIR is inserted invisibly, so only the base name shows."
     (nerd-icons-dired--refresh)))
 
 ;; ===============================================================
+;;; vc
+
+(defcustom dired-snacks-vc-marks t
+  "When non-nil, mark the Git state of each entry in the fringe."
+  :type 'boolean)
+
+(defface dired-snacks-vc-added '((t :inherit success))
+  "Face for the fringe mark of new files.")
+
+(defface dired-snacks-vc-modified '((t :inherit warning))
+  "Face for the fringe mark of modified files.")
+
+(defface dired-snacks-vc-conflict '((t :inherit error))
+  "Face for the fringe mark of files with conflicts.")
+
+(defconst dired-snacks--vc-faces
+  '(dired-snacks-vc-conflict dired-snacks-vc-modified dired-snacks-vc-added)
+  "Faces of the Git states, from the highest priority to the lowest.")
+
+(define-fringe-bitmap 'dired-snacks--vc-bar [7] nil 3 '(center t))
+
+(defvar-local dired-snacks--vc-proc nil
+  "Running `git status' process, or nil.")
+
+(defvar-local dired-snacks--vc-states nil
+  "Hash table from file names to fringe faces, or nil.")
+
+(defvar-local dired-snacks--vc-timer nil
+  "Timer of the pending refresh of the Git marks, or nil.")
+
+(defvar-local dired-snacks--vc-watch nil
+  "File notification watch on the Git directory, or nil.")
+
+(defun dired-snacks--vc-face (code)
+  "Return the face for the `git status' CODE."
+  (cond ((or (member code '("DD" "AA")) (string-search "U" code))
+         'dired-snacks-vc-conflict)
+        ((or (equal code "??") (eq (aref code 0) ?A))
+         'dired-snacks-vc-added)
+        (t 'dired-snacks-vc-modified)))
+
+(defun dired-snacks--vc-parse (root)
+  "Return the states in the `git status' output in this buffer.
+File names are relative to ROOT.  A directory gets the state of highest
+priority among the files below it."
+  (let ((states (make-hash-table :test #'equal)))
+    (dolist (entry (split-string (buffer-string) "\0" t) states)
+      (let ((face (dired-snacks--vc-face (substring entry 0 2)))
+            (name (substring entry 3)))
+        (while name
+          (let* ((file (directory-file-name (expand-file-name name root)))
+                 (old (gethash file states)))
+            (when (or (not old)
+                      (< (seq-position dired-snacks--vc-faces face)
+                         (seq-position dired-snacks--vc-faces old)))
+              (puthash file face states)))
+          (setq name (file-name-directory (directory-file-name name))))))))
+
+(defun dired-snacks--vc-draw ()
+  "Mark the Git state of each entry in the left fringe."
+  (remove-overlays nil nil 'dired-snacks--vc t)
+  (when (and dired-snacks-vc-marks dired-snacks--vc-states)
+    (save-excursion
+      (goto-char (point-min))
+      (while (not (eobp))
+        (when-let* ((file (dired-get-filename nil t))
+                    (face (gethash (directory-file-name file) dired-snacks--vc-states)))
+          (let ((ov (make-overlay (pos-bol) (pos-eol))))
+            (overlay-put ov 'dired-snacks--vc t)
+            (overlay-put ov 'evaporate t)
+            (overlay-put ov 'before-string
+                         (propertize " " 'display `(left-fringe dired-snacks--vc-bar ,face)))))
+        (forward-line 1)))))
+
+(defun dired-snacks--vc-sentinel (proc buffer root)
+  "Mark BUFFER with the states PROC read under ROOT."
+  (unless (process-live-p proc)
+    (when (and (buffer-live-p buffer) (eq (process-status proc) 'exit))
+      (let ((states (and (zerop (process-exit-status proc))
+                         (with-current-buffer (process-buffer proc)
+                           (dired-snacks--vc-parse root)))))
+        (with-current-buffer buffer
+          (setq dired-snacks--vc-states states)
+          (dired-snacks--vc-draw))))
+    (kill-buffer (process-buffer proc))))
+
+(defun dired-snacks--vc-schedule (buffer)
+  "Refresh the Git marks of BUFFER after a short delay."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (when (timerp dired-snacks--vc-timer)
+        (cancel-timer dired-snacks--vc-timer))
+      (setq dired-snacks--vc-timer
+            (run-with-timer 0.2 nil
+                            (lambda ()
+                              (when (buffer-live-p buffer)
+                                (with-current-buffer buffer
+                                  (dired-snacks--vc-refresh)))))))))
+
+(defun dired-snacks--vc-git-dir (root)
+  "Return the Git directory of the repository at ROOT, or nil."
+  (let ((dot-git (expand-file-name ".git" root)))
+    (if (file-directory-p dot-git)
+        dot-git
+      (with-work-buffer
+        (insert-file-contents dot-git)
+        (when (looking-at "gitdir: \\(.+\\)")
+          (expand-file-name (match-string 1) root))))))
+
+(defun dired-snacks--vc-add-watch (root)
+  "Refresh the Git marks whenever the Git directory of ROOT changes."
+  (require 'filenotify)
+  (unless (file-notify-valid-p dired-snacks--vc-watch)
+    (when-let* ((dir (dired-snacks--vc-git-dir root)))
+      (let ((buffer (current-buffer)))
+        (setq dired-snacks--vc-watch
+              (ignore-error file-notify-error
+                (file-notify-add-watch dir '(change)
+                                       (lambda (_event)
+                                         (dired-snacks--vc-schedule buffer)))))))))
+
+(defun dired-snacks--vc-remove-watch ()
+  "Stop watching the Git directory."
+  (when dired-snacks--vc-watch
+    (file-notify-rm-watch dired-snacks--vc-watch)
+    (setq dired-snacks--vc-watch nil)))
+
+(defun dired-snacks--vc-refresh ()
+  "Read the Git state of this directory in the background, then mark it."
+  (when (process-live-p dired-snacks--vc-proc)
+    (delete-process dired-snacks--vc-proc))
+  (if-let* (dired-snacks-vc-marks
+            (_ (not (file-remote-p default-directory)))
+            (root (locate-dominating-file default-directory ".git"))
+            (_ (executable-find "git")))
+      (let ((buffer (current-buffer))
+            (root (expand-file-name root)))
+        (dired-snacks--vc-add-watch root)
+        ;; `--no-optional-locks' keeps git from writing the index, which
+        ;; could collide with a git command the user is running.
+        (setq dired-snacks--vc-proc
+              (make-process
+               :name "dired-snacks-vc"
+               :buffer (generate-new-buffer " *dired-snacks-vc*")
+               :command '("git" "--no-optional-locks" "status" "--porcelain" "-z"
+                          "--no-renames" "--untracked-files=all" "--" ".")
+               :connection-type 'pipe
+               :noquery t
+               :sentinel (lambda (proc _event)
+                           (dired-snacks--vc-sentinel proc buffer root)))))
+    (setq dired-snacks--vc-states nil)
+    (dired-snacks--vc-draw)))
+
+(defun dired-snacks--vc-after-save ()
+  "Refresh the Git marks of the Dired buffers in this file's repository."
+  (when-let* ((_ (not (file-remote-p buffer-file-name)))
+              (root (locate-dominating-file buffer-file-name ".git")))
+    (dired-snacks--map-buffers
+     (lambda ()
+       (when (file-in-directory-p default-directory root)
+         (dired-snacks--vc-schedule (current-buffer)))))))
+
+(defun dired-snacks--vc-on-select (window)
+  "Refresh the Git marks when WINDOW gets selected."
+  (when (eq window (selected-window))
+    (dired-snacks--vc-schedule (current-buffer))))
+
+(defun dired-snacks--vc-after-readin ()
+  "Mark the new entries with the last known states, then refresh them."
+  (dired-snacks--vc-draw)
+  (dired-snacks--vc-refresh))
+
+(defun dired-snacks--vc-setup ()
+  "Enable the Git marks in the current Dired buffer."
+  (add-hook 'dired-after-readin-hook #'dired-snacks--vc-after-readin nil t)
+  (add-hook 'window-selection-change-functions #'dired-snacks--vc-on-select nil t)
+  (add-hook 'kill-buffer-hook #'dired-snacks--vc-remove-watch nil t))
+
+(defun dired-snacks--vc-teardown ()
+  "Disable the Git marks in the current Dired buffer."
+  (remove-hook 'dired-after-readin-hook #'dired-snacks--vc-after-readin t)
+  (remove-hook 'window-selection-change-functions #'dired-snacks--vc-on-select t)
+  (remove-hook 'kill-buffer-hook #'dired-snacks--vc-remove-watch t)
+  (dired-snacks--vc-remove-watch)
+  (when (timerp dired-snacks--vc-timer)
+    (cancel-timer dired-snacks--vc-timer))
+  (when (process-live-p dired-snacks--vc-proc)
+    (delete-process dired-snacks--vc-proc))
+  (remove-overlays nil nil 'dired-snacks--vc t)
+  (setq dired-snacks--vc-states nil))
+
+;; ===============================================================
 ;;; breadcrumb
 
 (defcustom dired-snacks-breadcrumb-separator " » "
@@ -1192,17 +1389,21 @@ The omit indicator and the sort criterion are dropped when space runs out."
 (defun dired-snacks--setup ()
   "Install the buffer-local features in the current Dired buffer."
   (dired-snacks--subtree-setup)
+  (dired-snacks--vc-setup)
   (dired-snacks--breadcrumb-setup)
   ;; A buffer that already has a listing needs decorating now.  From
   ;; `dired-mode-hook' there is none yet, and this does nothing.
   (dired-snacks--subtree-draw-indicators (point-min) (point-max))
   (dired-snacks--breadcrumb-decorate)
+  (unless (zerop (buffer-size))
+    (dired-snacks--vc-refresh))
   (dired-snacks--mode-line-setup)
   (dired-snacks--quit-mode 1))
 
 (defun dired-snacks--teardown ()
   "Remove the buffer-local features from the current Dired buffer."
   (dired-snacks--subtree-teardown)
+  (dired-snacks--vc-teardown)
   (dired-snacks--breadcrumb-teardown)
   (dired-snacks--mode-line-teardown)
   (dired-snacks--quit-mode -1))
@@ -1213,6 +1414,8 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (add-hook 'dired-mode-hook #'dired-snacks--zoxide-add-default-directory)
   (add-hook 'dired-mode-hook #'dired-snacks--setup)
   (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
+  (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--vc-draw)
+  (add-hook 'after-save-hook #'dired-snacks--vc-after-save)
   (advice-add 'dired--find-possibly-alternative-file :around #'dired-snacks--find-isolated)
   (add-to-list 'display-buffer-alist dired-snacks--side-window-rule)
   (dired-snacks--map-buffers #'dired-snacks--setup))
@@ -1223,6 +1426,8 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (remove-hook 'dired-mode-hook #'dired-snacks--zoxide-add-default-directory)
   (remove-hook 'dired-mode-hook #'dired-snacks--setup)
   (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
+  (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--vc-draw)
+  (remove-hook 'after-save-hook #'dired-snacks--vc-after-save)
   (advice-remove 'dired--find-possibly-alternative-file #'dired-snacks--find-isolated)
   (setq display-buffer-alist (delete dired-snacks--side-window-rule display-buffer-alist))
   (dired-snacks--map-buffers #'dired-snacks--teardown))
@@ -1231,7 +1436,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
 (define-minor-mode dired-snacks-mode
   "Toggle the passive Dired enhancements globally.
 The commands work on their own; this mode adds the breadcrumb, the
-Dired mode line, the split panes and the zoxide history."
+Git marks, the Dired mode line, the split panes and the zoxide history."
   :global t
   (if dired-snacks-mode
       (dired-snacks--enable)

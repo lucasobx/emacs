@@ -1521,6 +1521,27 @@ The omit indicator and the sort criterion are dropped when space runs out."
     ('time (format-time-string dired-snacks-columns-time-format
                                (file-attribute-modification-time attrs)))))
 
+(defun dired-snacks--columns-stamp (file attrs)
+  "Return the status change time the columns of FILE, with ATTRS, depend on."
+  (file-attribute-status-change-time
+   (if (stringp (file-attribute-type attrs))
+       (or (file-attributes (file-truename file)) attrs)
+     attrs)))
+
+(defun dired-snacks--columns-refresh-stale ()
+  "Redraw the visible columns of files that changed since they were drawn."
+  (with-demoted-errors "dired-snacks: %S"
+    (dolist (window (window-list nil 'no-minibuf))
+      (with-current-buffer (window-buffer window)
+        (when (derived-mode-p 'dired-mode)
+          (dolist (ov (overlays-in (window-start window) (window-end window)))
+            (when-let* ((file (overlay-get ov 'dired-snacks--columns-file)))
+              (let ((attrs (file-attributes file)))
+                (unless (and attrs
+                             (time-equal-p (overlay-get ov 'dired-snacks--columns-stamp)
+                                           (dired-snacks--columns-stamp file attrs)))
+                  (jit-lock-refontify (overlay-start ov) (overlay-end ov)))))))))))
+
 (defun dired-snacks--columns-hl-line ()
   "Return the overlay of `hl-line-mode' in this buffer, or nil."
   (seq-find (lambda (ov) (and (overlayp ov) (overlay-buffer ov)))
@@ -1570,6 +1591,9 @@ The omit indicator and the sort criterion are dropped when space runs out."
                   (ov (make-overlay (pos-bol) (pos-eol))))
               (overlay-put ov 'dired-snacks--columns t)
               (overlay-put ov 'evaporate t)
+              (overlay-put ov 'dired-snacks--columns-file file)
+              (overlay-put ov 'dired-snacks--columns-stamp
+                           (dired-snacks--columns-stamp file attrs))
               (overlay-put ov 'dired-snacks--columns-string
                            (concat (propertize " " 'display
                                                `(space :align-to
@@ -1636,6 +1660,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--vc-draw)
   (add-hook 'after-save-hook #'dired-snacks--vc-after-save)
   (add-hook 'post-command-hook #'dired-snacks--isolate-panes)
+  (add-hook 'post-command-hook #'dired-snacks--columns-refresh-stale)
   (add-to-list 'display-buffer-alist dired-snacks--side-window-rule)
   (dired-snacks--map-buffers #'dired-snacks--setup))
 
@@ -1648,6 +1673,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--vc-draw)
   (remove-hook 'after-save-hook #'dired-snacks--vc-after-save)
   (remove-hook 'post-command-hook #'dired-snacks--isolate-panes)
+  (remove-hook 'post-command-hook #'dired-snacks--columns-refresh-stale)
   (setq display-buffer-alist (delete dired-snacks--side-window-rule display-buffer-alist))
   (dired-snacks--map-buffers #'dired-snacks--teardown))
 

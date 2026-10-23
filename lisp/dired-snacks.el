@@ -250,6 +250,10 @@
   "Minimum number of characters before a search runs."
   :type 'natnum)
 
+(defcustom dired-snacks-find-group-by-directory t
+  "When non-nil, group search results by directory, else list them together."
+  :type 'boolean)
+
 (defvar dired-snacks--find-proc nil
   "Current live-search `fd' process, or nil.")
 
@@ -278,13 +282,12 @@
           (list "--" query (expand-file-name dir))))
 
 (defun dired-snacks--find-parse (line)
-  "Parse an `fd --list-details' LINE into (DIR BASENAME LISTING)."
+  "Parse an `fd --list-details' LINE into (DIR BASENAME DETAILS)."
   (when (string-match "\\(/.*\\)\\'" line)
-    (let ((file (match-string 1 line))
-          (prefix (substring line 0 (match-beginning 1))))
+    (let ((file (match-string 1 line)))
       (list (file-name-directory file)
             (file-name-nondirectory file)
-            (concat prefix (file-name-nondirectory file))))))
+            (substring line 0 (match-beginning 1))))))
 
 (defun dired-snacks--find-icon-subdirs ()
   "Add folder icons to Dired subdir headers."
@@ -314,23 +317,36 @@
       (insert "  " (directory-file-name (car group)) ":\n")
       (insert (format "  total used in directory %d\n" (length (cdr group))))
       (dolist (entry (cdr group))
-        (insert "  " (nth 2 entry) "\n")))))
+        (insert "  " (nth 2 entry) (nth 1 entry) "\n")))))
+
+(defun dired-snacks--find-insert-flat (root entries)
+  "Insert ENTRIES as one Dired listing of ROOT, sorted by file name."
+  (let ((lines (mapcar (lambda (entry)
+                         (cons (file-relative-name (concat (car entry) (nth 1 entry)) root)
+                               (nth 2 entry)))
+                       entries)))
+    (insert "  " (directory-file-name root) ":\n")
+    (insert (format "  total used in directory %d\n" (length lines)))
+    (pcase-dolist (`(,name . ,details) (sort lines :key #'car))
+      (insert "  " details name "\n"))))
 
 (defun dired-snacks--find-render (root entries)
   "Render ENTRIES from `dired-snacks--find-parse' under ROOT as a Dired buffer."
   (when (buffer-live-p dired-snacks--find-buffer)
     (with-current-buffer dired-snacks--find-buffer
-      (let ((inhibit-read-only t)
-            (groups (seq-group-by #'car entries)))
+      (let ((inhibit-read-only t))
         (widen)
         (remove-overlays nil nil 'dired-snacks--find-icon t)
         (erase-buffer)
         (setq-local default-directory (file-name-as-directory root))
-        (if (null entries)
-            (insert "  " (directory-file-name root) ":\n"
-                    "  total used in directory 0\n\n"
-                    "  (no matches)\n")
-          (dired-snacks--find-insert-groups groups))
+        (cond
+         ((null entries)
+          (insert "  " (directory-file-name root) ":\n"
+                  "  total used in directory 0\n\n"
+                  "  (no matches)\n"))
+         (dired-snacks-find-group-by-directory
+          (dired-snacks--find-insert-groups (seq-group-by #'car entries)))
+         (t (dired-snacks--find-insert-flat root entries)))
         (dired-build-subdir-alist)
         (dired-insert-set-properties (point-min) (point-max))
         (run-hooks 'dired-after-readin-hook)

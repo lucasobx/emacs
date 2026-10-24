@@ -773,7 +773,8 @@ With prefix argument REPLACE, clip only these files."
            (set-visited-file-name to nil t)))))
     ('hardlink
      (dired-relist-file from)))
-  (dired-add-file to))
+  (dired-add-file to)
+  (dired-snacks--subtree-prune-visible))
 
 (defun dired-snacks--paste-report (task)
   "Report the outcome of TASK."
@@ -997,6 +998,7 @@ DIR is inserted invisibly, so only the base name shows."
             (dired-omit-expunge)))
         (let ((ov (make-overlay beg end nil nil t)))
           (overlay-put ov 'dired-snacks--subtree depth)
+          (overlay-put ov 'dired-snacks--subtree-parent (copy-marker parent t))
           (overlay-put ov 'line-prefix prefix)
           (overlay-put ov 'evaporate t)
           (push ov dired-snacks--subtree-overlays))
@@ -1043,6 +1045,33 @@ DIR is inserted invisibly, so only the base name shows."
           (delete-region (overlay-start ov) (overlay-end ov)))
         (delete-overlay ov)))
     (setq dired-snacks--subtree-overlays nil)))
+
+(defun dired-snacks--subtree-prune ()
+  "Collapse the subtrees whose directory line was deleted."
+  (when dired-snacks--subtree-overlays
+    (let ((pruned nil)
+          (inhibit-read-only t))
+      (dolist (ov dired-snacks--subtree-overlays)
+        (when-let* ((_ (overlay-buffer ov))
+                    (parent (overlay-get ov 'dired-snacks--subtree-parent))
+                    ;; Once the directory line is deleted, its marker sits
+                    ;; at the subtree, or past a line inserted in its place.
+                    (_ (>= parent (overlay-start ov))))
+          (delete-region parent (overlay-end ov))
+          (delete-overlay ov)
+          (setq pruned t)))
+      (setq dired-snacks--subtree-overlays
+            (seq-filter #'overlay-buffer dired-snacks--subtree-overlays))
+      (when pruned
+        (run-hooks 'dired-snacks-subtree-after-change-hook)))))
+
+(defun dired-snacks--subtree-prune-visible ()
+  "Collapse the orphan subtrees of the buffers in visible windows."
+  (with-demoted-errors "dired-snacks: %S"
+    (walk-windows (lambda (window)
+                    (with-current-buffer (window-buffer window)
+                      (dired-snacks--subtree-prune)))
+                  'no-minibuf 'visible)))
 
 (defun dired-snacks--subtree-after-readin ()
   "Collapse every subtree on a full readin, then draw the indicators."
@@ -1921,6 +1950,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (add-hook 'after-save-hook #'dired-snacks--vc-after-save)
   (add-hook 'post-command-hook #'dired-snacks--isolate-panes)
   (add-hook 'post-command-hook #'dired-snacks--columns-refresh-stale)
+  (add-hook 'post-command-hook #'dired-snacks--subtree-prune-visible)
   (add-to-list 'display-buffer-alist dired-snacks--side-window-rule)
   (dired-snacks--map-buffers #'dired-snacks--setup))
 
@@ -1934,6 +1964,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (remove-hook 'after-save-hook #'dired-snacks--vc-after-save)
   (remove-hook 'post-command-hook #'dired-snacks--isolate-panes)
   (remove-hook 'post-command-hook #'dired-snacks--columns-refresh-stale)
+  (remove-hook 'post-command-hook #'dired-snacks--subtree-prune-visible)
   (setq display-buffer-alist (delete dired-snacks--side-window-rule display-buffer-alist))
   (dired-snacks--map-buffers #'dired-snacks--teardown))
 

@@ -708,6 +708,9 @@ Each copy is renamed with a numbered suffix to avoid clashes."
 (defvar dired-snacks--paste-query nil
   "Answer to the overwrite query, for `dired-query'.")
 
+(defvar dired-snacks--paste-backup-query nil
+  "Answer to the backup query, for `dired-query'.")
+
 (cl-defstruct dired-snacks--paste-task
   "A paste running in the background."
   op jobs total failures proc cancelled)
@@ -757,18 +760,24 @@ With prefix argument REPLACE, clip only these files."
           (list "-T" "--" from to)))
 
 (defun dired-snacks--paste-jobs (op dir)
-  "Return the (FROM . TO) pairs for pasting the clipped files into DIR with OP."
-  (let ((dired-snacks--paste-query nil))
+  "Return the jobs for pasting the clipped files into DIR with OP."
+  (let ((dired-snacks--paste-query nil)
+        (dired-snacks--paste-backup-query nil))
     (seq-keep
      (lambda (from)
        (let ((to (expand-file-name (file-name-nondirectory from) dir)))
          (cond
           ((equal from to)
            (unless (eq op 'move)
-             (cons from (dired-snacks--unique-copy-name from))))
-          ((or (not (or (file-exists-p to) (file-symlink-p to)))
-               (dired-query 'dired-snacks--paste-query "Overwrite `%s'?" to))
-           (cons from to)))))
+             (list from (dired-snacks--unique-copy-name from) nil)))
+          ((not (or (file-exists-p to) (file-symlink-p to)))
+           (list from to nil))
+          ((dired-query 'dired-snacks--paste-query "Overwrite `%s'?" to)
+           (list from to
+                 (and dired-backup-overwrite
+                      (or (eq dired-backup-overwrite 'always)
+                          (dired-query 'dired-snacks--paste-backup-query
+                                       "Make backup for existing file `%s'?" to))))))))
      dired-snacks--clipped)))
 
 (defun dired-snacks--paste-update (op from to)
@@ -809,23 +818,32 @@ With prefix argument REPLACE, clip only these files."
      (t
       (message "%s: %d file%s done" label total plural)))))
 
-(defun dired-snacks--paste-discard (op from to new)
-  "Clean up after the job of OP from FROM to TO was interrupted.
-NEW means TO did not exist before the job."
+(defun dired-snacks--paste-restore (to backup)
+  "Move BACKUP back to TO, unless something took its place."
+  (when backup
+    (if (or (file-exists-p to) (file-symlink-p to))
+        (dired-log "Kept the old `%s' as `%s'\n" to backup)
+      (rename-file backup to)
+      (dired-remove-file backup)
+      (dired-relist-file to))))
+
+(defun dired-snacks--paste-discard (op from to new backup)
+  "Clean up the interrupted job of OP from FROM to TO, using NEW and BACKUP."
   (pcase op
     ('copy
-     (when new
+     (when (or new backup)
        (if (and (file-directory-p to) (not (file-symlink-p to)))
            (delete-directory to t)
          (delete-file to))
        (dired-remove-file to)))
     ('move
-     (dired-log "Move `%s' to `%s' was interrupted, check both\n" from to))))
+     (dired-log "Move `%s' to `%s' was interrupted, check both\n" from to)))
+  (dired-snacks--paste-restore to backup))
 
-(defun dired-snacks--paste-sentinel (proc event task new)
+(defun dired-snacks--paste-sentinel (proc event task new backup)
   "Record how PROC, the first job of TASK, ended with EVENT, then go on."
   (unless (process-live-p proc)
-    (pcase-let ((`(,from . ,to) (car (dired-snacks--paste-task-jobs task)))
+    (pcase-let ((`(,from ,to) (car (dired-snacks--paste-task-jobs task)))
                 (op (dired-snacks--paste-task-op task))
                 (output (with-current-buffer (process-buffer proc)
                           (buffer-string))))
@@ -834,31 +852,49 @@ NEW means TO did not exist before the job."
           (progn
             (setf (dired-snacks--paste-task-cancelled task) t)
             (with-demoted-errors "dired-snacks: %S"
-              (dired-snacks--paste-discard op from to new)))
+              (dired-snacks--paste-discard op from to new backup)))
         (pop (dired-snacks--paste-task-jobs task))
         (if (zerop (process-exit-status proc))
             (with-demoted-errors "dired-snacks: %S"
               (dired-snacks--paste-update op from to))
           (push from (dired-snacks--paste-task-failures task))
           (dired-log "%s `%s' to `%s' failed (%s):\n%s\n"
-                     (dired-snacks--paste-label op) from to (string-trim event) output)))
+                     (dired-snacks--paste-label op) from to (string-trim event) output)
+          (with-demoted-errors "dired-snacks: %S"
+            (dired-snacks--paste-restore to backup))))
       (dired-snacks--paste-next task))))
+
+(defun dired-snacks--paste-start (task job)
+  "Start JOB of TASK and return its process."
+  (pcase-let* ((`(,from ,to ,backup) job)
+               (new (not (or (file-exists-p to) (file-symlink-p to))))
+               (backup (and backup (not new) (car (find-backup-file-name to)))))
+    (when backup
+      (rename-file to backup t)
+      (dired-relist-file backup))
+    (let ((default-directory "/"))
+      (make-process
+       :name "dired-snacks-paste"
+       :buffer (generate-new-buffer " *dired-snacks-paste*")
+       :command (dired-snacks--paste-command (dired-snacks--paste-task-op task) from to)
+       :connection-type 'pipe
+       :sentinel (lambda (proc event)
+                   (dired-snacks--paste-sentinel proc event task new backup))))))
 
 (defun dired-snacks--paste-next (task)
   "Start the next job of TASK, or report on TASK when none is left."
   (if-let* ((_ (not (dired-snacks--paste-task-cancelled task)))
             (job (car (dired-snacks--paste-task-jobs task))))
-      (let ((default-directory "/")
-            (new (not (or (file-exists-p (cdr job)) (file-symlink-p (cdr job))))))
-        (setf (dired-snacks--paste-task-proc task)
-              (make-process
-               :name "dired-snacks-paste"
-               :buffer (generate-new-buffer " *dired-snacks-paste*")
-               :command (dired-snacks--paste-command (dired-snacks--paste-task-op task)
-                                                     (car job) (cdr job))
-               :connection-type 'pipe
-               :sentinel (lambda (proc event)
-                           (dired-snacks--paste-sentinel proc event task new)))))
+      (condition-case err
+          (setf (dired-snacks--paste-task-proc task)
+                (dired-snacks--paste-start task job))
+        (file-error
+         (pop (dired-snacks--paste-task-jobs task))
+         (push (car job) (dired-snacks--paste-task-failures task))
+         (dired-log "%s `%s' to `%s' failed:\n%s\n"
+                    (dired-snacks--paste-label (dired-snacks--paste-task-op task))
+                    (car job) (cadr job) (error-message-string err))
+         (dired-snacks--paste-next task)))
     (setq dired-snacks--paste-tasks (delq task dired-snacks--paste-tasks))
     (dired-snacks--paste-report task))
   (dired-snacks--mode-line-animate-pastes))

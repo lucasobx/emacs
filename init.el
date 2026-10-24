@@ -359,6 +359,7 @@
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-recursive-deletes 'always)
   (dired-recursive-copies 'always)
+  (dired-no-confirm '(delete))
   (dired-auto-revert-buffer t)
   (dired-backup-overwrite t)
   (hl-line-sticky-flag nil)

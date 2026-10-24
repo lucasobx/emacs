@@ -263,6 +263,10 @@
   "When non-nil, group search results by directory, else list them together."
   :type 'boolean)
 
+(defcustom dired-snacks-find-show-hidden nil
+  "When non-nil, show hidden files in the find buffer."
+  :type 'boolean)
+
 (defvar dired-snacks--find-proc nil
   "Current live-search `fd' process, or nil.")
 
@@ -283,9 +287,10 @@
 
 (defun dired-snacks--find-fd-args (query dir)
   "Return the `fd' arguments to search for QUERY under DIR."
-  (append `("--color=never" "--list-details" "--hidden" "--no-ignore"
+  (append `("--color=never" "--list-details" "--no-ignore"
             "--type" "f" "--fixed-strings" "--ignore-case"
             "--batch-size" ,(number-to-string (1+ dired-snacks-find-max-results)))
+          (and dired-snacks-find-show-hidden '("--hidden"))
           (mapcan (lambda (d) (list "--exclude" d))
                   dired-snacks-find-prune-dirs)
           (list "--" query (expand-file-name dir))))
@@ -345,7 +350,7 @@
         (end (point-marker)))
     (dired-insert-directory root dired-actual-switches nil nil t)
     (set-marker end (point))
-    (dired-snacks--subtree-delete-dots beg end)
+    (dired-snacks--subtree-delete-dots beg end (not dired-snacks-find-show-hidden))
     (set-marker end nil)))
 
 (defun dired-snacks--find-render (root entries)
@@ -1051,12 +1056,14 @@ DIR is inserted invisibly, so only the base name shows."
                            'invisible 'dired-snacks--subtree-hidden))
       (forward-line 1))))
 
-(defun dired-snacks--subtree-delete-dots (beg end)
-  "Delete the . and .. entries between BEG and END."
+(defun dired-snacks--subtree-delete-dots (beg end &optional dotfiles)
+  "Delete the . and .. entries between BEG and END, and the dotfiles if DOTFILES."
   (save-excursion
     (goto-char beg)
     (while (< (point) end)
-      (if (dired-snacks--subtree-dot-p)
+      (if (or (dired-snacks--subtree-dot-p)
+              (and dotfiles
+                   (string-prefix-p "." (or (dired-get-filename 'no-dir t) ""))))
           (delete-region (pos-bol) (1+ (pos-eol)))
         (forward-line 1)))))
 

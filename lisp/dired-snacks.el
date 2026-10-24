@@ -19,6 +19,7 @@
 ;; split      - second Dired pane with independent navigation
 ;; mode-line  - per-buffer mode line with size, time, sort, position
 ;; columns    - size, time and permissions at the right edge
+;; last-file  - keep point on the last file, off the empty line below it
 ;; copy-uri   - copy files as file:// URIs to the clipboard
 
 ;;; Code:
@@ -2007,6 +2008,20 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (setq dired-snacks--columns-highlighted nil))
 
 ;; ===============================================================
+;;; last-file
+
+(defun dired-snacks--stay-on-last-file ()
+  "Move point from the empty end of the buffer to the last visible file."
+  (when (and (eobp) (derived-mode-p 'dired-mode))
+    (let ((pos nil))
+      (save-excursion
+        (while (and (not pos) (zerop (forward-line -1)))
+          (unless (invisible-p (point))
+            (setq pos (dired-move-to-filename)))))
+      (when pos
+        (goto-char pos)))))
+
+;; ===============================================================
 ;;; minor mode
 
 (defun dired-snacks--setup ()
@@ -2020,6 +2035,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (unless (zerop (buffer-size))
     (dired-snacks--vc-refresh))
   (dired-snacks--mode-line-setup)
+  (add-hook 'post-command-hook #'dired-snacks--stay-on-last-file nil t)
   (dired-snacks--quit-mode 1))
 
 (defun dired-snacks--teardown ()
@@ -2029,6 +2045,7 @@ The omit indicator and the sort criterion are dropped when space runs out."
   (dired-snacks--columns-teardown)
   (dired-snacks--breadcrumb-teardown)
   (dired-snacks--mode-line-teardown)
+  (remove-hook 'post-command-hook #'dired-snacks--stay-on-last-file t)
   (dired-snacks--quit-mode -1))
 
 (defun dired-snacks--enable ()

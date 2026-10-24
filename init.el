@@ -357,7 +357,6 @@
   :ensure nil
   :custom
   (dired-kill-when-opening-new-dired-buffer t)
-  (dired-movement-style 'bounded-files)
   (dired-recursive-deletes 'always)
   (dired-recursive-copies 'always)
   (dired-auto-revert-buffer t)

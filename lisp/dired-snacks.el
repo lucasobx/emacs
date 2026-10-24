@@ -728,6 +728,17 @@ With prefix argument REPLACE, clip only these files."
     (message "%d file%s to paste" (length dired-snacks--clipped)
              (if (length= dired-snacks--clipped 1) "" "s"))))
 
+;;;###autoload
+(defun dired-snacks-clip-clear ()
+  "Forget the files to paste."
+  (interactive)
+  (unless dired-snacks--clipped
+    (user-error "No files to paste"))
+  (let ((count (length dired-snacks--clipped)))
+    (setq dired-snacks--clipped nil)
+    (force-mode-line-update t)
+    (message "Cleared %d file%s to paste" count (if (= count 1) "" "s"))))
+
 (defun dired-snacks--paste-label (op)
   "Return the name of the paste operation OP."
   (cadr (assq op dired-snacks--paste-operations)))

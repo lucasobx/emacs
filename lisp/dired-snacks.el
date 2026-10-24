@@ -330,8 +330,18 @@
     (pcase-dolist (`(,name . ,details) (sort lines :key #'car))
       (insert "  " details name "\n"))))
 
+(defun dired-snacks--find-insert-listing (root)
+  "Insert the contents of ROOT as a Dired listing."
+  (let ((beg (point))
+        (end (point-marker)))
+    (dired-insert-directory root dired-actual-switches nil nil t)
+    (set-marker end (point))
+    (dired-snacks--subtree-delete-dots beg end)
+    (set-marker end nil)))
+
 (defun dired-snacks--find-render (root entries)
-  "Render ENTRIES from `dired-snacks--find-parse' under ROOT as a Dired buffer."
+  "Render ENTRIES from `dired-snacks--find-parse' under ROOT as a Dired buffer.
+If ENTRIES is `listing', show the contents of ROOT instead."
   (when (buffer-live-p dired-snacks--find-buffer)
     (with-current-buffer dired-snacks--find-buffer
       (let ((inhibit-read-only t))
@@ -340,6 +350,8 @@
         (erase-buffer)
         (setq-local default-directory (file-name-as-directory root))
         (cond
+         ((eq entries 'listing)
+          (dired-snacks--find-insert-listing root))
          ((null entries)
           (insert "  " (directory-file-name root) ":\n"
                   "  total used in directory 0\n\n"
@@ -352,7 +364,7 @@
         (run-hooks 'dired-after-readin-hook)
         (dired-snacks--find-icon-subdirs)
         (goto-char (point-min))
-        (when (and entries (null (cdr entries)))
+        (when (and (consp entries) (null (cdr entries)))
           (dired-goto-next-file))))))
 
 (defun dired-snacks--find-show (query entries)
@@ -417,7 +429,7 @@ Drop them if a newer search has started."
     (cond
      ((or (string-empty-p query)
           (length< query dired-snacks-find-min-length))
-      (dired-snacks--find-render dired-snacks--find-root nil))
+      (dired-snacks--find-render dired-snacks--find-root 'listing))
      ((dired-snacks--find-refinable-p query)
       (dired-snacks--find-render dired-snacks--find-root
                                  (dired-snacks--find-refine query)))
@@ -484,6 +496,7 @@ Drop them if a newer search has started."
         (keymap-set map "q" #'kill-current-buffer)
         (keymap-set map "TAB" #'dired-hide-subdir)
         (use-local-map map)))
+    (dired-snacks--find-dispatch "")
     (let ((display-buffer-overriding-action
            (and side `(display-buffer-in-side-window
                        (side . ,side) (slot . ,(or slot 0))))))

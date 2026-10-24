@@ -711,6 +711,9 @@ Each copy is renamed with a numbered suffix to avoid clashes."
   "A paste running in the background."
   op jobs total failures)
 
+(defvar dired-snacks--paste-tasks nil
+  "Pastes running in the background, oldest first.")
+
 ;;;###autoload
 (defun dired-snacks-clip (&optional replace)
   "Add the marked files, or the file at point, to the files to paste.
@@ -719,12 +722,21 @@ With prefix argument REPLACE, clip only these files."
   (let ((files (or (dired-get-marked-files) (user-error "No file to clip"))))
     (setq dired-snacks--clipped
           (if replace files (seq-union dired-snacks--clipped files)))
+    (force-mode-line-update t)
     (message "%d file%s to paste" (length dired-snacks--clipped)
              (if (length= dired-snacks--clipped 1) "" "s"))))
 
 (defun dired-snacks--paste-label (op)
   "Return the name of the paste operation OP."
   (cadr (assq op dired-snacks--paste-operations)))
+
+(defun dired-snacks--paste-progress (task)
+  "Return the progress of TASK, such as \"Copy 3/10\"."
+  (let ((total (dired-snacks--paste-task-total task)))
+    (format "%s %d/%d"
+            (dired-snacks--paste-label (dired-snacks--paste-task-op task))
+            (- total (length (dired-snacks--paste-task-jobs task)))
+            total)))
 
 (defun dired-snacks--paste-command (op from to)
   "Return the command that applies OP to FROM, creating TO."
@@ -806,7 +818,9 @@ With prefix argument REPLACE, clip only these files."
          :connection-type 'pipe
          :sentinel (lambda (proc event)
                      (dired-snacks--paste-sentinel proc event task))))
-    (dired-snacks--paste-report task)))
+    (setq dired-snacks--paste-tasks (delq task dired-snacks--paste-tasks))
+    (dired-snacks--paste-report task))
+  (dired-snacks--mode-line-animate-pastes))
 
 (defun dired-snacks--paste (op)
   "Paste the clipped files into the current directory with OP."
@@ -819,7 +833,8 @@ With prefix argument REPLACE, clip only these files."
     (if-let* ((jobs (dired-snacks--paste-jobs op dir)))
         (let ((task (make-dired-snacks--paste-task
                      :op op :jobs jobs :total (length jobs))))
-          (setq dired-snacks--clipped nil)
+          (setq dired-snacks--clipped nil
+                dired-snacks--paste-tasks (append dired-snacks--paste-tasks (list task)))
           (message "%s: %d file%s in progress" (dired-snacks--paste-label op)
                    (length jobs) (if (length= jobs 1) "" "s"))
           (dired-snacks--paste-next task))
@@ -1472,6 +1487,10 @@ It opens beside this one in a wide or side window, else below it."
   "When non-nil, show the sort criterion."
   :type 'boolean)
 
+(defcustom dired-snacks-mode-line-show-paste t
+  "When non-nil, show the running pastes and the number of files to paste."
+  :type 'boolean)
+
 (defcustom dired-snacks-mode-line-index-width 7
   "Width reserved for the entry counter, so it never shifts."
   :type 'integer)
@@ -1630,6 +1649,44 @@ It opens beside this one in a wide or side window, else below it."
     (concat "  " (propertize (dired-snacks--sort-criterion dired-actual-switches)
                              'face 'shadow))))
 
+(defconst dired-snacks--mode-line-spinner '("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+  "Frames of the animation shown next to a running paste.")
+
+(defvar dired-snacks--mode-line-spinner-step 0
+  "Number of frames the running pastes have been animated.")
+
+(defvar dired-snacks--mode-line-spinner-timer nil
+  "Timer that animates the running pastes, or nil.")
+
+(defun dired-snacks--mode-line-spin ()
+  "Show the next frame of the paste animation."
+  (incf dired-snacks--mode-line-spinner-step)
+  (dired-snacks--map-buffers #'force-mode-line-update))
+
+(defun dired-snacks--mode-line-animate-pastes ()
+  "Animate the mode lines while a paste runs, and refresh them."
+  (cond
+   ((and dired-snacks--paste-tasks (not dired-snacks--mode-line-spinner-timer))
+    (setq dired-snacks--mode-line-spinner-timer
+          (run-with-timer 0.1 0.1 #'dired-snacks--mode-line-spin)))
+   ((and (not dired-snacks--paste-tasks) dired-snacks--mode-line-spinner-timer)
+    (cancel-timer dired-snacks--mode-line-spinner-timer)
+    (setq dired-snacks--mode-line-spinner-timer nil)))
+  (force-mode-line-update t))
+
+(defun dired-snacks--mode-line-paste ()
+  "Return the progress of the running pastes and the files to paste, or nil."
+  (when-let* ((_ dired-snacks-mode-line-show-paste)
+              (frame (nth (mod dired-snacks--mode-line-spinner-step
+                               (length dired-snacks--mode-line-spinner))
+                          dired-snacks--mode-line-spinner))
+              (parts (append (mapcar (lambda (task)
+                                       (concat frame " " (dired-snacks--paste-progress task)))
+                                     dired-snacks--paste-tasks)
+                             (and dired-snacks--clipped
+                                  (list (format "%d to paste" (length dired-snacks--clipped)))))))
+    (concat "  " (string-join parts "  "))))
+
 (defun dired-snacks--mode-line-width (&rest segments)
   "Return the total display width of SEGMENTS."
   (apply #'+ (mapcar #'string-width (delq nil segments))))
@@ -1638,18 +1695,19 @@ It opens beside this one in a wide or side window, else below it."
   "Return the right-hand segments of the mode line.
 The omit indicator and the sort criterion are dropped when space runs out."
   (when (derived-mode-p 'dired-mode)
-    (let ((size (dired-snacks--mode-line-size))
+    (let ((paste (dired-snacks--mode-line-paste))
+          (size (dired-snacks--mode-line-size))
           (time (dired-snacks--mode-line-time))
           (crit (dired-snacks--mode-line-sort))
           (omit (dired-snacks--mode-line-omit))
           (index (dired-snacks--mode-line-index))
           (room (- (window-width)
                    (+ 10 (max 12 (string-width (buffer-name)))))))
-      (when (> (dired-snacks--mode-line-width size time crit omit index) room)
+      (when (> (dired-snacks--mode-line-width paste size time crit omit index) room)
         (setq omit nil))
-      (when (> (dired-snacks--mode-line-width size time crit omit index) room)
+      (when (> (dired-snacks--mode-line-width paste size time crit omit index) room)
         (setq crit nil))
-      (concat size time crit omit index))))
+      (concat paste size time crit omit index))))
 
 (defcustom dired-snacks-mode-line-format
   '("%e  "

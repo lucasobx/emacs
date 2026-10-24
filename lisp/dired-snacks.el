@@ -47,6 +47,7 @@
 (declare-function dired-insert-directory "dired")
 (declare-function dired-insert-set-properties "dired")
 (declare-function dired-unmark-all-marks "dired")
+(declare-function dired-change-marks "dired")
 (declare-function dired-find-file "dired")
 (declare-function dired-goto-file "dired")
 (declare-function dired-goto-next-file "dired")
@@ -722,6 +723,7 @@ With prefix argument REPLACE, clip only these files."
   (let ((files (or (dired-get-marked-files) (user-error "No file to clip"))))
     (setq dired-snacks--clipped
           (if replace files (seq-union dired-snacks--clipped files)))
+    (dired-change-marks dired-marker-char ?\s)
     (force-mode-line-update t)
     (message "%d file%s to paste" (length dired-snacks--clipped)
              (if (length= dired-snacks--clipped 1) "" "s"))))

@@ -12,6 +12,7 @@
 ;; find       - incremental file-name search as you type
 ;; open       - smart RET for opening files in external apps
 ;; duplicate  - duplicate marked files with auto-numbered names
+;; paste      - clip files, then copy, move or link them elsewhere
 ;; subtree    - expand directories inline without leaving the buffer
 ;; vc         - mark the Git state of each entry in the fringe
 ;; breadcrumb - show the current directory in the header line
@@ -23,6 +24,7 @@
 ;;; Code:
 
 (eval-when-compile
+  (require 'cl-lib)
   (require 'cond-star)
   (require 'dired)
   (require 'dired-aux)
@@ -51,6 +53,12 @@
 (declare-function dired-advertise "dired")
 (declare-function dired-hide-details-mode "dired")
 (declare-function dired-add-file "dired-aux")
+(declare-function dired-remove-file "dired-aux")
+(declare-function dired-relist-file "dired-aux")
+(declare-function dired-rename-subdir "dired-aux")
+(declare-function dired-query "dired-aux")
+(declare-function dired-log "dired")
+(declare-function dired-log-summary "dired")
 (declare-function dired-kill-subdir "dired-aux")
 (declare-function dired-hide-subdir "dired-aux")
 (declare-function dired-omit-mode "dired-x")
@@ -681,6 +689,171 @@ Each copy is renamed with a numbered suffix to avoid clashes."
       (dired-goto-file (car copies))
       (message "Duplicated %d file%s"
                (length copies) (if (length= copies 1) "" "s")))))
+
+;; ===============================================================
+;;; paste
+
+(defconst dired-snacks--paste-operations
+  '((copy       "Copy"             "cp" "-a")
+    (move       "Move"             "mv")
+    (symlink    "Symlink"          "ln" "-sf")
+    (relsymlink "Relative symlink" "ln" "-srf")
+    (hardlink   "Hardlink"         "ln" "-f"))
+  "Paste operations, as (OP LABEL PROGRAM ARG...).")
+
+(defvar dired-snacks--clipped nil
+  "Files clipped for a later paste.")
+
+(defvar dired-snacks--paste-query nil
+  "Answer to the overwrite query, for `dired-query'.")
+
+(cl-defstruct dired-snacks--paste-task
+  "A paste running in the background."
+  op jobs total failures)
+
+;;;###autoload
+(defun dired-snacks-clip (&optional replace)
+  "Add the marked files, or the file at point, to the files to paste.
+With prefix argument REPLACE, clip only these files."
+  (interactive "P" dired-mode)
+  (let ((files (or (dired-get-marked-files) (user-error "No file to clip"))))
+    (setq dired-snacks--clipped
+          (if replace files (seq-union dired-snacks--clipped files)))
+    (message "%d file%s to paste" (length dired-snacks--clipped)
+             (if (length= dired-snacks--clipped 1) "" "s"))))
+
+(defun dired-snacks--paste-label (op)
+  "Return the name of the paste operation OP."
+  (cadr (assq op dired-snacks--paste-operations)))
+
+(defun dired-snacks--paste-command (op from to)
+  "Return the command that applies OP to FROM, creating TO."
+  (append (cddr (assq op dired-snacks--paste-operations))
+          (list "-T" "--" from to)))
+
+(defun dired-snacks--paste-jobs (op dir)
+  "Return the (FROM . TO) pairs for pasting the clipped files into DIR with OP."
+  (let ((dired-snacks--paste-query nil))
+    (seq-keep
+     (lambda (from)
+       (let ((to (expand-file-name (file-name-nondirectory from) dir)))
+         (cond
+          ((equal from to)
+           (unless (eq op 'move)
+             (cons from (dired-snacks--unique-copy-name from))))
+          ((or (not (or (file-exists-p to) (file-symlink-p to)))
+               (dired-query 'dired-snacks--paste-query "Overwrite `%s'?" to))
+           (cons from to)))))
+     dired-snacks--clipped)))
+
+(defun dired-snacks--paste-update (op from to)
+  "Bring the buffers up to date after OP created TO from FROM."
+  (dired-remove-file to)
+  (pcase op
+    ('move
+     (dired-remove-file from)
+     (if (file-directory-p to)
+         (dired-rename-subdir from to)
+       (when-let* ((buffer (get-file-buffer from)))
+         (with-current-buffer buffer
+           (set-visited-file-name to nil t)))))
+    ('hardlink
+     (dired-relist-file from)))
+  (dired-add-file to))
+
+(defun dired-snacks--paste-report (task)
+  "Report the outcome of TASK."
+  (let ((label (dired-snacks--paste-label (dired-snacks--paste-task-op task)))
+        (total (dired-snacks--paste-task-total task))
+        (failures (dired-snacks--paste-task-failures task)))
+    (if failures
+        (dired-log-summary (format "%s: %d of %d file%s failed" label
+                                   (length failures) total (if (= total 1) "" "s"))
+                           (mapcar #'file-name-nondirectory (reverse failures)))
+      (message "%s: %d file%s done" label total (if (= total 1) "" "s")))))
+
+(defun dired-snacks--paste-sentinel (proc event task)
+  "Record how PROC, the first job of TASK, ended with EVENT, then go on."
+  (unless (process-live-p proc)
+    (pcase-let ((`(,from . ,to) (pop (dired-snacks--paste-task-jobs task)))
+                (op (dired-snacks--paste-task-op task))
+                (output (with-current-buffer (process-buffer proc)
+                          (buffer-string))))
+      (kill-buffer (process-buffer proc))
+      (if (and (eq (process-status proc) 'exit)
+               (zerop (process-exit-status proc)))
+          (with-demoted-errors "dired-snacks: %S"
+            (dired-snacks--paste-update op from to))
+        (push from (dired-snacks--paste-task-failures task))
+        (dired-log "%s `%s' to `%s' failed (%s):\n%s\n"
+                   (dired-snacks--paste-label op) from to (string-trim event) output))
+      (when (eq (process-status proc) 'signal)
+        (dolist (job (dired-snacks--paste-task-jobs task))
+          (push (car job) (dired-snacks--paste-task-failures task)))
+        (setf (dired-snacks--paste-task-jobs task) nil))
+      (dired-snacks--paste-next task))))
+
+(defun dired-snacks--paste-next (task)
+  "Start the next job of TASK, or report on TASK when none is left."
+  (if-let* ((job (car (dired-snacks--paste-task-jobs task))))
+      ;; Any local directory will do, since the file names are absolute.
+      (let ((default-directory "/"))
+        (make-process
+         :name "dired-snacks-paste"
+         :buffer (generate-new-buffer " *dired-snacks-paste*")
+         :command (dired-snacks--paste-command (dired-snacks--paste-task-op task)
+                                               (car job) (cdr job))
+         :connection-type 'pipe
+         :sentinel (lambda (proc event)
+                     (dired-snacks--paste-sentinel proc event task))))
+    (dired-snacks--paste-report task)))
+
+(defun dired-snacks--paste (op)
+  "Paste the clipped files into the current directory with OP."
+  (require 'dired-aux)
+  (let ((dir (dired-current-directory)))
+    (unless dired-snacks--clipped
+      (user-error "No files to paste"))
+    (when (seq-some #'file-remote-p (cons dir dired-snacks--clipped))
+      (user-error "Cannot paste remote files"))
+    (if-let* ((jobs (dired-snacks--paste-jobs op dir)))
+        (let ((task (make-dired-snacks--paste-task
+                     :op op :jobs jobs :total (length jobs))))
+          (setq dired-snacks--clipped nil)
+          (message "%s: %d file%s in progress" (dired-snacks--paste-label op)
+                   (length jobs) (if (length= jobs 1) "" "s"))
+          (dired-snacks--paste-next task))
+      (message "Nothing pasted"))))
+
+;;;###autoload
+(defun dired-snacks-paste ()
+  "Copy the clipped files into the current directory."
+  (interactive nil dired-mode)
+  (dired-snacks--paste 'copy))
+
+;;;###autoload
+(defun dired-snacks-paste-move ()
+  "Move the clipped files into the current directory."
+  (interactive nil dired-mode)
+  (dired-snacks--paste 'move))
+
+;;;###autoload
+(defun dired-snacks-paste-symlink ()
+  "Make symbolic links to the clipped files in the current directory."
+  (interactive nil dired-mode)
+  (dired-snacks--paste 'symlink))
+
+;;;###autoload
+(defun dired-snacks-paste-relsymlink ()
+  "Make relative symbolic links to the clipped files in the current directory."
+  (interactive nil dired-mode)
+  (dired-snacks--paste 'relsymlink))
+
+;;;###autoload
+(defun dired-snacks-paste-hardlink ()
+  "Make hard links to the clipped files in the current directory."
+  (interactive nil dired-mode)
+  (dired-snacks--paste 'hardlink))
 
 ;; ===============================================================
 ;;; subtree

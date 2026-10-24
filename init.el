@@ -122,6 +122,10 @@
   (recentf-mode 1)
 
   ;; hooks
+  (add-hook 'emacs-startup-hook
+          (lambda ()
+            (message "Loaded in %s with %d packages."
+                     (emacs-init-time) (length package-activated-list))))
   (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
   (add-hook 'prog-mode-hook #'display-line-numbers-mode)
   (dolist (hook '(prog-mode-hook text-mode-hook conf-mode-hook))
@@ -711,30 +715,7 @@
   :config
   (add-to-list 'ghostel-eval-cmds '("magit-status-setup-buffer" magit-status-setup-buffer))
   (define-key ghostel-semi-char-mode-map [remap my/backward-delete]
-              (lambda () (interactive) (ghostel-send-key "backspace" "meta")))
-  (defun my/ghostel-frame--kill-terminal (frame)
-    "Kill the Ghostel session and its frame."
-    (when-let* ((buffer (frame-parameter frame 'my/ghostel-buffer))
-                ((buffer-live-p buffer)))
-      (with-current-buffer buffer
-        (let ((kill-buffer-query-functions nil))
-          (kill-buffer)))))
-  (add-hook 'delete-frame-functions #'my/ghostel-frame--kill-terminal)
-  (defun my/ghostel-frame ()
-    "Open Ghostel in a dedicated frame."
-    (interactive)
-    (let* ((frame (selected-frame))
-           (action '(display-buffer-full-frame))
-           (display-buffer-overriding-action action)
-           (buffer (ghostel-create "*ghostel-frame*" action)))
-      (set-frame-parameter frame 'my/ghostel-buffer buffer)
-      (with-current-buffer buffer
-        (add-hook 'ghostel-exit-functions
-                  (lambda (_buffer _event)
-                    (when (frame-live-p frame)
-                      (set-frame-parameter frame 'my/ghostel-buffer nil)
-                      (delete-frame frame)))
-                  nil t)))))
+              (lambda () (interactive) (ghostel-send-key "backspace" "meta"))))
 
 (use-package ghostel-compile
   :hook (after-init . ghostel-compile-global-mode))

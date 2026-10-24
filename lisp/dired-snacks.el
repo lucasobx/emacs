@@ -710,7 +710,7 @@ Each copy is renamed with a numbered suffix to avoid clashes."
 
 (cl-defstruct dired-snacks--paste-task
   "A paste running in the background."
-  op jobs total failures)
+  op jobs total failures proc cancelled)
 
 (defvar dired-snacks--paste-tasks nil
   "Pastes running in the background, oldest first.")
@@ -778,49 +778,76 @@ With prefix argument REPLACE, clip only these files."
 
 (defun dired-snacks--paste-report (task)
   "Report the outcome of TASK."
-  (let ((label (dired-snacks--paste-label (dired-snacks--paste-task-op task)))
-        (total (dired-snacks--paste-task-total task))
-        (failures (dired-snacks--paste-task-failures task)))
-    (if failures
-        (dired-log-summary (format "%s: %d of %d file%s failed" label
-                                   (length failures) total (if (= total 1) "" "s"))
-                           (mapcar #'file-name-nondirectory (reverse failures)))
-      (message "%s: %d file%s done" label total (if (= total 1) "" "s")))))
+  (let* ((op (dired-snacks--paste-task-op task))
+         (label (dired-snacks--paste-label op))
+         (total (dired-snacks--paste-task-total task))
+         (failures (dired-snacks--paste-task-failures task))
+         (plural (if (= total 1) "" "s")))
+    (cond
+     ((dired-snacks--paste-task-cancelled task)
+      (let ((summary (format "%s: cancelled after %d of %d file%s" label
+                             (- total (length (dired-snacks--paste-task-jobs task)))
+                             total plural)))
+        (if (eq op 'move)
+            (dired-log-summary summary nil)
+          (message "%s" summary))))
+     (failures
+      (dired-log-summary (format "%s: %d of %d file%s failed" label
+                                 (length failures) total plural)
+                         (mapcar #'file-name-nondirectory (reverse failures))))
+     (t
+      (message "%s: %d file%s done" label total plural)))))
 
-(defun dired-snacks--paste-sentinel (proc event task)
+(defun dired-snacks--paste-discard (op from to new)
+  "Clean up after the job of OP from FROM to TO was interrupted.
+NEW means TO did not exist before the job."
+  (pcase op
+    ('copy
+     (when new
+       (if (and (file-directory-p to) (not (file-symlink-p to)))
+           (delete-directory to t)
+         (delete-file to))
+       (dired-remove-file to)))
+    ('move
+     (dired-log "Move `%s' to `%s' was interrupted, check both\n" from to))))
+
+(defun dired-snacks--paste-sentinel (proc event task new)
   "Record how PROC, the first job of TASK, ended with EVENT, then go on."
   (unless (process-live-p proc)
-    (pcase-let ((`(,from . ,to) (pop (dired-snacks--paste-task-jobs task)))
+    (pcase-let ((`(,from . ,to) (car (dired-snacks--paste-task-jobs task)))
                 (op (dired-snacks--paste-task-op task))
                 (output (with-current-buffer (process-buffer proc)
                           (buffer-string))))
       (kill-buffer (process-buffer proc))
-      (if (and (eq (process-status proc) 'exit)
-               (zerop (process-exit-status proc)))
-          (with-demoted-errors "dired-snacks: %S"
-            (dired-snacks--paste-update op from to))
-        (push from (dired-snacks--paste-task-failures task))
-        (dired-log "%s `%s' to `%s' failed (%s):\n%s\n"
-                   (dired-snacks--paste-label op) from to (string-trim event) output))
-      (when (eq (process-status proc) 'signal)
-        (dolist (job (dired-snacks--paste-task-jobs task))
-          (push (car job) (dired-snacks--paste-task-failures task)))
-        (setf (dired-snacks--paste-task-jobs task) nil))
+      (if (eq (process-status proc) 'signal)
+          (progn
+            (setf (dired-snacks--paste-task-cancelled task) t)
+            (with-demoted-errors "dired-snacks: %S"
+              (dired-snacks--paste-discard op from to new)))
+        (pop (dired-snacks--paste-task-jobs task))
+        (if (zerop (process-exit-status proc))
+            (with-demoted-errors "dired-snacks: %S"
+              (dired-snacks--paste-update op from to))
+          (push from (dired-snacks--paste-task-failures task))
+          (dired-log "%s `%s' to `%s' failed (%s):\n%s\n"
+                     (dired-snacks--paste-label op) from to (string-trim event) output)))
       (dired-snacks--paste-next task))))
 
 (defun dired-snacks--paste-next (task)
   "Start the next job of TASK, or report on TASK when none is left."
-  (if-let* ((job (car (dired-snacks--paste-task-jobs task))))
-      ;; Any local directory will do, since the file names are absolute.
-      (let ((default-directory "/"))
-        (make-process
-         :name "dired-snacks-paste"
-         :buffer (generate-new-buffer " *dired-snacks-paste*")
-         :command (dired-snacks--paste-command (dired-snacks--paste-task-op task)
-                                               (car job) (cdr job))
-         :connection-type 'pipe
-         :sentinel (lambda (proc event)
-                     (dired-snacks--paste-sentinel proc event task))))
+  (if-let* ((_ (not (dired-snacks--paste-task-cancelled task)))
+            (job (car (dired-snacks--paste-task-jobs task))))
+      (let ((default-directory "/")
+            (new (not (or (file-exists-p (cdr job)) (file-symlink-p (cdr job))))))
+        (setf (dired-snacks--paste-task-proc task)
+              (make-process
+               :name "dired-snacks-paste"
+               :buffer (generate-new-buffer " *dired-snacks-paste*")
+               :command (dired-snacks--paste-command (dired-snacks--paste-task-op task)
+                                                     (car job) (cdr job))
+               :connection-type 'pipe
+               :sentinel (lambda (proc event)
+                           (dired-snacks--paste-sentinel proc event task new)))))
     (setq dired-snacks--paste-tasks (delq task dired-snacks--paste-tasks))
     (dired-snacks--paste-report task))
   (dired-snacks--mode-line-animate-pastes))
@@ -872,6 +899,16 @@ With prefix argument REPLACE, clip only these files."
   "Make hard links to the clipped files in the current directory."
   (interactive nil dired-mode)
   (dired-snacks--paste 'hardlink))
+
+;;;###autoload
+(defun dired-snacks-paste-cancel ()
+  "Cancel the pastes running in the background."
+  (interactive)
+  (unless dired-snacks--paste-tasks
+    (user-error "No paste is running"))
+  (dolist (task (copy-sequence dired-snacks--paste-tasks))
+    (setf (dired-snacks--paste-task-cancelled task) t)
+    (delete-process (dired-snacks--paste-task-proc task))))
 
 ;; ===============================================================
 ;;; subtree

@@ -65,6 +65,7 @@
 (declare-function dired-omit-mode "dired-x")
 (declare-function dired-omit-expunge "dired-x")
 (declare-function browse-url-file-url "browse-url")
+(declare-function project-root "project")
 (declare-function file-notify-add-watch "filenotify")
 (declare-function file-notify-rm-watch "filenotify")
 (declare-function file-notify-valid-p "filenotify")
@@ -279,6 +280,9 @@
 (defvar dired-snacks--find-root nil
   "Root directory of the current search.")
 
+(defvar dired-snacks--find-origin nil
+  "Directory listed before a search.")
+
 (defvar dired-snacks--find-query nil
   "Query of the latest search started.")
 
@@ -463,7 +467,7 @@ Drop them if a newer search has started."
      ((let ((input (string-trim query)))
         (or (string-empty-p input)
             (length< input dired-snacks-find-min-length)))
-      (dired-snacks--find-render dired-snacks--find-root 'listing))
+      (dired-snacks--find-render dired-snacks--find-origin 'listing))
      ((dired-snacks--find-refinable-p query)
       (dired-snacks--find-render dired-snacks--find-root
                                  (dired-snacks--find-refine query)))
@@ -504,10 +508,12 @@ Drop them if a newer search has started."
 
 ;;;###autoload
 (defun dired-snacks-find ()
-  "Search for files under `default-directory', showing results as you type."
+  "Search for files in the current project or directory as you type."
   (interactive)
   (require 'dired)
-  (let* ((root (expand-file-name default-directory))
+  (let* ((origin (expand-file-name default-directory))
+         (project (project-current))
+         (root (if project (expand-file-name (project-root project)) origin))
          (here (selected-window))
          (side (window-parameter here 'window-side))
          (slot (window-parameter here 'window-slot))
@@ -517,6 +523,7 @@ Drop them if a newer search has started."
     (dired-snacks--find-cleanup)
     (setq dired-snacks--find-buffer buf
           dired-snacks--find-root root
+          dired-snacks--find-origin origin
           dired-snacks--find-query nil
           dired-snacks--find-results nil)
     (with-current-buffer buf
@@ -525,6 +532,9 @@ Drop them if a newer search has started."
         (setq-local default-directory (file-name-as-directory root))
         (let ((dired-buffers nil)) (dired-mode root)))
       (setq-local dired-omit-mode nil)
+      (when project
+        (setq-local mode-line-buffer-identification
+                    (list mode-line-buffer-identification " (project)")))
       (let ((map (make-sparse-keymap)))
         (set-keymap-parent map dired-mode-map)
         (keymap-set map "q" #'kill-current-buffer)

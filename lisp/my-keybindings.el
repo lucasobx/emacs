@@ -180,6 +180,15 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 ;; escape quits like C-g
 (keymap-set key-translation-map "ESC" "C-g")
 
+;; C-m and RET are the same key, except in graphical frames
+(defun my/decode-C-m (&optional frame)
+  "Make Ctrl+m send a separate event in FRAME, if graphical."
+  (when (display-graphic-p frame)
+    (with-selected-frame (or frame (selected-frame))
+      (keymap-set input-decode-map "C-m" [C-m]))))
+(my/decode-C-m)
+(add-hook 'after-make-frame-functions #'my/decode-C-m)
+
 ;; tools
 (my/bind
   '("<f1>" scratch-buffer)
@@ -205,6 +214,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("M-c"           capitalize-dwim)
   '("M-<up>"        my/move-text-up)
   '("M-<down>"      my/move-text-down)
+  '("C-<m>"         rectangle-mark-mode)
   '("C-0"           my/wrap-parens)
   '("C-]"           my/wrap-brackets))
 
@@ -314,14 +324,12 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 (my/bind-prefix "C-x" "emacs"
   '("<left>"  previous-buffer t)
   '("<right>" next-buffer     t)
-  '("r" tramp-revert-buffer-with-sudo "sudo edit")
-  '("m" rectangle-mark-mode "rectangle mark")
+  '("r" tramp-revert-buffer-with-sudo "sudo edit file")
   '("b" my/system-buffers   "system-buffers")
-  '("s" save-buffer         "save buffer")
-  '("e" eval-last-sexp      "eval sexp")
-  '("t" visual-line-mode    "truncate")
-  '("x" restart-emacs       "restart")
-  '("i" my/find-init-file   "init.el"))
+  '("t" visual-line-mode    "truncate lines")
+  '("i" my/find-init-file   "go to init.el")
+  '("x" restart-emacs       "restart emacs")
+  '("s" save-buffer         "save buffer"))
 
 (my/bind-prefix "C-h" "help"
   '("h" helpful-at-point "help at point")
@@ -364,7 +372,9 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 (with-eval-after-load 'elisp-mode
   (dolist (map (list emacs-lisp-mode-map lisp-interaction-mode-map))
     (dolist (key '("C-c C-b" "C-c C-e" "C-c C-f"))
-      (keymap-unset map key t))))
+      (keymap-unset map key t))
+    (my/bind-local map
+      '("C-x e" eval-last-sexp "eval sexp"))))
 
 (with-eval-after-load 'ruby-ts-mode
   (keymap-set ruby-ts-mode-map "C-l" (cons "lsp" (make-sparse-keymap)))

@@ -213,7 +213,6 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 (my/bind-sub my/delete-map "C-d"
   '("p" my/delete-paragraph       "paragraph")
   '("d" my/delete-line            "line")
-  '("w" my/delete-word            "word")
   '("s" my/delete-symbol          "symbol")
   '("0" my/delete-inside-parens   "inside ()")
   '("]" my/delete-inside-brackets "inside []")
@@ -223,7 +222,6 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 (my/bind-sub my/copy-map "C-y"
   '("p" my/copy-paragraph       "paragraph")
   '("y" my/copy-line            "line")
-  '("w" my/copy-word            "word")
   '("s" my/copy-symbol          "symbol")
   '("0" my/copy-inside-parens   "inside ()")
   '("]" my/copy-inside-brackets "inside []")
@@ -266,17 +264,16 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("q" query-replace  "query replace"))
 
 (my/bind-prefix "C-." "cursors"
-  '("m" mc/mark-all-in-region      "cursor region")
-  '("l" mc/edit-lines              "cursor lines")
-  '("." mc/mark-next-like-this     "cursor next")
-  '("/" mc/mark-previous-like-this "cursor prev"))
+  '("m" mc/mark-all-in-region      "mark matches in region")
+  '("l" mc/edit-lines              "mark lines in region")
+  '("." mc/mark-next-like-this     "mark next")
+  '("/" mc/mark-previous-like-this "mark prev"))
 
 (my/bind-prefix "C-s" "search"
-  '("g" consult-ripgrep     "ripgrep")
-  '("f" isearch-forward     "isearch")
-  '("r" consult-recent-file "recent")
-  '("i" consult-imenu       "imenu")
-  '("s" consult-line        "line"))
+  '("r" consult-recent-file "recent files")
+  '("g" consult-ripgrep     "find in project")
+  '("s" isearch-forward     "find in buffer")
+  '("i" consult-imenu       "find symbols"))
 
 (my/bind-prefix "C-w" "window"
   '("w" split-window-below         "new window ↓")
@@ -284,25 +281,23 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("f" window-layout-flip-topdown "flip window ↑↓")
   '("d" delete-window              "close window"))
 
-(my/bind-prefix "C-x" ""
-  '("<right>" next-buffer         t)
-  '("<left>"  previous-buffer     t)
-  '("m"       rectangle-mark-mode "rectangle mark")
-  '("e"       eval-last-sexp      "eval sexp"))
-
-(my/bind-prefix "C-e" "emacs"
-  '("e" save-buffer                   "save buffer")
-  '("s" tramp-revert-buffer-with-sudo "sudo edit")
-  '("t" visual-line-mode              "truncate")
-  '("i" my/find-init-file             "init.el")
-  '("r" restart-emacs                 "restart"))
+(my/bind-prefix "C-x" "emacs"
+  '("<left>"  previous-buffer t)
+  '("<right>" next-buffer     t)
+  '("r" tramp-revert-buffer-with-sudo "sudo edit")
+  '("m" rectangle-mark-mode "rectangle mark")
+  '("b" my/system-buffers   "system-buffers")
+  '("s" save-buffer         "save buffer")
+  '("e" eval-last-sexp      "eval sexp")
+  '("t" visual-line-mode    "truncate")
+  '("x" restart-emacs       "restart")
+  '("i" my/find-init-file   "init.el"))
 
 (my/bind-prefix "C-h" "help"
   '("h" helpful-at-point "help at point")
   '("f" helpful-function "desc function")
   '("v" helpful-variable "desc variable")
   '("k" describe-key     "desc key")
-  '("K" describe-keymap  "desc keymap")
   '("d" devdocs-lookup   "devdocs"))
 
 ;; ===============================================================

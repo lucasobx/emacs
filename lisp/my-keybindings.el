@@ -272,8 +272,8 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 (my/bind-prefix "C-s" "search"
   '("r" consult-recent-file "recent files")
   '("g" consult-ripgrep     "find in project")
-  '("s" isearch-forward     "find in buffer")
-  '("i" consult-imenu       "find symbols"))
+  '("i" consult-imenu       "find in outline")
+  '("s" isearch-forward     "find in buffer"))
 
 (my/bind-prefix "C-w" "window"
   '("w" split-window-below         "new window ↓")

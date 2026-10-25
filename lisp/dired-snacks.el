@@ -42,6 +42,7 @@
 (declare-function dired-get-subdir "dired")
 (declare-function dired-current-directory "dired")
 (declare-function dired-move-to-filename "dired")
+(declare-function dired-move-to-end-of-filename "dired")
 (declare-function dired-goto-subdir "dired")
 (declare-function dired-build-subdir-alist "dired")
 (declare-function dired-insert-directory "dired")
@@ -276,6 +277,9 @@
   "When non-nil, search terms match the path below the root, not only the name."
   :type 'boolean)
 
+(defface dired-snacks-find-match '((t :inherit match))
+  "Face for the parts of file names that match the search.")
+
 (defvar dired-snacks--find-proc nil
   "Current live-search `fd' process, or nil.")
 
@@ -396,14 +400,48 @@
             (forward-line 1)))))
     (set-marker end nil)))
 
-(defun dired-snacks--find-render (root entries)
+(defun dired-snacks--find-highlight-region (beg end regexps)
+  "Highlight the matches for REGEXPS between BEG and END."
+  (dolist (regexp regexps)
+    (goto-char beg)
+    (while (re-search-forward regexp end t)
+      (let ((ov (make-overlay (match-beginning 0) (match-end 0))))
+        (overlay-put ov 'dired-snacks--find-match t)
+        (overlay-put ov 'evaporate t)
+        (overlay-put ov 'face 'dired-snacks-find-match)))))
+
+(defun dired-snacks--find-highlight (root query)
+  "Highlight the words of QUERY in the file names below ROOT."
+  (let ((case-fold-search (dired-snacks--find-case-fold-p query))
+        (regexps (mapcar #'regexp-quote (split-string query))))
+    (save-excursion
+      (when dired-snacks-find-match-path
+        (pcase-dolist (`(,_ . ,header) dired-subdir-alist)
+          (goto-char header)
+          (let ((beg (+ header 2 (length root))))
+            (when (< beg (pos-eol))
+              (dired-snacks--find-highlight-region beg (1- (pos-eol)) regexps)))))
+      (goto-char (point-min))
+      (while (not (eobp))
+        (when-let* ((beg (dired-move-to-filename))
+                    (end (dired-move-to-end-of-filename t)))
+          (unless dired-snacks-find-match-path
+            (goto-char end)
+            (skip-chars-backward "^/" beg)
+            (setq beg (point)))
+          (dired-snacks--find-highlight-region beg end regexps))
+        (forward-line 1)))))
+
+(defun dired-snacks--find-render (root entries &optional query)
   "Render ENTRIES from `dired-snacks--find-parse' under ROOT as a Dired buffer.
-If ENTRIES is `listing', show the contents of ROOT instead."
+If ENTRIES is `listing', show the contents of ROOT instead, else highlight
+the words of QUERY."
   (when (buffer-live-p dired-snacks--find-buffer)
     (with-current-buffer dired-snacks--find-buffer
       (let ((inhibit-read-only t))
         (widen)
         (remove-overlays nil nil 'dired-snacks--find-icon t)
+        (remove-overlays nil nil 'dired-snacks--find-match t)
         (erase-buffer)
         (setq-local default-directory (file-name-as-directory root))
         (cond
@@ -420,6 +458,7 @@ If ENTRIES is `listing', show the contents of ROOT instead."
         (dired-insert-set-properties (point-min) (point-max))
         (run-hooks 'dired-after-readin-hook)
         (dired-snacks--find-icon-subdirs)
+        (when query (dired-snacks--find-highlight root query))
         (goto-char (point-min))
         (when (and (consp entries) (null (cdr entries)))
           (dired-goto-next-file))))))
@@ -433,7 +472,7 @@ If ENTRIES is `listing', show the contents of ROOT instead."
                 entries (take max entries))
           (message "find: showing the first %d results" max))
       (setq dired-snacks--find-results (cons query entries)))
-    (dired-snacks--find-render dired-snacks--find-root entries)))
+    (dired-snacks--find-render dired-snacks--find-root entries query)))
 
 (defun dired-snacks--find-refinable-p (query)
   "Return non-nil if the last `fd' results include every match for QUERY."
@@ -502,7 +541,8 @@ Drop them if a newer search has started."
       (dired-snacks--find-render dired-snacks--find-origin 'listing))
      ((dired-snacks--find-refinable-p query)
       (dired-snacks--find-render dired-snacks--find-root
-                                 (dired-snacks--find-refine query)))
+                                 (dired-snacks--find-refine query)
+                                 query))
      ((not (executable-find "fd"))
       (message "find: the `fd' program is required for live search"))
      (t

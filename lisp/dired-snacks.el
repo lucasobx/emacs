@@ -263,6 +263,10 @@
   "When non-nil, show hidden files in the find buffer."
   :type 'boolean)
 
+(defcustom dired-snacks-find-directories nil
+  "When non-nil, show directories in the find buffer."
+  :type 'boolean)
+
 (defcustom dired-snacks-find-respect-ignore t
   "When non-nil, leave out of searches the files that .gitignore excludes."
   :type 'boolean)
@@ -319,6 +323,7 @@
                  "--case-sensitive")
               "--batch-size"
               ,(number-to-string (1+ dired-snacks-find-max-results)))
+            (and dired-snacks-find-directories '("--type" "d"))
             (and dired-snacks-find-match-path '("--full-path"))
             (and dired-snacks-find-show-hidden '("--hidden"))
             (unless dired-snacks-find-respect-ignore '("--no-ignore"))
@@ -363,7 +368,7 @@
       (insert "  " details name "\n"))))
 
 (defun dired-snacks--find-insert-listing (root)
-  "Insert the files in ROOT as a Dired listing."
+  "Insert the contents of ROOT as a Dired listing."
   (let ((beg (point))
         (end (point-marker)))
     (let ((dired-free-space nil))
@@ -374,7 +379,9 @@
       (while (< (point) end)
         (let ((name (dired-get-filename 'no-dir t)))
           (if (and name
-                   (or (file-directory-p (expand-file-name name root))
+                   (or (member name '("." ".."))
+                       (and (not dired-snacks-find-directories)
+                            (file-directory-p (expand-file-name name root)))
                        (and (not dired-snacks-find-show-hidden)
                             (string-prefix-p "." name))))
               (delete-region (pos-bol) (1+ (pos-eol)))
@@ -1130,12 +1137,14 @@ DIR is inserted invisibly, so only the base name shows."
                            'invisible 'dired-snacks--subtree-hidden))
       (forward-line 1))))
 
-(defun dired-snacks--subtree-delete-dots (beg end)
-  "Delete the . and .. entries between BEG and END."
+(defun dired-snacks--subtree-delete-dots (beg end &optional dotfiles)
+  "Delete the . and .. entries between BEG and END, and the dotfiles if DOTFILES."
   (save-excursion
     (goto-char beg)
     (while (< (point) end)
-      (if (dired-snacks--subtree-dot-p)
+      (if (or (dired-snacks--subtree-dot-p)
+              (and dotfiles
+                   (string-prefix-p "." (or (dired-get-filename 'no-dir t) ""))))
           (delete-region (pos-bol) (1+ (pos-eol)))
         (forward-line 1)))))
 
@@ -1154,7 +1163,9 @@ DIR is inserted invisibly, so only the base name shows."
           (dired-insert-directory dir dired-actual-switches nil nil nil))
         (set-marker end (point))
         (dired-snacks--subtree-absolutize beg end dir)
-        (dired-snacks--subtree-delete-dots beg end)
+        (dired-snacks--subtree-delete-dots
+         beg end (and (eq (current-buffer) dired-snacks--find-buffer)
+                      (not dired-snacks-find-show-hidden)))
         (when (bound-and-true-p dired-omit-mode)
           (let ((dired-omit-size-limit nil)
                 (dired-omit-verbose nil))

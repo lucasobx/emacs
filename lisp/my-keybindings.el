@@ -344,6 +344,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 (my/bind-local isearch-mode-map
   '("<down>" isearch-repeat-forward)
   '("<up>"   isearch-repeat-backward)
+  '("C-v"    isearch-yank-kill)
   '("M-w"    isearch-copy-selected-word)
   '("M-r"    my/isearch-query-replace))
 

@@ -150,7 +150,6 @@
   (setq switch-to-prev-buffer-skip 'skip-these-buffers)
 
   ;; smart context clearing and quit handler
-  (keymap-set key-translation-map "ESC" "C-g")
   (define-advice keyboard-quit (:around (quit) quit-context-dwim)
     (cond
      ((and (region-active-p)
@@ -164,13 +163,7 @@
         (abort-recursive-edit)))
      (t
       (unless (or defining-kbd-macro executing-kbd-macro)
-        (funcall quit)))))
-
-  :bind
-  ("M-d"       . dired-jump)
-  ("M-<right>" . my/end-of-line)
-  ("M-<left>"  . my/beginning-of-line)
-  ("RET"       . newline-and-indent))
+        (funcall quit))))))
 
 ;; ===============================================================
 ;;; THEMES
@@ -431,9 +424,6 @@
 (use-package completion-preview
   :ensure nil
   :hook (after-init . global-completion-preview-mode)
-  :bind
-  ( :map completion-preview-active-mode-map
-    ("M-n" . completion-preview-next-candidate))
   :custom
   (completion-preview-minimum-symbol-length 1)
   (completion-preview-exact-match-only nil)
@@ -734,9 +724,7 @@
 (use-package ghostel
   :ensure t
   :config
-  (add-to-list 'ghostel-eval-cmds '("magit-status-setup-buffer" magit-status-setup-buffer))
-  (define-key ghostel-semi-char-mode-map [remap my/backward-delete]
-              (lambda () (interactive) (ghostel-send-key "backspace" "meta"))))
+  (add-to-list 'ghostel-eval-cmds '("magit-status-setup-buffer" magit-status-setup-buffer)))
 
 (use-package ghostel-compile
   :hook (after-init . ghostel-compile-global-mode))
@@ -749,19 +737,8 @@
   :defer t
   :init
   (setq magit-define-global-key-bindings nil)
-  :preface
-  (defun my/magit-kill-buffers ()
-    "Restore window configuration and kill all Magit buffers."
-    (interactive)
-    (let ((buffers (magit-mode-get-buffers)))
-      (magit-restore-window-configuration)
-      (mapc #'kill-buffer buffers)))
-  :bind
-  (:map magit-status-mode-map ("q" . my/magit-kill-buffers))
   :custom
-  (magit-section-visibility-indicators nil)
-  :config
-  (keymap-set transient-map "<escape>" #'transient-quit-one))
+  (magit-section-visibility-indicators nil))
 
 (use-package diff-hl
   :ensure t

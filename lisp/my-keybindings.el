@@ -6,7 +6,7 @@
 ;;; Commentary:
 
 ;; Personal keybindings: a global override keymap, region-aware
-;; prefixes with which-key labels, and mode-local bindings.
+;; prefixes with which-key labels, and per-mode bindings.
 
 ;;; Code:
 
@@ -14,6 +14,14 @@
 (defvar ruby-ts-mode-map)
 (defvar dired-mode-map)
 (defvar org-mode-map)
+(defvar completion-preview-active-mode-map)
+(defvar ghostel-semi-char-mode-map)
+(defvar magit-status-mode-map)
+(defvar transient-map)
+
+(declare-function ghostel-send-key "ghostel")
+(declare-function magit-mode-get-buffers "magit-mode")
+(declare-function magit-restore-window-configuration "magit-mode")
 
 ;; ===============================================================
 ;;; SETUP
@@ -107,6 +115,25 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
                       (mapcar #'buffer-name bufs)
                       nil t))))
 
+(defun isearch-copy-selected-word ()
+  "Copy the current `isearch` selection to the kill ring."
+  (interactive)
+  (when isearch-other-end
+    (copy-region-as-kill isearch-other-end (point))
+    (isearch-exit)))
+
+(defun my/ghostel-backward-delete ()
+  "Send M-<backspace> to the terminal."
+  (interactive)
+  (ghostel-send-key "backspace" "meta"))
+
+(defun my/magit-kill-buffers ()
+  "Restore window configuration and kill all Magit buffers."
+  (interactive)
+  (let ((buffers (magit-mode-get-buffers)))
+    (magit-restore-window-configuration)
+    (mapc #'kill-buffer buffers)))
+
 ;; ===============================================================
 ;;; UNBINDINGS
 
@@ -118,6 +145,10 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 ;; ===============================================================
 ;;; GLOBAL
 
+;; escape quits like C-g
+(keymap-set key-translation-map "ESC" "C-g")
+
+;; tools
 (my/bind
   '("<f1>" scratch-buffer)
   '("<f3>" diff-hl-show-hunk)
@@ -126,6 +157,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("C-f"  dired-snacks-find)
   '("C-t"  ghostel))
 
+;; buffers and windows
 (my/bind
   '("C-b"     consult-buffer)
   '("C-k"     my/kill-buffer-and-window)
@@ -133,27 +165,34 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("C-,"     popper-toggle)
   '("C-<"     popper-cycle))
 
+;; editing
 (my/bind
   '("C-v"           yank)
-  '("C-o"           my/open-line-below)
   '("C-<backspace>" my/backward-delete)
-  '("M-k"           kill-line)
   '("M-u"           upcase-dwim)
   '("M-c"           capitalize-dwim)
-  '("M-p"           duplicate-dwim)
   '("M-<up>"        my/move-text-up)
   '("M-<down>"      my/move-text-down)
   '("C-0"           my/wrap-parens)
   '("C-]"           my/wrap-brackets))
 
+;; text size
 (my/bind
   '("C-=" text-scale-increase)
   '("C--" text-scale-decrease))
 
+;; overridable by modes
 (my/bind-local global-map
-  '("<f2>" magit-status)
-  '("M-m"  mark-paragraph)
-  '("M-l"  downcase-dwim))
+  '("<f2>"      magit-status)
+  '("M-d"       dired-jump)
+  '("M-m"       mark-paragraph)
+  '("M-l"       downcase-dwim)
+  '("C-o"       my/open-line-below)
+  '("M-k"       kill-line)
+  '("M-p"       duplicate-dwim)
+  '("M-<right>" my/end-of-line)
+  '("M-<left>"  my/beginning-of-line)
+  '("RET"       newline-and-indent))
 
 ;; ===============================================================
 ;;; PREFIX GROUPS
@@ -269,24 +308,12 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("d" devdocs-lookup   "devdocs"))
 
 ;; ===============================================================
-;;; MODE-LOCAL
+;;; MODE MAPS
 
-(keymap-set prog-mode-map "C-l" (cons "lsp" (make-sparse-keymap)))
-(my/bind-local prog-mode-map
-  '("C-l n" eglot-rename     "rename symbol")
-  '("C-l e" consult-flycheck "list errors"))
-
-(with-eval-after-load 'elisp-mode
-  (dolist (map (list emacs-lisp-mode-map lisp-interaction-mode-map))
-    (dolist (key '("C-c C-b" "C-c C-e" "C-c C-f"))
-      (keymap-unset map key t))))
-
-(with-eval-after-load 'ruby-ts-mode
-  (my/bind-local ruby-ts-mode-map
-    '("C-l b" ruby-send-buffer "send buffer")
-    '("C-l s" ruby-send-region "send region")
-    '("C-l l" ruby-send-line   "send line")
-    '("C-l r" inf-ruby         "open repl")))
+(my/bind-local isearch-mode-map
+  '("<down>" isearch-repeat-forward)
+  '("<up>"   isearch-repeat-backward)
+  '("M-w"    isearch-copy-selected-word))
 
 (with-eval-after-load 'dired
   (my/bind-local dired-mode-map
@@ -306,11 +333,45 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
     '("M-q"            dired-snacks-paste-cancel)
     '("M-y"            dired-snacks-copy-file-uri)))
 
+(with-eval-after-load 'completion-preview
+  (my/bind-local completion-preview-active-mode-map
+    '("M-n" completion-preview-next-candidate)))
+
+(keymap-set prog-mode-map "C-l" (cons "lsp" (make-sparse-keymap)))
+(my/bind-local prog-mode-map
+  '("C-l n" eglot-rename     "rename symbol")
+  '("C-l e" consult-flycheck "list errors"))
+
+(with-eval-after-load 'elisp-mode
+  (dolist (map (list emacs-lisp-mode-map lisp-interaction-mode-map))
+    (dolist (key '("C-c C-b" "C-c C-e" "C-c C-f"))
+      (keymap-unset map key t))))
+
+(with-eval-after-load 'ruby-ts-mode
+  (my/bind-local ruby-ts-mode-map
+    '("C-l b" ruby-send-buffer "send buffer")
+    '("C-l s" ruby-send-region "send region")
+    '("C-l l" ruby-send-line   "send line")
+    '("C-l r" inf-ruby         "open repl")))
+
 (with-eval-after-load 'org
   (dolist (key '("M-<left>" "M-<right>"))
     (keymap-unset org-mode-map key t))
   (my/bind-local org-mode-map
     '("C-c t" org-hide-drawers-toggle "toggle drawers")))
+
+(with-eval-after-load 'ghostel
+  ;; `keymap-set' rejects a slash in the command name of a <remap> key.
+  (define-key ghostel-semi-char-mode-map [remap my/backward-delete]
+              #'my/ghostel-backward-delete))
+
+(with-eval-after-load 'magit-status
+  (my/bind-local magit-status-mode-map
+    '("q" my/magit-kill-buffers)))
+
+(with-eval-after-load 'transient
+  (my/bind-local transient-map
+    '("<escape>" transient-quit-one)))
 
 (with-eval-after-load 'winner
   (dolist (key '("C-c <left>" "C-c <right>"))

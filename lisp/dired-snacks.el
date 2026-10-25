@@ -39,7 +39,6 @@
 (declare-function dired-get-filename "dired")
 (declare-function dired-get-marked-files "dired")
 (declare-function dired-get-file-for-visit "dired")
-(declare-function dired-get-subdir "dired")
 (declare-function dired-current-directory "dired")
 (declare-function dired-move-to-filename "dired")
 (declare-function dired-move-to-end-of-filename "dired")
@@ -62,7 +61,6 @@
 (declare-function dired-log "dired")
 (declare-function dired-log-summary "dired")
 (declare-function dired-kill-subdir "dired-aux")
-(declare-function dired-hide-subdir "dired-aux")
 (declare-function dired-omit-mode "dired-x")
 (declare-function dired-omit-expunge "dired-x")
 (declare-function browse-url-file-url "browse-url")
@@ -261,10 +259,6 @@
   "Minimum number of characters before a search runs."
   :type 'natnum)
 
-(defcustom dired-snacks-find-group-by-directory t
-  "When non-nil, group search results by directory, else list them together."
-  :type 'boolean)
-
 (defcustom dired-snacks-find-show-hidden nil
   "When non-nil, show hidden files in the find buffer."
   :type 'boolean)
@@ -341,37 +335,23 @@
             (file-name-nondirectory file)
             (substring line 0 (match-beginning 1))))))
 
-(defun dired-snacks--find-icon-subdirs ()
-  "Add folder icons to Dired subdir headers."
+(defun dired-snacks--find-icon-header (dir)
+  "Add a folder icon for DIR to the header line."
   (when (bound-and-true-p nerd-icons-dired-mode)
     (save-excursion
       (goto-char (point-min))
-      (while (not (eobp))
-        (when-let* ((dir (dired-get-subdir)))
-          (beginning-of-line)
-          (skip-chars-forward " \t")
-          (let* ((pos  (point))
-                 (icon (funcall nerd-icons-dired-dir-icon-function
-                                dir :height nerd-icons-dired-icon-size
-                                :face 'dired-directory))
-                 (str  (concat icon nerd-icons-dired-infix-string))
-                 (ov   (make-overlay pos (1+ pos))))
-            (overlay-put ov 'dired-snacks--find-icon t)
-            (overlay-put ov 'evaporate t)
-            (overlay-put ov 'before-string (propertize str 'display str))))
-        (forward-line 1)))))
+      (skip-chars-forward " \t")
+      (let* ((pos  (point))
+             (icon (funcall nerd-icons-dired-dir-icon-function
+                            dir :height nerd-icons-dired-icon-size
+                            :face 'dired-directory))
+             (str  (concat icon nerd-icons-dired-infix-string))
+             (ov   (make-overlay pos (1+ pos))))
+        (overlay-put ov 'dired-snacks--find-icon t)
+        (overlay-put ov 'evaporate t)
+        (overlay-put ov 'before-string (propertize str 'display str))))))
 
-(defun dired-snacks--find-insert-groups (groups)
-  "Insert GROUPS as Dired subdir listings."
-  (let ((first t))
-    (dolist (group groups)
-      (if first (setq first nil) (insert "\n"))
-      (insert "  " (directory-file-name (car group)) ":\n")
-      (insert (format "  total used in directory %d\n" (length (cdr group))))
-      (dolist (entry (cdr group))
-        (insert "  " (nth 2 entry) (nth 1 entry) "\n")))))
-
-(defun dired-snacks--find-insert-flat (root entries)
+(defun dired-snacks--find-insert-results (root entries)
   "Insert ENTRIES as one Dired listing of ROOT, sorted by file name."
   (let ((lines (mapcar (lambda (entry)
                          (cons (file-relative-name (concat (car entry) (nth 1 entry)) root)
@@ -411,17 +391,11 @@
         (overlay-put ov 'evaporate t)
         (overlay-put ov 'face 'dired-snacks-find-match)))))
 
-(defun dired-snacks--find-highlight (root query)
-  "Highlight the words of QUERY in the file names below ROOT."
+(defun dired-snacks--find-highlight (query)
+  "Highlight the words of QUERY in the file names."
   (let ((case-fold-search (dired-snacks--find-case-fold-p query))
         (regexps (mapcar #'regexp-quote (split-string query))))
     (save-excursion
-      (when dired-snacks-find-match-path
-        (pcase-dolist (`(,_ . ,header) dired-subdir-alist)
-          (goto-char header)
-          (let ((beg (+ header 2 (length root))))
-            (when (< beg (pos-eol))
-              (dired-snacks--find-highlight-region beg (1- (pos-eol)) regexps)))))
       (goto-char (point-min))
       (while (not (eobp))
         (when-let* ((beg (dired-move-to-filename))
@@ -452,14 +426,12 @@ the words of QUERY."
           (insert "  " (directory-file-name root) ":\n"
                   "  total used in directory 0\n\n"
                   "  (no matches)\n"))
-         (dired-snacks-find-group-by-directory
-          (dired-snacks--find-insert-groups (seq-group-by #'car entries)))
-         (t (dired-snacks--find-insert-flat root entries)))
+         (t (dired-snacks--find-insert-results root entries)))
         (dired-build-subdir-alist)
         (dired-insert-set-properties (point-min) (point-max))
         (run-hooks 'dired-after-readin-hook)
-        (dired-snacks--find-icon-subdirs)
-        (when query (dired-snacks--find-highlight root query))
+        (dired-snacks--find-icon-header root)
+        (when query (dired-snacks--find-highlight query))
         (goto-char (point-min))
         (when (and (consp entries) (null (cdr entries)))
           (dired-goto-next-file))))))
@@ -611,7 +583,6 @@ Drop them if a newer search has started."
       (let ((map (make-sparse-keymap)))
         (set-keymap-parent map dired-mode-map)
         (keymap-set map "q" #'kill-current-buffer)
-        (keymap-set map "TAB" #'dired-hide-subdir)
         (use-local-map map)))
     (dired-snacks--find-dispatch "")
     (let ((display-buffer-overriding-action

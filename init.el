@@ -381,7 +381,6 @@
   :ensure nil
   :load-path "~/.config/emacs/lisp"
   :custom
-  (dired-snacks-find-group-by-directory nil)
   (dired-snacks-mode-line-show-time nil)
   (dired-snacks-mode-line-show-omit nil)
   (dired-snacks-mode-line-show-size nil)

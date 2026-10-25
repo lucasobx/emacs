@@ -350,10 +350,12 @@
 (use-package isearch
   :ensure nil
   :custom
-  (isearch-lazy-count t)
+  (isearch-repeat-on-direction-change t)
   (lazy-count-prefix-format "(%s/%s) ")
   (search-whitespace-regexp ".*?")
-  (lazy-count-suffix-format nil))
+  (lazy-count-suffix-format nil)
+  (isearch-wrap-pause 'no-ding)
+  (isearch-lazy-count t))
 
 (use-package dired
   :ensure nil

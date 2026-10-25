@@ -268,6 +268,10 @@
   "When non-nil, show hidden files in the find buffer."
   :type 'boolean)
 
+(defcustom dired-snacks-find-respect-ignore t
+  "When non-nil, leave out of searches the files that .gitignore excludes."
+  :type 'boolean)
+
 (defvar dired-snacks--find-proc nil
   "Current live-search `fd' process, or nil.")
 
@@ -297,7 +301,7 @@
 (defun dired-snacks--find-fd-args (query dir)
   "Return the `fd' arguments to search for every word of QUERY under DIR."
   (let ((terms (split-string query)))
-    (append `("--color=never" "--list-details" "--no-ignore"
+    (append `("--color=never" "--list-details"
               "--type" "f" "--fixed-strings"
               ,(if (dired-snacks--find-case-fold-p query)
                    "--ignore-case"
@@ -305,6 +309,7 @@
               "--batch-size"
               ,(number-to-string (1+ dired-snacks-find-max-results)))
             (and dired-snacks-find-show-hidden '("--hidden"))
+            (unless dired-snacks-find-respect-ignore '("--no-ignore"))
             (mapcan (lambda (d) (list "--exclude" d))
                     dired-snacks-find-prune-dirs)
             (mapcan (lambda (term) (list "--and" term)) (cdr terms))

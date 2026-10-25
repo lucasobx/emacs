@@ -291,17 +291,20 @@
     (not (string-match-p "[[:upper:]]" query))))
 
 (defun dired-snacks--find-fd-args (query dir)
-  "Return the `fd' arguments to search for QUERY under DIR."
-  (append `("--color=never" "--list-details" "--no-ignore"
-            "--type" "f" "--fixed-strings"
-            ,(if (dired-snacks--find-case-fold-p query)
-                 "--ignore-case"
-               "--case-sensitive")
-            "--batch-size" ,(number-to-string (1+ dired-snacks-find-max-results)))
-          (and dired-snacks-find-show-hidden '("--hidden"))
-          (mapcan (lambda (d) (list "--exclude" d))
-                  dired-snacks-find-prune-dirs)
-          (list "--" query (expand-file-name dir))))
+  "Return the `fd' arguments to search for every word of QUERY under DIR."
+  (let ((terms (split-string query)))
+    (append `("--color=never" "--list-details" "--no-ignore"
+              "--type" "f" "--fixed-strings"
+              ,(if (dired-snacks--find-case-fold-p query)
+                   "--ignore-case"
+                 "--case-sensitive")
+              "--batch-size"
+              ,(number-to-string (1+ dired-snacks-find-max-results)))
+            (and dired-snacks-find-show-hidden '("--hidden"))
+            (mapcan (lambda (d) (list "--exclude" d))
+                    dired-snacks-find-prune-dirs)
+            (mapcan (lambda (term) (list "--and" term)) (cdr terms))
+            (list "--" (car terms) (expand-file-name dir)))))
 
 (defun dired-snacks--find-parse (line)
   "Parse an `fd --list-details' LINE into (DIR BASENAME DETAILS)."
@@ -403,15 +406,21 @@ If ENTRIES is `listing', show the contents of ROOT instead."
 (defun dired-snacks--find-refinable-p (query)
   "Return non-nil if the last `fd' results include every match for QUERY."
   (when-let* ((last (car dired-snacks--find-results)))
-    (string-search last (if (dired-snacks--find-case-fold-p last)
-                            (downcase query)
-                          query))))
+    (let ((terms (split-string (if (dired-snacks--find-case-fold-p last)
+                                   (downcase query)
+                                 query))))
+      (seq-every-p (lambda (old)
+                     (seq-some (lambda (term) (string-search old term)) terms))
+                   (split-string last)))))
 
 (defun dired-snacks--find-refine (query)
   "Return the entries of the last `fd' results whose names match QUERY."
   (let ((case-fold-search (dired-snacks--find-case-fold-p query))
-        (regexp (regexp-quote query)))
-    (seq-filter (lambda (entry) (string-match-p regexp (nth 1 entry)))
+        (regexps (mapcar #'regexp-quote (split-string query))))
+    (seq-filter (lambda (entry)
+                  (let ((name (nth 1 entry)))
+                    (seq-every-p (lambda (regexp) (string-match-p regexp name))
+                                 regexps)))
                 (cdr dired-snacks--find-results))))
 
 (defun dired-snacks--find-filter (proc output)
@@ -451,8 +460,9 @@ Drop them if a newer search has started."
                (process-live-p dired-snacks--find-proc))
       (delete-process dired-snacks--find-proc))
     (cond
-     ((or (string-empty-p query)
-          (length< query dired-snacks-find-min-length))
+     ((let ((input (string-trim query)))
+        (or (string-empty-p input)
+            (length< input dired-snacks-find-min-length)))
       (dired-snacks--find-render dired-snacks--find-root 'listing))
      ((dired-snacks--find-refinable-p query)
       (dired-snacks--find-render dired-snacks--find-root

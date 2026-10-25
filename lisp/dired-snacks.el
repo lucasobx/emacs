@@ -545,6 +545,15 @@ Drop them if a newer search has started."
           (run-with-timer dired-snacks-find-debounce nil
                           #'dired-snacks--find-dispatch query))))
 
+(defun dired-snacks--find-revert (&rest _)
+  "Run the search of this find buffer again."
+  (unless (eq (current-buffer) dired-snacks--find-buffer)
+    (user-error "This search is over; run `dired-snacks-find' again"))
+  (let ((query (or dired-snacks--find-query "")))
+    (setq dired-snacks--find-query nil
+          dired-snacks--find-results nil)
+    (dired-snacks--find-dispatch query)))
+
 (defun dired-snacks--find-cleanup (&optional keep-proc)
   "Tear down the live-search timer and, unless KEEP-PROC, the process."
   (when (timerp dired-snacks--find-timer)
@@ -582,6 +591,7 @@ Drop them if a newer search has started."
         (setq-local default-directory (file-name-as-directory root))
         (let ((dired-buffers nil)) (dired-mode root)))
       (setq-local dired-omit-mode nil)
+      (setq-local revert-buffer-function #'dired-snacks--find-revert)
       (when project
         (setq-local mode-line-buffer-identification
                     (list mode-line-buffer-identification " (project)")))

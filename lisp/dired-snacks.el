@@ -19,7 +19,6 @@
 ;; split      - second Dired pane with independent navigation
 ;; mode-line  - per-buffer mode line with size, time, sort, position
 ;; columns    - size, time and permissions at the right edge
-;; last-file  - keep point on the last file, off the empty line below it
 ;; copy-uri   - copy files as file:// URIs to the clipboard
 
 ;;; Code:

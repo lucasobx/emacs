@@ -9,7 +9,7 @@
 
 ;; A bundle of small Dired enhancements:
 ;; zoxide     - jump to a directory by frecency, with inline preview
-;; find       - incremental file-name search as you type
+;; find       - incremental file search as you type
 ;; open       - smart RET for opening files in external apps
 ;; duplicate  - duplicate marked files with auto-numbered names
 ;; paste      - clip files, then copy, move or link them elsewhere
@@ -272,6 +272,10 @@
   "When non-nil, leave out of searches the files that .gitignore excludes."
   :type 'boolean)
 
+(defcustom dired-snacks-find-match-path t
+  "When non-nil, search terms match the path below the root, not only the name."
+  :type 'boolean)
+
 (defvar dired-snacks--find-proc nil
   "Current live-search `fd' process, or nil.")
 
@@ -298,22 +302,32 @@
   (let ((case-fold-search nil))
     (not (string-match-p "[[:upper:]]" query))))
 
+(defun dired-snacks--find-fd-quote (string)
+  "Return an `fd' regexp that matches STRING literally."
+  (replace-regexp-in-string "[][\\.+*?(){}|^$#&~-]" "\\\\\\&" string))
+
 (defun dired-snacks--find-fd-args (query dir)
   "Return the `fd' arguments to search for every word of QUERY under DIR."
-  (let ((terms (split-string query)))
-    (append `("--color=never" "--list-details"
-              "--type" "f" "--fixed-strings"
+  (let* ((dir (file-name-as-directory (expand-file-name dir)))
+         (prefix (if dired-snacks-find-match-path
+                     (concat "^" (dired-snacks--find-fd-quote dir) ".*")
+                   ""))
+         (patterns (mapcar (lambda (term)
+                             (concat prefix (dired-snacks--find-fd-quote term)))
+                           (split-string query))))
+    (append `("--color=never" "--list-details" "--type" "f"
               ,(if (dired-snacks--find-case-fold-p query)
                    "--ignore-case"
                  "--case-sensitive")
               "--batch-size"
               ,(number-to-string (1+ dired-snacks-find-max-results)))
+            (and dired-snacks-find-match-path '("--full-path"))
             (and dired-snacks-find-show-hidden '("--hidden"))
             (unless dired-snacks-find-respect-ignore '("--no-ignore"))
             (mapcan (lambda (d) (list "--exclude" d))
                     dired-snacks-find-prune-dirs)
-            (mapcan (lambda (term) (list "--and" term)) (cdr terms))
-            (list "--" (car terms) (expand-file-name dir)))))
+            (mapcan (lambda (pattern) (list "--and" pattern)) (cdr patterns))
+            (list "--" (car patterns) dir))))
 
 (defun dired-snacks--find-parse (line)
   "Parse an `fd --list-details' LINE into (DIR BASENAME DETAILS)."
@@ -423,11 +437,15 @@ If ENTRIES is `listing', show the contents of ROOT instead."
                    (split-string last)))))
 
 (defun dired-snacks--find-refine (query)
-  "Return the entries of the last `fd' results whose names match QUERY."
+  "Return the entries of the last `fd' results that match QUERY."
   (let ((case-fold-search (dired-snacks--find-case-fold-p query))
         (regexps (mapcar #'regexp-quote (split-string query))))
     (seq-filter (lambda (entry)
-                  (let ((name (nth 1 entry)))
+                  (let ((name (if dired-snacks-find-match-path
+                                  (concat (string-remove-prefix
+                                           dired-snacks--find-root (car entry))
+                                          (nth 1 entry))
+                                (nth 1 entry))))
                     (seq-every-p (lambda (regexp) (string-match-p regexp name))
                                  regexps)))
                 (cdr dired-snacks--find-results))))

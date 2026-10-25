@@ -116,6 +116,7 @@
   (file-name-shadow-mode 1)
   (electric-indent-mode 1)
   (global-hl-line-mode -1)
+  (electric-pair-mode 1)
   (save-place-mode 1)
   (tooltip-mode -1)
   (savehist-mode 1)

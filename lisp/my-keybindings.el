@@ -19,6 +19,7 @@
 (defvar magit-status-mode-map)
 (defvar transient-map)
 (defvar consult-buffer-filter)
+(defvar eglot-mode-map)
 
 (declare-function ghostel-send-key "ghostel")
 (declare-function magit-mode-get-buffers "magit-mode")
@@ -360,22 +361,24 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   (my/bind-local completion-preview-active-mode-map
     '("M-n" completion-preview-next-candidate)))
 
-(keymap-set prog-mode-map "C-l" (cons "lsp" (make-sparse-keymap)))
-(my/bind-local prog-mode-map
-  '("C-l n" eglot-rename     "rename symbol")
-  '("C-l e" consult-flycheck "list errors"))
-
 (with-eval-after-load 'elisp-mode
   (dolist (map (list emacs-lisp-mode-map lisp-interaction-mode-map))
     (dolist (key '("C-c C-b" "C-c C-e" "C-c C-f"))
       (keymap-unset map key t))))
 
 (with-eval-after-load 'ruby-ts-mode
+  (keymap-set ruby-ts-mode-map "C-l" (cons "lsp" (make-sparse-keymap)))
   (my/bind-local ruby-ts-mode-map
     '("C-l b" ruby-send-buffer "send buffer")
     '("C-l s" ruby-send-region "send region")
     '("C-l l" ruby-send-line   "send line")
     '("C-l r" inf-ruby         "open repl")))
+
+(with-eval-after-load 'eglot
+  (keymap-set eglot-mode-map "C-l" (cons "lsp" (make-sparse-keymap)))
+  (my/bind-local eglot-mode-map
+    '("C-l n" eglot-rename     "rename symbol")
+    '("C-l e" consult-flycheck "list errors")))
 
 (with-eval-after-load 'org
   (dolist (key '("M-<left>" "M-<right>"))

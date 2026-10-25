@@ -121,9 +121,8 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 
 (my/bind
   '("<f1>"          scratch-buffer)
-  '("<f3>"          magit-status)
-  '("<f4>"          diff-hl-show-hunk)
-  '("<f5>"          my/rotate-theme)
+  '("<f3>"          diff-hl-show-hunk)
+  '("<f4>"          my/rotate-theme)
   '("C-<backspace>" my/backward-delete)
   '("C-<tab>"       other-window)
   '("C-b"           consult-buffer)
@@ -143,10 +142,14 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '("M-<up>"        my/move-text-up)
   '("M-k"           kill-line)
   '("M-u"           upcase-dwim)
-  '("M-m"           mark-paragraph)
-  '("M-l"           downcase-dwim)
   '("M-p"           duplicate-dwim)
   '("M-c"           capitalize-dwim))
+
+;; in the global map rather than `my/override-map', so modes can rebind them
+(my/bind-local global-map
+  '("<f2>" magit-status)
+  '("M-m"  mark-paragraph)
+  '("M-l"  downcase-dwim))
 
 ;; ===============================================================
 ;;; REGION-AWARE PREFIXES (C-d / C-y)
@@ -225,13 +228,10 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 
 (my/wk-add "C-s" "search")
 (my/bind
-  '("C-s f" find-file           "find-file")
-  '("C-s h" consult-outline     "heading")
-  '("C-s d" consult-fd          "fd-find")
   '("C-s g" consult-ripgrep     "ripgrep")
+  '("C-s f" isearch-forward     "isearch")
   '("C-s r" consult-recent-file "recent")
-  '("C-s i" imenu               "imenu")
-  '("C-s n" nerd-icons-insert   "icons")
+  '("C-s i" consult-imenu       "imenu")
   '("C-s s" consult-line        "line"))
 
 (my/wk-add "C-e" "emacs")
@@ -290,16 +290,20 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 
 (with-eval-after-load 'dired
   (my/bind-local dired-mode-map
-    '("RET"      dired-snacks-open)
     '("<f2>"     wdired-change-to-wdired-mode)
-    '("TAB"      dired-snacks-subtree-toggle)
-    '("M-y"      dired-snacks-copy-file-uri)
     '("M-f"      dired-create-empty-file)
-    '("M-d"      dired-create-directory)
-    '("M-s"      dired-snacks-split)
     '("M-<left>" dired-up-directory)
     '("M-."      dired-omit-mode)
-    '("<remap> <duplicate-dwim>" dired-snacks-duplicate)))
+    '("<remap> <yank>" dired-snacks-paste)
+    '("M-m" dired-snacks-paste-move)
+    '("M-w" dired-snacks-clip)
+    '("M-l" dired-snacks-paste-symlink)
+    '("M-q" dired-snacks-paste-cancel)
+    '("TAB" dired-snacks-subtree-toggle)
+    '("M-y" dired-snacks-copy-file-uri)
+    '("M-d" dired-snacks-duplicate)
+    '("M-s" dired-snacks-split)
+    '("RET" dired-snacks-open)))
 
 (with-eval-after-load 'org
   (my/bind-local org-mode-map

@@ -353,6 +353,14 @@
   (bookmark-fringe-mark nil)
   (bookmark-save-flag 1))
 
+(use-package isearch
+  :ensure nil
+  :custom
+  (isearch-lazy-count t)
+  (lazy-count-prefix-format "(%s/%s) ")
+  (search-whitespace-regexp ".*?")
+  (lazy-count-suffix-format nil))
+
 (use-package dired
   :ensure nil
   :custom

@@ -20,7 +20,6 @@
 
 (require 'which-key)
 (defalias 'my/wk-add #'which-key-add-key-based-replacements)
-(defalias 'my/wk-add-map #'which-key-add-keymap-based-replacements)
 
 (defvar my/override-map (make-sparse-keymap))
 (define-minor-mode my/override-mode
@@ -46,26 +45,21 @@
 
 (defun my/bind (&rest bindings)
   "Bind each (KEY COMMAND [DESC]) in BINDINGS in `my/override-map'."
-  (dolist (binding bindings)
-    (seq-let (key command desc) binding
-      (keymap-set my/override-map key command)
-      (cond ((eq desc t) (my/wk-hide key))
-            (desc         (my/wk-add key desc))))))
+  (apply #'my/bind-sub my/override-map nil bindings))
 
 (defun my/bind-local (keymap &rest bindings)
   "Bind each (KEY COMMAND [DESC]) in BINDINGS in KEYMAP."
   (dolist (binding bindings)
     (seq-let (key command desc) binding
-      (keymap-set keymap key command)
-      (when desc (my/wk-add-map keymap key desc)))))
+      (keymap-set keymap key (if desc (cons desc command) command)))))
 
 (defun my/bind-sub (map prefix &rest bindings)
-  "Bind each (KEY COMMAND [DESC]) in BINDINGS in prefix MAP.
+  "Bind each (KEY COMMAND [DESC]) in BINDINGS in MAP.
 Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   (dolist (binding bindings)
     (seq-let (key command desc) binding
       (keymap-set map key command)
-      (let ((full (concat prefix " " key)))
+      (let ((full (if prefix (concat prefix " " key) key)))
         (cond ((eq desc t) (my/wk-hide full))
               (desc         (my/wk-add full desc)))))))
 
@@ -203,16 +197,15 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 (dotimes (i 9)
   (let ((n (1+ i)))
     (pcase-dolist (`(,key ,name) '(("" "") ("<up> " "up-")))
-      (my/bind (list (format "C-; %s%d" key n) (intern (format "my/comment-lines-%s%d" name n)) t))
-      (my/bind (list (format "C-q %s%d" key n) (intern (format "my/select-lines-%s%d" name n)) t))
+      (my/bind (list (format "C-; %s%d" key n) (intern (format "my/comment-lines-%s%d" name n))))
+      (my/bind (list (format "C-q %s%d" key n) (intern (format "my/select-lines-%s%d" name n))))
       (my/bind-sub my/delete-map "C-d"
-                   (list (format "%s%d" key n) (intern (format "my/delete-lines-%s%d" name n)) t))
+                   (list (format "%s%d" key n) (intern (format "my/delete-lines-%s%d" name n))))
       (my/bind-sub my/copy-map "C-y"
-                   (list (format "%s%d" key n) (intern (format "my/copy-lines-%s%d" name n)) t)))))
-;; every key under <up> is hidden
-(dolist (key '("C-; <up>" "C-q <up>" "C-d <up>" "C-y <up>"))
-  (my/wk-hide key)
-  (push (concat "\\`" (regexp-quote key) "\\'") which-key-inhibit-regexps))
+                   (list (format "%s%d" key n) (intern (format "my/copy-lines-%s%d" name n)))))))
+(push '(("\\`C-[;qdy] \\(?:<up>\\|\\(?:<up> \\)?[1-9]\\)\\'" . nil) . t)
+      which-key-replacement-alist)
+(push "\\`C-[;qdy] <up>\\'" which-key-inhibit-regexps)
 
 (my/wk-add "C-r" "replace")
 (my/bind
@@ -276,7 +269,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 ;; ===============================================================
 ;;; MODE-LOCAL
 
-(my/wk-add-map prog-mode-map "C-l" "lsp")
+(keymap-set prog-mode-map "C-l" (cons "lsp" (make-sparse-keymap)))
 (my/bind-local prog-mode-map
   '("C-l n" eglot-rename     "rename symbol")
   '("C-l e" consult-flycheck "list errors"))

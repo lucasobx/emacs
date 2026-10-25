@@ -355,7 +355,10 @@
   (search-whitespace-regexp ".*?")
   (lazy-count-suffix-format nil)
   (isearch-wrap-pause 'no-ding)
-  (isearch-lazy-count t))
+  (isearch-lazy-count t)
+  :config
+  (define-advice isearch-message-prefix (:filter-return (prefix) hide-direction)
+    (string-replace " backward" "" prefix)))
 
 (use-package dired
   :ensure nil

@@ -605,14 +605,6 @@
   (eldoc-idle-delay 0.5)
   (eldoc-echo-area-use-multiline-p nil))
 
-(use-package eldoc-box
-  :ensure t
-  :hook
-  (prog-mode . eldoc-box-hover-mode)
-  :custom
-  (eldoc-box-max-pixel-height 200)
-  (eldoc-box-max-pixel-width 400))
-
 (use-package inf-ruby
   :ensure t
   :hook

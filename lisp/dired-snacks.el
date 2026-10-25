@@ -42,7 +42,6 @@
 (declare-function dired-current-directory "dired")
 (declare-function dired-move-to-filename "dired")
 (declare-function dired-move-to-end-of-filename "dired")
-(declare-function dired-goto-subdir "dired")
 (declare-function dired-build-subdir-alist "dired")
 (declare-function dired-insert-directory "dired")
 (declare-function dired-insert-set-properties "dired")
@@ -60,7 +59,6 @@
 (declare-function dired-query "dired-aux")
 (declare-function dired-log "dired")
 (declare-function dired-log-summary "dired")
-(declare-function dired-kill-subdir "dired-aux")
 (declare-function dired-omit-mode "dired-x")
 (declare-function dired-omit-expunge "dired-x")
 (declare-function browse-url-file-url "browse-url")
@@ -1403,27 +1401,31 @@ priority among the files below it."
   "Read the Git state of this directory in the background, then mark it."
   (when (process-live-p dired-snacks--vc-proc)
     (delete-process dired-snacks--vc-proc))
-  (if-let* (dired-snacks-vc-marks
-            (_ (not (file-remote-p default-directory)))
-            (root (locate-dominating-file default-directory ".git"))
-            (_ (executable-find "git")))
-      (let ((buffer (current-buffer))
-            (root (expand-file-name root)))
-        (dired-snacks--vc-add-watch root)
-        ;; `--no-optional-locks' keeps git from writing the index, which
-        ;; could collide with a git command the user is running.
-        (setq dired-snacks--vc-proc
-              (make-process
-               :name "dired-snacks-vc"
-               :buffer (generate-new-buffer " *dired-snacks-vc*")
-               :command '("git" "--no-optional-locks" "status" "--porcelain" "-z"
-                          "--no-renames" "--untracked-files=all" "--" ".")
-               :connection-type 'pipe
-               :noquery t
-               :sentinel (lambda (proc _event)
-                           (dired-snacks--vc-sentinel proc buffer root)))))
-    (setq dired-snacks--vc-states nil)
-    (dired-snacks--vc-draw)))
+  ;; The find buffer lists files from anywhere under the search root.
+  (let ((default-directory (if (eq (current-buffer) dired-snacks--find-buffer)
+                               dired-snacks--find-root
+                             default-directory)))
+    (if-let* (dired-snacks-vc-marks
+              (_ (not (file-remote-p default-directory)))
+              (root (locate-dominating-file default-directory ".git"))
+              (_ (executable-find "git")))
+        (let ((buffer (current-buffer))
+              (root (expand-file-name root)))
+          (dired-snacks--vc-add-watch root)
+          ;; `--no-optional-locks' keeps git from writing the index, which
+          ;; could collide with a git command the user is running.
+          (setq dired-snacks--vc-proc
+                (make-process
+                 :name "dired-snacks-vc"
+                 :buffer (generate-new-buffer " *dired-snacks-vc*")
+                 :command '("git" "--no-optional-locks" "status" "--porcelain" "-z"
+                            "--no-renames" "--untracked-files=all" "--" ".")
+                 :connection-type 'pipe
+                 :noquery t
+                 :sentinel (lambda (proc _event)
+                             (dired-snacks--vc-sentinel proc buffer root)))))
+      (setq dired-snacks--vc-states nil)
+      (dired-snacks--vc-draw))))
 
 (defun dired-snacks--vc-after-save ()
   "Refresh the Git marks of the Dired buffers in this file's repository."

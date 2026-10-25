@@ -18,10 +18,12 @@
 (defvar ghostel-semi-char-mode-map)
 (defvar magit-status-mode-map)
 (defvar transient-map)
+(defvar consult-buffer-filter)
 
 (declare-function ghostel-send-key "ghostel")
 (declare-function magit-mode-get-buffers "magit-mode")
 (declare-function magit-restore-window-configuration "magit-mode")
+(declare-function consult-buffer "consult")
 
 ;; ===============================================================
 ;;; SETUP
@@ -107,13 +109,9 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 (defun my/system-buffers ()
   "Switch to a system buffer."
   (interactive)
-  (let ((bufs (seq-filter
-               (lambda (b) (string-match-p "\\`\\*" (buffer-name b)))
-               (buffer-list))))
-    (switch-to-buffer
-     (completing-read "System buffer: "
-                      (mapcar #'buffer-name bufs)
-                      nil t))))
+  (require 'consult)
+  (let ((consult-buffer-filter '("\\`[^*]")))
+    (consult-buffer '(consult-source-buffer))))
 
 (defun isearch-copy-selected-word ()
   "Copy the current `isearch` selection to the kill ring."

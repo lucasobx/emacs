@@ -373,9 +373,5 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   (my/bind-local transient-map
     '("<escape>" transient-quit-one)))
 
-(with-eval-after-load 'winner
-  (dolist (key '("C-c <left>" "C-c <right>"))
-    (keymap-unset winner-mode-map key t)))
-
 (provide 'my-keybindings)
 ;;; my-keybindings.el ends here

@@ -1,7 +1,7 @@
 ;;; dired-snacks.el --- Dired utilities -*- lexical-binding: t; -*-
 
 ;; Author: Lucas
-;; Version: 0.1.0
+;; Version: 0.1
 ;; Package-Requires: ((emacs "31.0"))
 ;; Keywords: files, convenience
 
@@ -386,7 +386,8 @@
   "Insert the files in ROOT as a Dired listing."
   (let ((beg (point))
         (end (point-marker)))
-    (dired-insert-directory root dired-actual-switches nil nil t)
+    (let ((dired-free-space nil))
+      (dired-insert-directory root dired-actual-switches nil nil t))
     (set-marker end (point))
     (save-excursion
       (goto-char beg)
@@ -1513,6 +1514,9 @@ priority among the files below it."
   "Font size of the breadcrumb, as a fraction of the default."
   :type 'number)
 
+(defvar-local dired-snacks--breadcrumb-free nil
+  "Free disk space shown in the breadcrumb, or nil.")
+
 (defun dired-snacks--breadcrumb-segments (dir)
   "Split DIR into breadcrumb segments."
   (let* ((abbr (abbreviate-file-name (directory-file-name dir)))
@@ -1548,10 +1552,23 @@ priority among the files below it."
                          sep)
               (when (plusp dired-snacks-breadcrumb-spacing)
                 (propertize " " 'display
-                            `(raise ,(- dired-snacks-breadcrumb-spacing))))))))
+                            `(raise ,(- dired-snacks-breadcrumb-spacing))))
+              (dired-snacks--breadcrumb-free-space height)))))
+
+(defun dired-snacks--breadcrumb-free-space (height)
+  "Return the free disk space at the right edge, in a font of HEIGHT, or nil."
+  (when dired-snacks--breadcrumb-free
+    (let* ((text (propertize (concat "  " dired-snacks--breadcrumb-free " free")
+                             'face `(:inherit shadow :height ,height)))
+           (measured (copy-sequence text)))
+      (add-face-text-property 0 (length measured) 'header-line t measured)
+      (concat (propertize " " 'display
+                          `(space :align-to (- right 1 (,(string-pixel-width measured)))))
+              text))))
 
 (defun dired-snacks--breadcrumb-decorate ()
-  "Hide the directory header line."
+  "Hide the directory header line and note the free disk space."
+  (setq dired-snacks--breadcrumb-free (get-free-disk-space default-directory))
   (unless (eq (current-buffer) dired-snacks--find-buffer)
     (remove-overlays (point-min) (point-max) 'dired-snacks--header t)
     (when dired-snacks-breadcrumb-hide-header

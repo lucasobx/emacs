@@ -31,7 +31,8 @@
   (require 'dired-x)
   (require 'browse-url)
   (require 'completion-preview)
-  (require 'filenotify))
+  (require 'filenotify)
+  (require 'transient))
 
 ;; `with-work-buffer' needs subr-x at run time.
 (require 'subr-x)
@@ -66,6 +67,10 @@
 (declare-function file-notify-add-watch "filenotify")
 (declare-function file-notify-rm-watch "filenotify")
 (declare-function file-notify-valid-p "filenotify")
+(declare-function transient-parse-suffixes "transient")
+(declare-function transient-setup "transient")
+(declare-function transient-prefix "transient")
+(declare-function transient--set-layout "transient")
 
 (declare-function nerd-icons-dired--refresh "nerd-icons-dired")
 (declare-function nerd-icons-dired-mode "nerd-icons-dired")
@@ -173,6 +178,14 @@
                  (insert (abbreviate-file-name dir)))
         (minibuffer-message "No zoxide match")))))
 
+(defun dired-snacks--visit (dir buffer)
+  "Show DIR in Dired, in place of BUFFER if it is the Dired buffer on display."
+  (if (and (buffer-live-p buffer)
+           (eq buffer (window-buffer (selected-window)))
+           (with-current-buffer buffer (derived-mode-p 'dired-mode)))
+      (with-current-buffer buffer (find-alternate-file dir))
+    (dired dir)))
+
 (defvar dired-snacks--zoxide-minibuffer-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map minibuffer-local-map)
@@ -205,12 +218,62 @@
     (if dir
         (progn
           (dired-snacks--zoxide-add dir)
-          (if (and (buffer-live-p orig)
-                   (eq orig (window-buffer (selected-window)))
-                   (with-current-buffer orig (derived-mode-p 'dired-mode)))
-              (find-alternate-file dir)
-            (dired dir)))
+          (dired-snacks--visit dir orig))
       (user-error "No zoxide match for: %s" input))))
+
+;; ===============================================================
+;;; places
+
+(defcustom dired-snacks-places-directories nil
+  "Directories pinned to the places menu, after the home directories."
+  :type '(repeat directory))
+
+(defconst dired-snacks--places-keys "1234567890abcdefghijklmnopqrstuvwxyz"
+  "Keys of the entries in the places menu, in order.")
+
+(defun dired-snacks--places-open (dir)
+  "Return a command that opens DIR in Dired."
+  (lambda ()
+    (interactive)
+    (dired-snacks--visit dir (current-buffer))))
+
+(defun dired-snacks--places-sections ()
+  "Return the sections of the places menu, as (TITLE (LABEL COMMAND)...)."
+  (list (cons "Home"
+              (mapcar (lambda (dir)
+                        (list (file-name-nondirectory dir) (dired-snacks--places-open dir)))
+                      (seq-filter #'file-directory-p (directory-files "~" t "\\`[^.]"))))
+        (cons "Pinned"
+              (mapcar (lambda (dir)
+                        (list (abbreviate-file-name (directory-file-name dir))
+                              (dired-snacks--places-open dir)))
+                      (seq-filter #'file-directory-p
+                                  (mapcar #'expand-file-name dired-snacks-places-directories))))))
+
+(defun dired-snacks--places-suffixes (_)
+  "Return the sections of the places menu as groups, numbering their entries."
+  (let ((keys (string-to-list dired-snacks--places-keys)))
+    (transient-parse-suffixes
+     'dired-snacks--places-menu
+     (seq-keep (pcase-lambda (`(,title . ,entries))
+                 (when-let* ((suffixes (seq-keep (lambda (entry)
+                                                   (and keys (cons (string (pop keys)) entry)))
+                                                 entries)))
+                   (apply #'vector title suffixes)))
+               (dired-snacks--places-sections)))))
+
+(with-eval-after-load 'transient
+  (transient-define-prefix dired-snacks--places-menu ()
+    "Jump to a directory of the places menu."
+    [:class transient-columns
+     :setup-children dired-snacks--places-suffixes]))
+
+;;;###autoload
+(defun dired-snacks-places ()
+  "Show a numbered menu of the home and pinned directories, to open in Dired."
+  (interactive)
+  (require 'transient)
+  (transient-setup 'dired-snacks--places-menu))
 
 ;; ===============================================================
 ;;; copy-uri

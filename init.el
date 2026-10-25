@@ -562,6 +562,7 @@
   (eglot-code-action-indications nil)
   (eglot-prefer-plaintext nil)
   (jsonrpc-event-hook nil)
+  (eglot-sync-connect nil)
   (eglot-autoshutdown t)
   :init
   (fset #'jsonrpc--log-event #'ignore)

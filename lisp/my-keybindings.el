@@ -120,6 +120,39 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
     (copy-region-as-kill isearch-other-end (point))
     (isearch-exit)))
 
+(defun my/isearch-query-replace ()
+  "Run `isearch-query-replace' on the whole buffer."
+  (interactive)
+  (let* ((origin (copy-marker (min (point) (or isearch-other-end (point))) t))
+         (wrapped nil)
+         (last nil)
+         (replace-search-function
+          (lambda (string bound noerror)
+            (let ((search (isearch-search-fun-default))
+                  (pos (point)))
+              (cond
+               ((or bound (not isearch-forward))
+                (funcall search string bound noerror))
+               ((and (not wrapped)
+                     (funcall search string nil noerror)
+                     (or (< (point) (point-max))
+                         (progn (setq last (copy-marker (match-beginning 0) t))
+                                nil)))
+                (point))
+               (t
+                (unless wrapped
+                  (setq wrapped t)
+                  (goto-char (point-min)))
+                (or (and (<= (point) origin)
+                         (funcall search string origin noerror))
+                    (when last
+                      (goto-char last)
+                      (setq last nil)
+                      (funcall search string nil noerror))
+                    (progn (goto-char pos) nil)))))))
+         (replace-re-search-function replace-search-function))
+    (call-interactively #'isearch-query-replace)))
+
 (defun my/ghostel-backward-delete ()
   "Send M-<backspace> to the terminal."
   (interactive)
@@ -259,10 +292,6 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
       which-key-replacement-alist)
 (push "\\`C-[;qdy] <up>\\'" which-key-inhibit-regexps)
 
-(my/bind-prefix "C-r" "replace"
-  '("r" replace-string "replace string")
-  '("q" query-replace  "query replace"))
-
 (my/bind-prefix "C-." "cursors"
   '("m" mc/mark-all-in-region      "mark matches in region")
   '("l" mc/edit-lines              "mark lines in region")
@@ -306,7 +335,8 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 (my/bind-local isearch-mode-map
   '("<down>" isearch-repeat-forward)
   '("<up>"   isearch-repeat-backward)
-  '("M-w"    isearch-copy-selected-word))
+  '("M-w"    isearch-copy-selected-word)
+  '("M-r"    my/isearch-query-replace))
 
 (with-eval-after-load 'dired
   (my/bind-local dired-mode-map

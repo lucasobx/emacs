@@ -237,6 +237,73 @@
     (interactive)
     (dired-snacks--visit dir (current-buffer))))
 
+(defconst dired-snacks--places-system-mounts
+  '("/" "/boot" "/boot/efi" "/efi" "/home" "/usr" "/var" "[SWAP]")
+  "Mount points of the system volumes, which the places menu leaves out.")
+
+(defun dired-snacks--places-volumes ()
+  "Return the volumes that `lsblk' reports, other than the system ones."
+  (when (executable-find "lsblk")
+    (with-work-buffer
+      (when (zerop (call-process "lsblk" nil t nil "--json" "--list" "--output"
+                                 "PATH,LABEL,SIZE,FSTYPE,MOUNTPOINTS,RM,HOTPLUG,PARTTYPENAME"))
+        (goto-char (point-min))
+        (seq-filter
+         (lambda (volume)
+           (let-alist volume
+             (and .fstype
+                  (not (member .fstype '("swap" "crypto_LUKS" "LVM2_member"
+                                         "linux_raid_member")))
+                  (not (equal .parttypename "EFI System"))
+                  (not (seq-intersection .mountpoints
+                                         dired-snacks--places-system-mounts)))))
+         (alist-get 'blockdevices
+                    (json-parse-buffer :object-type 'alist :array-type 'list
+                                       :null-object nil :false-object nil)))))))
+
+(defun dired-snacks--places-mountpoint (device)
+  "Return the directory where DEVICE is mounted, or nil."
+  (when-let* ((volume (seq-find (lambda (volume)
+                                  (equal (alist-get 'path volume) device))
+                                (dired-snacks--places-volumes))))
+    (car (delq nil (alist-get 'mountpoints volume)))))
+
+(defun dired-snacks--places-mount (device label buffer)
+  "Mount DEVICE, named LABEL, then show it in Dired in place of BUFFER."
+  (unless (executable-find "udisksctl")
+    (user-error "Cannot find udisksctl; install udisks2"))
+  (message "Mounting %s..." label)
+  (make-process
+   :name "dired-snacks-mount"
+   :buffer (generate-new-buffer " *dired-snacks-mount*")
+   :command (list "udisksctl" "mount" "--block-device" device)
+   :connection-type 'pipe
+   :noquery t
+   :sentinel
+   (lambda (proc _event)
+     (unless (process-live-p proc)
+       (let ((output (with-current-buffer (process-buffer proc)
+                       (string-trim (buffer-string)))))
+         (kill-buffer (process-buffer proc))
+         (if-let* ((_ (zerop (process-exit-status proc)))
+                   (dir (dired-snacks--places-mountpoint device)))
+             (progn
+               (message "Mounted %s" label)
+               (dired-snacks--visit dir buffer))
+           (message "Could not mount %s: %s" label output)))))))
+
+(defun dired-snacks--places-volume-entry (volume)
+  "Return the places menu entry of VOLUME, which mounts it if needed."
+  (let-alist volume
+    (let ((label (or .label (format "%s %s" .size (file-name-nondirectory .path))))
+          (dir (car (delq nil .mountpoints))))
+      (list (if dir label (propertize label 'face 'shadow))
+            (if dir
+                (dired-snacks--places-open dir)
+              (lambda ()
+                (interactive)
+                (dired-snacks--places-mount .path label (current-buffer))))))))
+
 (defun dired-snacks--places-sections ()
   "Return the sections of the places menu, as (TITLE (LABEL COMMAND)...)."
   (list (cons "Home"
@@ -248,7 +315,12 @@
                         (list (abbreviate-file-name (directory-file-name dir))
                               (dired-snacks--places-open dir)))
                       (seq-filter #'file-directory-p
-                                  (mapcar #'expand-file-name dired-snacks-places-directories))))))
+                                  (mapcar #'expand-file-name dired-snacks-places-directories))))
+        (cons "Drives"
+              (mapcar #'dired-snacks--places-volume-entry
+                      (seq-remove (lambda (volume)
+                                    (or (alist-get 'rm volume) (alist-get 'hotplug volume)))
+                                  (dired-snacks--places-volumes))))))
 
 (defun dired-snacks--places-suffixes (_)
   "Return the sections of the places menu as groups, numbering their entries."
@@ -270,7 +342,7 @@
 
 ;;;###autoload
 (defun dired-snacks-places ()
-  "Show a numbered menu of the home and pinned directories, to open in Dired."
+  "Show a numbered menu of directories and drives, to open one in Dired."
   (interactive)
   (require 'transient)
   (transient-setup 'dired-snacks--places-menu))

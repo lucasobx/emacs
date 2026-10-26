@@ -9,7 +9,7 @@
 
 ;; A bundle of small Dired enhancements:
 ;; zoxide     - jump to a directory by frecency, with inline preview
-;; places     - quick access to home directories, drives and removable media
+;; places     - quick access to directories, drives, removable media and trash
 ;; find       - incremental file search as you type
 ;; open       - smart RET for opening files in external apps
 ;; duplicate  - duplicate marked files with auto-numbered names
@@ -334,7 +334,7 @@ CALLBACK gets nil when all of them succeed, else the output of the failure."
    (lambda (failure)
      (if failure
          (message "Could not eject %s: %s" label failure)
-       (message "Ejected %s, which can be removed now" label)))))
+       (message "This device can now be safely removed")))))
 
 (defun dired-snacks--places-volume-entry (volume)
   "Return the places menu entry of VOLUME, which mounts it if needed."
@@ -359,8 +359,48 @@ CALLBACK gets nil when all of them succeed, else the output of the failure."
                       (dired-snacks--places-eject disk (substring-no-properties
                                                         (car entry)))))))))
 
+(defun dired-snacks--places-trash ()
+  "Return the trash directory, as the freedesktop.org specification defines it."
+  (expand-file-name "Trash/" (or (getenv "XDG_DATA_HOME") "~/.local/share")))
+
+(defun dired-snacks--places-trash-items (subdir)
+  "Return the files in SUBDIR of the trash directory."
+  (let ((dir (expand-file-name subdir (dired-snacks--places-trash))))
+    (and (file-directory-p dir)
+         (directory-files dir t directory-files-no-dot-files-regexp))))
+
+(defun dired-snacks--places-open-trash ()
+  "Show the files in the trash in Dired."
+  (interactive)
+  (let ((dir (expand-file-name "files" (dired-snacks--places-trash))))
+    (make-directory dir t)
+    (dired-snacks--visit dir (current-buffer))))
+
+(defun dired-snacks--places-empty-trash ()
+  "Delete the files in the trash for good."
+  (interactive)
+  (let ((count (length (dired-snacks--places-trash-items "files"))))
+    (cond
+     ((zerop count)
+      (message "Trash is empty"))
+     ((yes-or-no-p "Do you want to permanently delete all items from the Trash? ")
+      (message "Emptying Trash...")
+      (dired-snacks--places-run
+       (list (append '("rm" "-rf" "--")
+                     (dired-snacks--places-trash-items "files")
+                     (dired-snacks--places-trash-items "info")))
+       (lambda (failure)
+         (if failure
+             (message "Could not empty the Trash: %s" failure)
+           (dired-snacks--map-buffers
+            (lambda ()
+              (when (file-in-directory-p default-directory (dired-snacks--places-trash))
+                (revert-buffer))))
+           (message "Trash emptied"))))))))
+
 (defun dired-snacks--places-sections ()
-  "Return the sections of the places menu, as (TITLE (LABEL COMMAND [EJECT])...)."
+  "Return the places menu sections as (TITLE ENTRY...).
+Each ENTRY is (LABEL COMMAND [EJECT]), numbered, or (:key KEY LABEL COMMAND)."
   (let ((volumes (seq-group-by (lambda (volume)
                                  (and (or (alist-get 'rm volume) (alist-get 'hotplug volume))
                                       t))
@@ -378,28 +418,38 @@ CALLBACK gets nil when all of them succeed, else the output of the failure."
           (cons "Drives"
                 (mapcar #'dired-snacks--places-volume-entry (alist-get nil volumes)))
           (cons "Removable"
-                (mapcar #'dired-snacks--places-removable-entry (alist-get t volumes))))))
+                (mapcar #'dired-snacks--places-removable-entry (alist-get t volumes)))
+          (cons "Trash"
+                (let* ((count (length (dired-snacks--places-trash-items "files")))
+                       (empty (zerop count)))
+                  (list (list (if empty "Trash" (format "Trash (%d)" count))
+                              #'dired-snacks--places-open-trash)
+                        (list :key "E" (if empty (propertize "Empty" 'face 'shadow) "Empty")
+                              #'dired-snacks--places-empty-trash)))))))
 
 (defun dired-snacks--places-suffixes (_)
-  "Return the sections of the places menu as groups, numbering their entries.
-Entries with an eject command also get a key in the Eject group."
-  (let ((keys (string-to-list dired-snacks--places-keys))
-        (ejects nil))
+  "Return the places menu groups, with numbered entries and an Eject group."
+  (let ((keys (string-to-list dired-snacks--places-keys)))
     (transient-parse-suffixes
      'dired-snacks--places-menu
-     (append
-      (seq-keep (pcase-lambda (`(,title . ,entries))
-                  (when-let* ((suffixes
-                               (seq-keep (pcase-lambda (`(,label ,command ,eject))
-                                           (when keys
-                                             (let ((key (string (pop keys))))
-                                               (when eject
-                                                 (push (list (concat "0" key) label eject) ejects))
-                                               (list key label command))))
-                                         entries)))
-                    (apply #'vector title suffixes)))
-                (dired-snacks--places-sections))
-      (and ejects (list (apply #'vector "Eject" (nreverse ejects))))))))
+     (mapcan (pcase-lambda (`(,title . ,entries))
+               (let* ((ejects nil)
+                      (suffixes
+                       (seq-keep (lambda (entry)
+                                   (if (eq (car entry) :key)
+                                       (cdr entry)
+                                     (pcase-let ((`(,label ,command ,eject) entry))
+                                       (when keys
+                                         (let ((key (string (pop keys))))
+                                           (when eject
+                                             (push (list (concat "0" key) label eject) ejects))
+                                           (list key label command))))))
+                                 entries)))
+                 (and suffixes
+                      (cons (apply #'vector title suffixes)
+                            (and ejects
+                                 (list (apply #'vector "Eject" (nreverse ejects))))))))
+             (dired-snacks--places-sections)))))
 
 (with-eval-after-load 'transient
   (transient-define-prefix dired-snacks--places-menu ()
@@ -409,7 +459,7 @@ Entries with an eject command also get a key in the Eject group."
 
 ;;;###autoload
 (defun dired-snacks-places ()
-  "Show a numbered menu of directories and drives, to open one in Dired."
+  "Display a menu of directories, drives, and trash locations to browse in Dired."
   (interactive)
   (require 'transient)
   (transient-setup 'dired-snacks--places-menu))

@@ -539,12 +539,11 @@
   (setq ruby-ts-mode-map (make-sparse-keymap))
   (set-keymap-parent ruby-ts-mode-map prog-mode-map))
 
-(use-package markdown-mode
-  :ensure t
-  :mode ("README\\.md\\'" . gfm-mode))
-
-;; (use-package markdown-ts-mode
-;;   :ensure nil)
+(use-package markdown-ts-mode
+  :ensure nil
+  :mode ("\\.md\\'" "\\.mdx\\'" "\\.markdown\\'")
+  :config
+  (require 'markdown-ts-mode-x))
 
 (use-package glsl-mode
   :ensure t

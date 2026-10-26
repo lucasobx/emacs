@@ -168,14 +168,14 @@
 ;; ===============================================================
 ;;; THEMES
 
-;; (use-package pixel-themes
-;;   :ensure nil
-;;   :load-path "~/.config/emacs/lisp/pixel-themes"
-;;   :config
-;;   (pixel-themes-load-theme 'pixel-themes-psygnosia))
-
 (use-package pixel-themes
   :vc (:url "https://github.com/lucasobx/pixel-themes"))
+
+;; (use-package pixel-themes
+;;   :ensure nil
+;;   :load-path "~/Projects/pixel-themes"
+;;   :config
+;;   (pixel-themes-load-theme 'pixel-themes-psygnosia))
 
 ;; ===============================================================
 ;;; KEYBINDINGS

@@ -707,13 +707,6 @@
   :hook
   (org-mode . org-modern-mode))
 
-(use-package org-hide-drawers
-  :ensure t
-  :custom
-  (org-hide-drawers-display-strings'((all " ⚙")))
-  :hook
-  (org-mode . org-hide-drawers-mode))
-
 ;; ===============================================================
 ;;; TERMINAL
 

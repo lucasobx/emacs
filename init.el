@@ -297,16 +297,6 @@
   :config
   (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 
-(use-package spacious-padding
-  :ensure t
-  :config
-  (setopt spacious-padding-widths
-          '(:internal-border-width 10
-            :right-divider-width 1
-            :mode-line-width 1
-            :fringe-width 2))
-  (spacious-padding-mode 1))
-
 (use-package rainbow-delimiters
   :ensure t
   :hook

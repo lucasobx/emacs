@@ -9,6 +9,7 @@
 
 ;; A bundle of small Dired enhancements:
 ;; zoxide     - jump to a directory by frecency, with inline preview
+;; places     - quick access to home directories, drives and removable media
 ;; find       - incremental file search as you type
 ;; open       - smart RET for opening files in external apps
 ;; duplicate  - duplicate marked files with auto-numbered names
@@ -228,8 +229,9 @@
   "Directories pinned to the places menu, after the home directories."
   :type '(repeat directory))
 
-(defconst dired-snacks--places-keys "1234567890abcdefghijklmnopqrstuvwxyz"
-  "Keys of the entries in the places menu, in order.")
+(defconst dired-snacks--places-keys "123456789abcdefghijklmnopqrstuvwxyz"
+  "Keys of the entries in the places menu, in order.
+Zero is left out, as it starts the eject keys.")
 
 (defun dired-snacks--places-open (dir)
   "Return a command that opens DIR in Dired."
@@ -241,62 +243,104 @@
   '("/" "/boot" "/boot/efi" "/efi" "/home" "/usr" "/var" "[SWAP]")
   "Mount points of the system volumes, which the places menu leaves out.")
 
-(defun dired-snacks--places-volumes ()
-  "Return the volumes that `lsblk' reports, other than the system ones."
+(defconst dired-snacks--places-hidden-types
+  '("EFI System" "EFI (FAT-12/16/32)")
+  "Partition types the places menu leaves out.")
+
+(defun dired-snacks--places-devices ()
+  "Return the block devices that `lsblk' reports, as alists."
   (when (executable-find "lsblk")
     (with-work-buffer
       (when (zerop (call-process "lsblk" nil t nil "--json" "--list" "--output"
-                                 "PATH,LABEL,SIZE,FSTYPE,MOUNTPOINTS,RM,HOTPLUG,PARTTYPENAME"))
+                                 "PATH,PKNAME,LABEL,SIZE,FSTYPE,MOUNTPOINTS,RM,HOTPLUG,PARTTYPENAME"))
         (goto-char (point-min))
-        (seq-filter
-         (lambda (volume)
-           (let-alist volume
-             (and .fstype
-                  (not (member .fstype '("swap" "crypto_LUKS" "LVM2_member"
-                                         "linux_raid_member")))
-                  (not (equal .parttypename "EFI System"))
-                  (not (seq-intersection .mountpoints
-                                         dired-snacks--places-system-mounts)))))
-         (alist-get 'blockdevices
-                    (json-parse-buffer :object-type 'alist :array-type 'list
-                                       :null-object nil :false-object nil)))))))
+        (mapcar (lambda (device)
+                  (setf (alist-get 'mountpoints device)
+                        (delq nil (alist-get 'mountpoints device)))
+                  device)
+                (alist-get 'blockdevices
+                           (json-parse-buffer :object-type 'alist :array-type 'list
+                                              :null-object nil :false-object nil)))))))
+
+(defun dired-snacks--places-volumes ()
+  "Return the devices that hold a filesystem, other than the system ones."
+  (seq-filter (lambda (device)
+                (let-alist device
+                  (and .fstype
+                       (not (member .fstype '("swap" "crypto_LUKS" "LVM2_member"
+                                              "linux_raid_member")))
+                       (not (member .parttypename dired-snacks--places-hidden-types))
+                       (not (seq-intersection .mountpoints
+                                              dired-snacks--places-system-mounts)))))
+              (dired-snacks--places-devices)))
 
 (defun dired-snacks--places-mountpoint (device)
   "Return the directory where DEVICE is mounted, or nil."
-  (when-let* ((volume (seq-find (lambda (volume)
-                                  (equal (alist-get 'path volume) device))
-                                (dired-snacks--places-volumes))))
-    (car (delq nil (alist-get 'mountpoints volume)))))
+  (car (alist-get 'mountpoints
+                  (seq-find (lambda (other) (equal (alist-get 'path other) device))
+                            (dired-snacks--places-devices)))))
+
+(defun dired-snacks--places-run (commands callback)
+  "Run COMMANDS one after another, then call CALLBACK.
+CALLBACK gets nil when all of them succeed, else the output of the failure."
+  (if (null commands)
+      (funcall callback nil)
+    (let ((default-directory "/"))
+      (make-process
+       :name "dired-snacks-udisks"
+       :buffer (generate-new-buffer " *dired-snacks-udisks*")
+       :command (car commands)
+       :connection-type 'pipe
+       :noquery t
+       :sentinel
+       (lambda (proc _event)
+         (unless (process-live-p proc)
+           (let ((output (with-current-buffer (process-buffer proc)
+                           (string-trim (buffer-string)))))
+             (kill-buffer (process-buffer proc))
+             (if (zerop (process-exit-status proc))
+                 (dired-snacks--places-run (cdr commands) callback)
+               (funcall callback output)))))))))
 
 (defun dired-snacks--places-mount (device label buffer)
   "Mount DEVICE, named LABEL, then show it in Dired in place of BUFFER."
   (unless (executable-find "udisksctl")
     (user-error "Cannot find udisksctl; install udisks2"))
   (message "Mounting %s..." label)
-  (make-process
-   :name "dired-snacks-mount"
-   :buffer (generate-new-buffer " *dired-snacks-mount*")
-   :command (list "udisksctl" "mount" "--block-device" device)
-   :connection-type 'pipe
-   :noquery t
-   :sentinel
-   (lambda (proc _event)
-     (unless (process-live-p proc)
-       (let ((output (with-current-buffer (process-buffer proc)
-                       (string-trim (buffer-string)))))
-         (kill-buffer (process-buffer proc))
-         (if-let* ((_ (zerop (process-exit-status proc)))
-                   (dir (dired-snacks--places-mountpoint device)))
-             (progn
-               (message "Mounted %s" label)
-               (dired-snacks--visit dir buffer))
-           (message "Could not mount %s: %s" label output)))))))
+  (dired-snacks--places-run
+   (list (list "udisksctl" "mount" "--block-device" device))
+   (lambda (failure)
+     (if-let* ((_ (not failure))
+               (dir (dired-snacks--places-mountpoint device)))
+         (progn
+           (message "Mounted %s" label)
+           (dired-snacks--visit dir buffer))
+       (message "Could not mount %s: %s" label failure)))))
+
+(defun dired-snacks--places-eject (disk label)
+  "Unmount the filesystems on DISK, named LABEL, then power DISK off."
+  (unless (executable-find "udisksctl")
+    (user-error "Cannot find udisksctl; install udisks2"))
+  (message "Ejecting %s..." label)
+  (dired-snacks--places-run
+   (append (seq-keep (lambda (device)
+                       (let-alist device
+                         (and .mountpoints
+                              (or (equal .path disk)
+                                  (equal .pkname (file-name-nondirectory disk)))
+                              (list "udisksctl" "unmount" "--block-device" .path))))
+                     (dired-snacks--places-devices))
+           (list (list "udisksctl" "power-off" "--block-device" disk)))
+   (lambda (failure)
+     (if failure
+         (message "Could not eject %s: %s" label failure)
+       (message "Ejected %s, which can be removed now" label)))))
 
 (defun dired-snacks--places-volume-entry (volume)
   "Return the places menu entry of VOLUME, which mounts it if needed."
   (let-alist volume
     (let ((label (or .label (format "%s %s" .size (file-name-nondirectory .path))))
-          (dir (car (delq nil .mountpoints))))
+          (dir (car .mountpoints)))
       (list (if dir label (propertize label 'face 'shadow))
             (if dir
                 (dired-snacks--places-open dir)
@@ -304,35 +348,58 @@
                 (interactive)
                 (dired-snacks--places-mount .path label (current-buffer))))))))
 
+(defun dired-snacks--places-removable-entry (volume)
+  "Return the places menu entry of the removable VOLUME, with an eject command."
+  (let-alist volume
+    (let ((entry (dired-snacks--places-volume-entry volume))
+          (disk (if .pkname (concat "/dev/" .pkname) .path)))
+      (append entry
+              (list (lambda ()
+                      (interactive)
+                      (dired-snacks--places-eject disk (substring-no-properties
+                                                        (car entry)))))))))
+
 (defun dired-snacks--places-sections ()
-  "Return the sections of the places menu, as (TITLE (LABEL COMMAND)...)."
-  (list (cons "Home"
-              (mapcar (lambda (dir)
-                        (list (file-name-nondirectory dir) (dired-snacks--places-open dir)))
-                      (seq-filter #'file-directory-p (directory-files "~" t "\\`[^.]"))))
-        (cons "Pinned"
-              (mapcar (lambda (dir)
-                        (list (abbreviate-file-name (directory-file-name dir))
-                              (dired-snacks--places-open dir)))
-                      (seq-filter #'file-directory-p
-                                  (mapcar #'expand-file-name dired-snacks-places-directories))))
-        (cons "Drives"
-              (mapcar #'dired-snacks--places-volume-entry
-                      (seq-remove (lambda (volume)
-                                    (or (alist-get 'rm volume) (alist-get 'hotplug volume)))
-                                  (dired-snacks--places-volumes))))))
+  "Return the sections of the places menu, as (TITLE (LABEL COMMAND [EJECT])...)."
+  (let ((volumes (seq-group-by (lambda (volume)
+                                 (and (or (alist-get 'rm volume) (alist-get 'hotplug volume))
+                                      t))
+                               (dired-snacks--places-volumes))))
+    (list (cons "Home"
+                (mapcar (lambda (dir)
+                          (list (file-name-nondirectory dir) (dired-snacks--places-open dir)))
+                        (seq-filter #'file-directory-p (directory-files "~" t "\\`[^.]"))))
+          (cons "Pinned"
+                (mapcar (lambda (dir)
+                          (list (abbreviate-file-name (directory-file-name dir))
+                                (dired-snacks--places-open dir)))
+                        (seq-filter #'file-directory-p
+                                    (mapcar #'expand-file-name dired-snacks-places-directories))))
+          (cons "Drives"
+                (mapcar #'dired-snacks--places-volume-entry (alist-get nil volumes)))
+          (cons "Removable"
+                (mapcar #'dired-snacks--places-removable-entry (alist-get t volumes))))))
 
 (defun dired-snacks--places-suffixes (_)
-  "Return the sections of the places menu as groups, numbering their entries."
-  (let ((keys (string-to-list dired-snacks--places-keys)))
+  "Return the sections of the places menu as groups, numbering their entries.
+Entries with an eject command also get a key in the Eject group."
+  (let ((keys (string-to-list dired-snacks--places-keys))
+        (ejects nil))
     (transient-parse-suffixes
      'dired-snacks--places-menu
-     (seq-keep (pcase-lambda (`(,title . ,entries))
-                 (when-let* ((suffixes (seq-keep (lambda (entry)
-                                                   (and keys (cons (string (pop keys)) entry)))
-                                                 entries)))
-                   (apply #'vector title suffixes)))
-               (dired-snacks--places-sections)))))
+     (append
+      (seq-keep (pcase-lambda (`(,title . ,entries))
+                  (when-let* ((suffixes
+                               (seq-keep (pcase-lambda (`(,label ,command ,eject))
+                                           (when keys
+                                             (let ((key (string (pop keys))))
+                                               (when eject
+                                                 (push (list (concat "0" key) label eject) ejects))
+                                               (list key label command))))
+                                         entries)))
+                    (apply #'vector title suffixes)))
+                (dired-snacks--places-sections))
+      (and ejects (list (apply #'vector "Eject" (nreverse ejects))))))))
 
 (with-eval-after-load 'transient
   (transient-define-prefix dired-snacks--places-menu ()

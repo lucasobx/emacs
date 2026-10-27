@@ -347,8 +347,11 @@
   (isearch-wrap-pause 'no-ding)
   (isearch-lazy-count t)
   :config
-  (define-advice isearch-message-prefix (:filter-return (prefix) hide-direction)
-    (string-replace " backward" "" prefix)))
+  (define-advice isearch-message-prefix (:around (fn &rest args) hide-state)
+    (let ((isearch-forward t)
+          (isearch-success t)
+          (isearch-wrapped nil))
+      (apply fn args))))
 
 (use-package dired
   :ensure nil

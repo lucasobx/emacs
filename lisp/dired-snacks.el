@@ -583,25 +583,25 @@ root are never matched."
 (defface dired-snacks-find-match '((t :inherit match))
   "Face for the parts of file names that match the search.")
 
-(defvar dired-snacks--find-proc nil
-  "Current live-search `fd' process, or nil.")
+(defvar dired-snacks--find-prompting nil
+  "Non-nil while a find prompt reads a query.")
 
 (defvar dired-snacks--find-timer nil
-  "Timer used to debounce live search updates.")
+  "Timer that debounces the search of the find prompt, or nil.")
 
-(defvar dired-snacks--find-buffer nil
-  "Buffer that shows the live search, or nil.")
+(defvar-local dired-snacks--find-root nil
+  "Root directory of the search in this find buffer, or nil elsewhere.")
 
-(defvar dired-snacks--find-root nil
-  "Root directory of the current search.")
-
-(defvar dired-snacks--find-origin nil
+(defvar-local dired-snacks--find-origin nil
   "Directory where the search started, listed while the query is too short.")
 
-(defvar dired-snacks--find-query nil
-  "Query of the latest search started.")
+(defvar-local dired-snacks--find-query nil
+  "Query of the latest search started in this find buffer.")
 
-(defvar dired-snacks--find-results nil
+(defvar-local dired-snacks--find-proc nil
+  "Latest `fd' process of this find buffer, or nil.")
+
+(defvar-local dired-snacks--find-results nil
   "Last complete `fd' results, as (QUERY . ENTRIES), or nil.
 ENTRIES are lists from `dired-snacks--find-parse'.  The value is nil
 after a search that was cut short, so that its results are not refined.")
@@ -725,26 +725,24 @@ no file name."
   "Show ENTRIES from `dired-snacks--find-parse' under ROOT in the find buffer.
 If ENTRIES is the symbol `listing', list the contents of ROOT instead.
 Highlight the words of QUERY when it is non-nil."
-  (when (buffer-live-p dired-snacks--find-buffer)
-    (with-current-buffer dired-snacks--find-buffer
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (setq-local default-directory (file-name-as-directory root))
-        (cond
-         ((eq entries 'listing)
-          (dired-snacks--find-insert-listing root))
-         ((null entries)
-          (insert "  " (directory-file-name root) ":\n"
-                  "  (no matches)\n"))
-         (t (dired-snacks--find-insert-results root entries)))
-        (dired-build-subdir-alist)
-        (dired-insert-set-properties (point-min) (point-max))
-        (run-hooks 'dired-after-readin-hook)
-        (dired-snacks--find-icon-header root)
-        (when query (dired-snacks--find-highlight query))
-        (goto-char (point-min))
-        (when (and (consp entries) (null (cdr entries)))
-          (dired-goto-next-file))))))
+  (let ((inhibit-read-only t))
+    (erase-buffer)
+    (setq-local default-directory (file-name-as-directory root))
+    (cond
+     ((eq entries 'listing)
+      (dired-snacks--find-insert-listing root))
+     ((null entries)
+      (insert "  " (directory-file-name root) ":\n"
+              "  (no matches)\n"))
+     (t (dired-snacks--find-insert-results root entries)))
+    (dired-build-subdir-alist)
+    (dired-insert-set-properties (point-min) (point-max))
+    (run-hooks 'dired-after-readin-hook)
+    (dired-snacks--find-icon-header root)
+    (when query (dired-snacks--find-highlight query))
+    (goto-char (point-min))
+    (when (and (consp entries) (null (cdr entries)))
+      (dired-goto-next-file))))
 
 (defun dired-snacks--find-show (query entries)
   "Show ENTRIES, the `fd' results for QUERY, up to the maximum.
@@ -798,82 +796,84 @@ QUERY, so the results can be filtered without running `fd' again."
         (process-put proc 'dired-snacks--cut t)
         (delete-process proc)))))
 
-(defun dired-snacks--find-sentinel (proc event query)
-  "Show the results of PROC, a search for QUERY, when EVENT ends PROC."
+(defun dired-snacks--find-sentinel (proc event buffer query)
+  "Show in BUFFER the results of PROC, a search for QUERY, when EVENT ends PROC."
   (when-let* ((_ (memq (process-status proc) '(exit signal)))
-              (buf (process-buffer proc))
-              (_ (buffer-live-p buf)))
+              (output (process-buffer proc))
+              (_ (buffer-live-p output)))
     (when (and (or (string-prefix-p "finished" event)
                    (process-get proc 'dired-snacks--cut))
-               (equal query dired-snacks--find-query))
-      (let ((entries (with-current-buffer buf
+               (buffer-live-p buffer))
+      (let ((entries (with-current-buffer output
                        (seq-keep #'dired-snacks--find-parse
                                  (split-string (buffer-string) "\n" t)))))
-        (with-demoted-errors "find render error: %S"
-          (dired-snacks--find-show query entries))))
-    (kill-buffer buf)))
+        (with-current-buffer buffer
+          (when (equal query dired-snacks--find-query)
+            (with-demoted-errors "find render error: %S"
+              (dired-snacks--find-show query entries))))))
+    (kill-buffer output)))
 
-(defun dired-snacks--find-dispatch (query)
-  "Show the results for QUERY, replacing any other running search."
-  (unless (equal query dired-snacks--find-query)
-    (setq dired-snacks--find-query query)
-    (when (and dired-snacks--find-proc
-               (process-live-p dired-snacks--find-proc))
-      (delete-process dired-snacks--find-proc))
-    (cond
-     ((let ((input (string-trim query)))
-        (or (string-empty-p input)
-            (length< input dired-snacks-find-min-length)))
-      (dired-snacks--find-render dired-snacks--find-origin 'listing))
-     ((dired-snacks--find-refinable-p query)
-      (dired-snacks--find-render dired-snacks--find-root
-                                 (dired-snacks--find-refine query)
-                                 query))
-     ((not (executable-find "fd"))
-      (message "find: the `fd' program is required for live search"))
-     (t
-      (let ((proc (make-process
-                   :name "find-fd"
-                   :buffer (generate-new-buffer " *find-fd*")
-                   :noquery t
-                   :connection-type 'pipe
-                   :command (cons "fd" (dired-snacks--find-fd-args
-                                        query dired-snacks--find-root))
-                   :filter #'dired-snacks--find-filter
-                   :sentinel (lambda (proc event)
-                               (dired-snacks--find-sentinel proc event query)))))
-        (setq dired-snacks--find-proc proc))))))
+(defun dired-snacks--find-stop ()
+  "Stop the running `fd' process of this find buffer."
+  (when (process-live-p dired-snacks--find-proc)
+    (delete-process dired-snacks--find-proc)))
 
-(defun dired-snacks--find-schedule (&rest _)
-  "Schedule a search after minibuffer input settles."
-  (let ((query (minibuffer-contents-no-properties)))
-    (when (timerp dired-snacks--find-timer)
-      (cancel-timer dired-snacks--find-timer))
-    (setq dired-snacks--find-timer
-          (run-with-timer dired-snacks-find-debounce nil
-                          #'dired-snacks--find-dispatch query))))
+(defun dired-snacks--find-dispatch (buffer query)
+  "Show the results for QUERY in BUFFER, replacing its running search."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (unless (equal query dired-snacks--find-query)
+        (setq dired-snacks--find-query query)
+        (dired-snacks--find-stop)
+        (cond
+         ((let ((input (string-trim query)))
+            (or (string-empty-p input)
+                (length< input dired-snacks-find-min-length)))
+          (dired-snacks--find-render dired-snacks--find-origin 'listing))
+         ((dired-snacks--find-refinable-p query)
+          (dired-snacks--find-render dired-snacks--find-root
+                                     (dired-snacks--find-refine query)
+                                     query))
+         ((not (executable-find "fd"))
+          (message "find: the `fd' program is required for live search"))
+         (t
+          (setq dired-snacks--find-proc
+                (make-process
+                 :name "find-fd"
+                 :buffer (generate-new-buffer " *find-fd*")
+                 :noquery t
+                 :connection-type 'pipe
+                 :command (cons "fd" (dired-snacks--find-fd-args
+                                      query dired-snacks--find-root))
+                 :filter #'dired-snacks--find-filter
+                 :sentinel (lambda (proc event)
+                             (dired-snacks--find-sentinel
+                              proc event buffer query))))))))))
+
+(defun dired-snacks--find-schedule (buffer)
+  "Search BUFFER for the minibuffer input once it settles."
+  (when (timerp dired-snacks--find-timer)
+    (cancel-timer dired-snacks--find-timer))
+  (setq dired-snacks--find-timer
+        (run-with-timer dired-snacks-find-debounce nil #'dired-snacks--find-dispatch
+                        buffer (minibuffer-contents-no-properties))))
 
 (defun dired-snacks--find-revert (&rest _)
   "Run the search of this find buffer again.
 This is the `revert-buffer-function' of the find buffer, so
 `revert-buffer' reruns the search with fresh results."
-  (unless (eq (current-buffer) dired-snacks--find-buffer)
-    (user-error "This search is over; run `dired-snacks-find' again"))
   (let ((query (or dired-snacks--find-query "")))
     (setq dired-snacks--find-query nil
           dired-snacks--find-results nil)
-    (dired-snacks--find-dispatch query)))
+    (dired-snacks--find-dispatch (current-buffer) query)))
 
-(defun dired-snacks--find-cleanup (&optional keep-proc)
-  "Tear down the live-search timer and, unless KEEP-PROC, the process."
-  (when (timerp dired-snacks--find-timer)
-    (cancel-timer dired-snacks--find-timer))
-  (unless keep-proc
-    (when (and dired-snacks--find-proc
-               (process-live-p dired-snacks--find-proc))
-      (delete-process dired-snacks--find-proc))
-    (setq dired-snacks--find-proc nil))
-  (setq dired-snacks--find-timer nil))
+(defun dired-snacks--find-kill-old (window)
+  "Kill the find buffer of WINDOW and the find buffers that no window shows."
+  (dolist (buffer (buffer-list))
+    (when (and (buffer-local-value 'dired-snacks--find-root buffer)
+               (or (eq buffer (window-buffer window))
+                   (not (get-buffer-window buffer t))))
+      (kill-buffer buffer))))
 
 ;;;###autoload
 (defun dired-snacks-find ()
@@ -888,36 +888,34 @@ uppercase letter.
 
 Press RET to keep the results and go to the find buffer, or \\[keyboard-quit]
 to close it.  In the find buffer, q closes it and g runs the search
-again, and files are always sorted by name.  The options
+again, and files are always sorted by name.  Each search replaces the
+previous find buffers, except the ones shown in other windows, so each
+Dired pane can keep its own search.  The options
 `dired-snacks-find-match-path', `dired-snacks-find-show-hidden',
 `dired-snacks-find-directories' and `dired-snacks-find-respect-ignore'
 control what the search finds."
   (interactive)
   (require 'dired)
+  (when dired-snacks--find-prompting
+    (user-error "A search prompt is already open"))
   (let* ((origin (expand-file-name default-directory))
          (project (project-current))
          (root (if project (expand-file-name (project-root project)) origin))
          (here (selected-window))
          (side (window-parameter here 'window-side))
          (slot (window-parameter here 'window-slot))
-         (bufname (format "*find: %s*" (abbreviate-file-name root)))
-         (buf (progn (when (get-buffer bufname) (kill-buffer bufname))
-                     (get-buffer-create bufname))))
-    (dired-snacks--find-cleanup)
-    (setq dired-snacks--find-buffer buf
-          dired-snacks--find-root root
-          dired-snacks--find-origin origin
-          dired-snacks--find-query nil
-          dired-snacks--find-results nil)
+         (buf (progn (dired-snacks--find-kill-old here)
+                     (generate-new-buffer (format "*find: %s*" (abbreviate-file-name root))))))
     (with-current-buffer buf
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (setq-local default-directory (file-name-as-directory root))
-        (let ((dired-buffers nil))
-          (dired-mode root (dired-snacks--sort-switches dired-listing-switches 'name))))
+      (setq-local default-directory (file-name-as-directory root))
+      (let ((dired-buffers nil))
+        (dired-mode root (dired-snacks--sort-switches dired-listing-switches 'name)))
       (setq-local dired-omit-mode nil
-                  dired-sort-inhibit t)
-      (setq-local revert-buffer-function #'dired-snacks--find-revert)
+                  dired-sort-inhibit t
+                  revert-buffer-function #'dired-snacks--find-revert
+                  dired-snacks--find-root root
+                  dired-snacks--find-origin origin)
+      (add-hook 'kill-buffer-hook #'dired-snacks--find-stop nil t)
       (when project
         (setq-local mode-line-buffer-identification
                     (list mode-line-buffer-identification " (project)")))
@@ -925,30 +923,31 @@ control what the search finds."
         (set-keymap-parent map dired-mode-map)
         (keymap-set map "q" #'kill-current-buffer)
         (use-local-map map)))
-    (dired-snacks--find-dispatch "")
+    (dired-snacks--find-dispatch buf "")
     (let ((display-buffer-overriding-action
            (and side `(display-buffer-in-side-window
                        (side . ,side) (slot . ,(or slot 0))))))
       (display-buffer buf '(display-buffer-same-window)))
-    (let ((query nil))
-      (unwind-protect
-          (progn
-            (setq query
-                  (condition-case nil
-                      (minibuffer-with-setup-hook
-                          (lambda ()
-                            (add-hook 'after-change-functions
-                                      #'dired-snacks--find-schedule nil t))
-                        (read-from-minibuffer "Find files: "))
-                    (quit nil)))
-            (if query
-                (when (buffer-live-p buf)
-                  (dired-snacks--find-dispatch query)
-                  (if-let* ((win (get-buffer-window buf)))
-                      (select-window win)
-                    (pop-to-buffer buf)))
-              (when (buffer-live-p buf) (kill-buffer buf))))
-        (dired-snacks--find-cleanup query)))))
+    (let ((query (unwind-protect
+                     (condition-case nil
+                         (let ((dired-snacks--find-prompting t))
+                           (minibuffer-with-setup-hook
+                               (lambda ()
+                                 (add-hook 'after-change-functions
+                                           (lambda (&rest _)
+                                             (dired-snacks--find-schedule buf))
+                                           nil t))
+                             (read-from-minibuffer "Find files: ")))
+                       (quit nil))
+                   (when (timerp dired-snacks--find-timer)
+                     (cancel-timer dired-snacks--find-timer)))))
+      (cond ((not (buffer-live-p buf)))
+            (query
+             (dired-snacks--find-dispatch buf query)
+             (if-let* ((win (get-buffer-window buf)))
+                 (select-window win)
+               (pop-to-buffer buf)))
+            (t (kill-buffer buf))))))
 
 ;; ===============================================================
 ;;; open
@@ -1578,7 +1577,7 @@ Each level is two columns wide, with a line under the parent's indicator."
         (set-marker end (point))
         (dired-snacks--subtree-absolutize beg end dir)
         (dired-snacks--subtree-delete-dots
-         beg end (and (eq (current-buffer) dired-snacks--find-buffer)
+         beg end (and dired-snacks--find-root
                       (not dired-snacks-find-show-hidden)))
         (when (bound-and-true-p dired-omit-mode)
           (let ((dired-omit-size-limit nil)
@@ -1826,9 +1825,7 @@ A .git file, as in worktrees and submodules, is followed to its gitdir."
   (when (process-live-p dired-snacks--vc-proc)
     (delete-process dired-snacks--vc-proc))
   ;; The find buffer lists files from anywhere under the search root.
-  (let ((default-directory (if (eq (current-buffer) dired-snacks--find-buffer)
-                               dired-snacks--find-root
-                             default-directory)))
+  (let ((default-directory (or dired-snacks--find-root default-directory)))
     (if-let* (dired-snacks-vc-marks
               (_ (not (file-remote-p default-directory)))
               (root (locate-dominating-file default-directory ".git"))
@@ -1867,8 +1864,7 @@ A .git file, as in worktrees and submodules, is followed to its gitdir."
 
 (defun dired-snacks--vc-after-readin ()
   "Read the Git states of the listing again."
-  (unless (and (eq (current-buffer) dired-snacks--find-buffer)
-               dired-snacks--vc-states)
+  (unless (and dired-snacks--find-root dired-snacks--vc-states)
     (dired-snacks--vc-refresh)))
 
 (defun dired-snacks--vc-setup ()
@@ -1982,7 +1978,7 @@ keeps its header line."
 (defun dired-snacks--breadcrumb-decorate ()
   "Hide the directory header line and record the free disk space."
   (setq dired-snacks--breadcrumb-free (get-free-disk-space default-directory))
-  (unless (eq (current-buffer) dired-snacks--find-buffer)
+  (unless dired-snacks--find-root
     (remove-overlays (point-min) (point-max) 'dired-snacks--header t)
     (when dired-snacks-breadcrumb-hide-header
       (let* ((first (next-single-property-change (point-min) 'dired-filename))

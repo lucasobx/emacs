@@ -1,7 +1,7 @@
 ;;; dired-snacks.el --- Dired utilities -*- lexical-binding: t; -*-
 
 ;; Author: Lucas
-;; Version: 0.1
+;; Version: 0.1.0
 ;; Package-Requires: ((emacs "31.0"))
 ;; Keywords: files, convenience
 
@@ -90,9 +90,7 @@
   "Overlay showing the best zoxide match in the minibuffer.")
 
 (defun dired-snacks--zoxide-query (input)
-  "Return the directory that INPUT names, or else zoxide's best match for it.
-INPUT names a directory when it contains / or ~ and the directory exists.
-Return nil when INPUT is empty or nothing matches."
+  "Return the directory that INPUT names, or else zoxide's best match for it."
   (when (and input (not (string-empty-p input)))
     (let ((expanded (expand-file-name input)))
       (if (and (string-match-p "[/~]" input) (file-directory-p expanded))
@@ -125,8 +123,7 @@ Return nil when INPUT is empty or nothing matches."
   (and (string-match-p "[/~]" input) t))
 
 (defun dired-snacks--zoxide-update-ghost (&rest _)
-  "Show the best zoxide match after the minibuffer input.
-Nothing is shown while the input looks like a file name."
+  "Show the best zoxide match after the minibuffer input."
   (when (overlayp dired-snacks--zoxide-ghost-ov)
     (delete-overlay dired-snacks--zoxide-ghost-ov))
   (let ((input (minibuffer-contents)))
@@ -143,14 +140,11 @@ Nothing is shown while the input looks like a file name."
         :predicate #'file-directory-p))
 
 (defun dired-snacks--zoxide-inhibit-preview ()
-  "Return non-nil unless the minibuffer input is a file name.
-In `completion-preview-inhibit-functions', non-nil hides the preview."
+  "Return non-nil unless the minibuffer input is a file name."
   (not (dired-snacks--zoxide-file-name-p (minibuffer-contents))))
 
 (defun dired-snacks--zoxide-complete-file-name ()
-  "Complete the minibuffer input as a directory name.
-When the input cannot be extended, list the matching directories in the
-echo area instead."
+  "Complete the minibuffer input as a directory name."
   (interactive)
   (let* ((beg (minibuffer-prompt-end))
          (input (buffer-substring-no-properties beg (point-max)))
@@ -186,9 +180,7 @@ input is replaced by the best zoxide match."
         (minibuffer-message "No zoxide match")))))
 
 (defun dired-snacks--visit (dir buffer)
-  "Show DIR in Dired, in place of BUFFER if it is the selected Dired buffer.
-BUFFER is replaced only when it is a Dired buffer shown in the selected
-window.  Otherwise DIR opens in a new Dired buffer."
+  "Show DIR in Dired, in place of BUFFER if it is the selected Dired buffer."
   (if (and (buffer-live-p buffer)
            (eq buffer (window-buffer (selected-window)))
            (with-current-buffer buffer (derived-mode-p 'dired-mode)))
@@ -673,8 +665,7 @@ no file name."
         (overlay-put ov 'before-string (propertize str 'display str))))))
 
 (defun dired-snacks--find-insert-results (root entries)
-  "Insert ENTRIES as one Dired listing of ROOT, sorted by file name.
-Each file is listed by its path relative to ROOT."
+  "Insert ENTRIES as one Dired listing of ROOT, sorted by file name."
   (let ((lines (mapcar (lambda (entry)
                          (cons (file-relative-name (concat (car entry) (nth 1 entry)) root)
                                (nth 2 entry)))
@@ -684,10 +675,7 @@ Each file is listed by its path relative to ROOT."
       (insert "  " details name "\n"))))
 
 (defun dired-snacks--find-insert-listing (root)
-  "Insert the contents of ROOT as a Dired listing.
-The . and .. entries are left out, as are the hidden files and the
-directories that `dired-snacks-find-show-hidden' and
-`dired-snacks-find-directories' exclude."
+  "Insert the contents of ROOT as a Dired listing."
   (let ((beg (point))
         (end (point-marker)))
     (let ((dired-free-space nil))
@@ -718,9 +706,7 @@ directories that `dired-snacks-find-show-hidden' and
         (overlay-put ov 'face 'dired-snacks-find-match)))))
 
 (defun dired-snacks--find-highlight (query)
-  "Highlight the words of QUERY in the file names.
-Only base names are highlighted, unless `dired-snacks-find-match-path' is
-non-nil."
+  "Highlight the words of QUERY in the file names."
   (let ((case-fold-search (dired-snacks--find-case-fold-p query))
         (regexps (mapcar #'regexp-quote (split-string query))))
     (save-excursion
@@ -738,8 +724,7 @@ non-nil."
 (defun dired-snacks--find-render (root entries &optional query)
   "Show ENTRIES from `dired-snacks--find-parse' under ROOT in the find buffer.
 If ENTRIES is the symbol `listing', list the contents of ROOT instead.
-Highlight the words of QUERY when it is non-nil.  With a single entry,
-point moves to that entry."
+Highlight the words of QUERY when it is non-nil."
   (when (buffer-live-p dired-snacks--find-buffer)
     (with-current-buffer dired-snacks--find-buffer
       (let ((inhibit-read-only t))
@@ -814,8 +799,7 @@ QUERY, so the results can be filtered without running `fd' again."
         (delete-process proc)))))
 
 (defun dired-snacks--find-sentinel (proc event query)
-  "Show the results of PROC, a search for QUERY, when EVENT ends PROC.
-The results are dropped if a newer search has started."
+  "Show the results of PROC, a search for QUERY, when EVENT ends PROC."
   (when-let* ((_ (memq (process-status proc) '(exit signal)))
               (buf (process-buffer proc))
               (_ (buffer-live-p buf)))
@@ -830,10 +814,7 @@ The results are dropped if a newer search has started."
     (kill-buffer buf)))
 
 (defun dired-snacks--find-dispatch (query)
-  "Show the results for QUERY, replacing any other running search.
-A query shorter than `dired-snacks-find-min-length' lists the directory
-where the search started.  When the last results contain every match,
-they are filtered again instead of running `fd'."
+  "Show the results for QUERY, replacing any other running search."
   (unless (equal query dired-snacks--find-query)
     (setq dired-snacks--find-query query)
     (when (and dired-snacks--find-proc
@@ -1042,9 +1023,7 @@ opens PDF files in the default application of the desktop."
             dired-snacks-external-openers))
 
 (defun dired-snacks--opener-for-file (file)
-  "Return the opener for FILE, as (PROGRAM ARG...), or nil.
-Use the program that `dired-snacks-external-app-alist' maps to the
-extension of FILE when it is installed, or else the default opener."
+  "Return the opener for FILE, as (PROGRAM ARG...), or nil."
   (let ((mapped (cdr (dired-snacks--entry-for-ext
                       (dired-snacks--file-ext file)))))
     (if (and mapped (executable-find (car mapped)))
@@ -1052,9 +1031,7 @@ extension of FILE when it is installed, or else the default opener."
       (dired-snacks--default-opener))))
 
 (defun dired-snacks--call-opener (opener files)
-  "Open FILES with OPENER, which is (PROGRAM ARG...).
-The program runs without Emacs waiting for it.  Openers in
-`dired-snacks-single-file-openers' are run once for each file."
+  "Open FILES with OPENER, which is (PROGRAM ARG...)."
   (pcase-let ((`(,program . ,args) opener))
     (dolist (batch (if (member program dired-snacks-single-file-openers)
                        (mapcar #'list files)
@@ -1062,9 +1039,7 @@ The program runs without Emacs waiting for it.  Openers in
       (apply #'call-process program nil 0 nil (append args batch)))))
 
 (defun dired-snacks--open-external (files)
-  "Open each of FILES in its external application.
-Files that share an opener are passed to it in one call.  Signal an
-error if no opener is installed."
+  "Open each of FILES in its external application."
   (let ((groups nil))
     (dolist (file files)
       (if-let* ((opener (dired-snacks--opener-for-file file)))
@@ -1265,8 +1240,7 @@ a numbered TO, and the user is asked before an existing TO is replaced."
      dired-snacks--clipped)))
 
 (defun dired-snacks--paste-update (op from to)
-  "Update the Dired buffers after OP created TO from FROM.
-Buffers visiting a moved file follow it to its new name."
+  "Update the Dired buffers after OP created TO from FROM."
   (dired-remove-file to)
   (pcase op
     ('move
@@ -1282,8 +1256,7 @@ Buffers visiting a moved file follow it to its new name."
   (dired-snacks--subtree-prune-visible))
 
 (defun dired-snacks--paste-report (task)
-  "Report the outcome of TASK.
-Failures and cancelled moves are summarized in the Dired log."
+  "Report the outcome of TASK."
   (let* ((op (dired-snacks--paste-task-op task))
          (label (dired-snacks--paste-label op))
          (total (dired-snacks--paste-task-total task))
@@ -1402,8 +1375,7 @@ instead of merging into it."
 
 (defun dired-snacks--paste (op)
   "Paste the clipped files into the current directory with OP.
-OP is a key of `dired-snacks--paste-operations'.  Remote files are not
-supported."
+OP is a key of `dired-snacks--paste-operations'."
   (require 'dired-aux)
   (let ((dir (dired-current-directory)))
     (unless dired-snacks--clipped
@@ -1565,8 +1537,7 @@ Each level is two columns wide, with a line under the parent's indicator."
     `(jit-lock-bounds ,beg . ,end)))
 
 (defun dired-snacks--subtree-absolutize (beg end dir)
-  "Make the file names between BEG and END absolute under DIR.
-DIR is inserted invisibly, so only the base name shows."
+  "Make the file names between BEG and END absolute under DIR."
   (save-excursion
     (goto-char beg)
     (while (< (point) end)
@@ -1592,9 +1563,7 @@ DIR is inserted invisibly, so only the base name shows."
         (forward-line 1)))))
 
 (defun dired-snacks--subtree-insert ()
-  "Insert the directory on this line as an inline subtree.
-The subtree follows `dired-omit-mode', and in the find buffer it also
-leaves out the hidden files that `dired-snacks-find-show-hidden' hides."
+  "Insert the directory on this line as an inline subtree."
   (let* ((dir (file-name-as-directory (dired-get-filename nil t)))
          (depth (1+ (dired-snacks--subtree-depth-at (point))))
          (prefix (dired-snacks--subtree-line-prefix depth))
@@ -1853,8 +1822,7 @@ A .git file, as in worktrees and submodules, is followed to its gitdir."
     (setq dired-snacks--vc-watch nil)))
 
 (defun dired-snacks--vc-refresh ()
-  "Read the Git state of this directory in the background, then draw the marks.
-In the find buffer, the state is read for the whole search root."
+  "Read the Git state of this directory in the background, then draw the marks."
   (when (process-live-p dired-snacks--vc-proc)
     (delete-process dired-snacks--vc-proc))
   ;; The find buffer lists files from anywhere under the search root.
@@ -1898,8 +1866,7 @@ In the find buffer, the state is read for the whole search root."
     (dired-snacks--vc-schedule (current-buffer))))
 
 (defun dired-snacks--vc-after-readin ()
-  "Read the Git states of the listing again.
-The find buffer keeps its states between searches."
+  "Read the Git states of the listing again."
   (unless (and (eq (current-buffer) dired-snacks--find-buffer)
                dired-snacks--vc-states)
     (dired-snacks--vc-refresh)))
@@ -1962,9 +1929,7 @@ keeps its header line."
   "Free disk space shown in the breadcrumb, or nil.")
 
 (defun dired-snacks--breadcrumb-segments (dir)
-  "Return the breadcrumb segments of DIR, as a list of strings.
-The home directory and the root become `dired-snacks-breadcrumb-home'
-and `dired-snacks-breadcrumb-root'."
+  "Return the breadcrumb segments of DIR, as a list of strings."
   (let* ((abbr (abbreviate-file-name (directory-file-name dir)))
          (parts (split-string abbr "/" t)))
     (cond
@@ -1983,9 +1948,7 @@ and `dired-snacks-breadcrumb-root'."
     (ignore-errors (dired-current-directory))))
 
 (defun dired-snacks--breadcrumb ()
-  "Return a breadcrumb for the directory at point, or nil.
-The breadcrumb is a header line string, with the free disk space at the
-right edge."
+  "Return a breadcrumb for the directory at point, or nil."
   (when (derived-mode-p 'dired-mode)
     (let* ((dir (or (dired-snacks--directory-at-point) default-directory))
            (height dired-snacks-breadcrumb-height)
@@ -2134,8 +2097,7 @@ closes a pane."
     (set-window-parameter nil 'dired-snacks-pane t)))
 
 (defun dired-snacks--give-own-buffer (window buffer)
-  "Give WINDOW its own Dired buffer for the directory of BUFFER.
-Point stays on the same file."
+  "Give WINDOW its own Dired buffer for the directory of BUFFER."
   (let* ((file (with-current-buffer buffer
                  (save-excursion
                    (goto-char (window-point window))
@@ -2375,8 +2337,7 @@ For a directory, the number of items in it is shown instead."
 
 (defun dired-snacks--size-text (file attrs)
   "Return the size of FILE as text, or the number of items for a directory.
-ATTRS are the attributes of FILE.  A symbolic link to a directory counts
-as a directory."
+ATTRS are the attributes of FILE."
   (let* ((type (file-attribute-type attrs))
          (dir-attrs (cond ((eq type t) attrs)
                           ((and (stringp type) (file-directory-p file))
@@ -2461,8 +2422,7 @@ as a directory."
   (apply #'+ (mapcar #'string-width (delq nil segments))))
 
 (defun dired-snacks--mode-line-right ()
-  "Return the right-hand segments of the mode line.
-The omit indicator and the sort criterion are dropped when space runs out."
+  "Return the right-hand segments of the mode line."
   (when (derived-mode-p 'dired-mode)
     (let ((paste (dired-snacks--mode-line-paste))
           (size (dired-snacks--mode-line-size))
@@ -2607,8 +2567,7 @@ describe the target."
         (dired-snacks--columns-paint ov hl)))))
 
 (defun dired-snacks--columns-draw (beg end)
-  "Draw the columns on the lines between BEG and END.
-This is a `jit-lock' function, so it only runs on the lines on display."
+  "Draw the columns on the lines between BEG and END."
   (save-excursion
     (setq beg (progn (goto-char beg) (pos-bol))
           end (progn (goto-char end) (min (1+ (pos-eol)) (point-max))))

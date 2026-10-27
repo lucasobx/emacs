@@ -197,7 +197,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   ("<f4>" my/rotate-theme)
   ("C-z"  dired-snacks-zoxide)
   ("C-f"  dired-snacks-find)
-  ("C-p"  dired-snacks-places)
+  ("C-p"  dired-snacks-drives)
   ("C-t"  ghostel))
 
 ;; buffers and windows

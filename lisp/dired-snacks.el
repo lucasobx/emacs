@@ -9,7 +9,8 @@
 
 ;; A bundle of small Dired enhancements:
 ;; zoxide     - jump to a directory by frecency, with inline preview
-;; places     - quick access to directories, drives, removable media and trash
+;; drives     - open, mount and eject drives
+;; trash      - open and empty the trash
 ;; find       - incremental file search as you type
 ;; open       - smart RET for opening files in external apps
 ;; duplicate  - duplicate marked files with auto-numbered names
@@ -33,8 +34,7 @@
   (require 'dired-x)
   (require 'browse-url)
   (require 'completion-preview)
-  (require 'filenotify)
-  (require 'transient))
+  (require 'filenotify))
 
 ;; `with-work-buffer' needs subr-x at run time.
 (require 'subr-x)
@@ -72,10 +72,6 @@
 (declare-function file-notify-rm-watch "filenotify")
 (declare-function file-notify-valid-p "filenotify")
 (declare-function hl-line-unhighlight "hl-line")
-(declare-function transient-parse-suffixes "transient")
-(declare-function transient-setup "transient")
-(declare-function transient-prefix "transient")
-(declare-function transient--set-layout "transient")
 
 (declare-function nerd-icons-dired--refresh "nerd-icons-dired")
 (declare-function nerd-icons-dired-mode "nerd-icons-dired")
@@ -240,44 +236,25 @@ database."
       (user-error "No zoxide match for: %s" input))))
 
 ;; ===============================================================
-;;; places
+;;; drives
 
-(defcustom dired-snacks-places-directories nil
-  "Directories pinned to the places menu.
-
-The menu shows them in the Pinned section, after the home directories,
-under their abbreviated names.  Directories that do not exist are left
-out.  For example, the value (\"~/.config/emacs\") pins the Emacs
-configuration directory."
-  :type '(repeat directory))
-
-(defconst dired-snacks--places-keys "123456789abcdefghijklmnopqrstuvwxyz"
-  "Keys assigned to the places menu entries, in order.
-Zero is left out because it starts the eject keys.")
-
-(defun dired-snacks--places-open (dir)
-  "Return a command that opens DIR in Dired."
-  (lambda ()
-    (interactive)
-    (dired-snacks--visit dir (current-buffer))))
-
-(defconst dired-snacks--places-system-mounts
+(defconst dired-snacks--drives-system-mounts
   '("/" "/boot" "/boot/efi" "/efi" "/home" "/usr" "/var" "[SWAP]")
-  "Mount points of the system volumes that the places menu leaves out.")
+  "Mount points of the system volumes that the drive list leaves out.")
 
-(defconst dired-snacks--places-hidden-types
+(defconst dired-snacks--drives-hidden-types
   '("EFI System" "EFI (FAT-12/16/32)")
-  "Partition types the places menu leaves out.")
+  "Partition types the drive list leaves out.")
 
-(defun dired-snacks--places-devices ()
+(defun dired-snacks--drives-devices ()
   "Return the block devices that `lsblk' reports, as alists.
-Each alist has the keys path, pkname, label, size, fstype, mountpoints,
-rm, hotplug and parttypename.  The mountpoints value is a list, empty
-for a device that is not mounted, and rm and hotplug are booleans."
+Each alist maps the lowercase names of the requested columns to their
+values.  For a device that is not mounted, fsavail is nil and
+mountpoints is an empty list.  The rm and hotplug values are booleans."
   (when (executable-find "lsblk")
     (with-work-buffer
       (when (zerop (call-process "lsblk" nil t nil "--json" "--list" "--output"
-                                 "PATH,PKNAME,LABEL,SIZE,FSTYPE,MOUNTPOINTS,RM,HOTPLUG,PARTTYPENAME"))
+                                 "PATH,PKNAME,LABEL,SIZE,FSAVAIL,FSTYPE,MOUNTPOINTS,RM,HOTPLUG,PARTTYPENAME"))
         (goto-char (point-min))
         (mapcar (lambda (device)
                   (setf (alist-get 'mountpoints device)
@@ -287,25 +264,29 @@ for a device that is not mounted, and rm and hotplug are booleans."
                            (json-parse-buffer :object-type 'alist :array-type 'list
                                               :null-object nil :false-object nil)))))))
 
-(defun dired-snacks--places-volumes ()
+(defun dired-snacks--drives-volumes ()
   "Return the devices that hold a filesystem, leaving out system volumes."
   (seq-filter (lambda (device)
                 (let-alist device
                   (and .fstype
                        (not (member .fstype '("swap" "crypto_LUKS" "LVM2_member"
                                               "linux_raid_member")))
-                       (not (member .parttypename dired-snacks--places-hidden-types))
+                       (not (member .parttypename dired-snacks--drives-hidden-types))
                        (not (seq-intersection .mountpoints
-                                              dired-snacks--places-system-mounts)))))
-              (dired-snacks--places-devices)))
+                                              dired-snacks--drives-system-mounts)))))
+              (dired-snacks--drives-devices)))
 
-(defun dired-snacks--places-mountpoint (device)
+(defun dired-snacks--drives-removable-p (volume)
+  "Return non-nil if VOLUME is on removable media."
+  (or (alist-get 'rm volume) (alist-get 'hotplug volume)))
+
+(defun dired-snacks--drives-mountpoint (device)
   "Return the directory where DEVICE is mounted, or nil."
   (car (alist-get 'mountpoints
                   (seq-find (lambda (other) (equal (alist-get 'path other) device))
-                            (dired-snacks--places-devices)))))
+                            (dired-snacks--drives-devices)))))
 
-(defun dired-snacks--places-run (commands callback)
+(defun dired-snacks--run-commands (commands callback)
   "Run COMMANDS one after another in the background, then call CALLBACK.
 Each command is a list of a program and its arguments.  The commands run
 from the root directory, so they never keep a volume busy.  CALLBACK
@@ -315,8 +296,8 @@ first failing command, which stops the rest."
       (funcall callback nil)
     (let ((default-directory "/"))
       (make-process
-       :name "dired-snacks-udisks"
-       :buffer (generate-new-buffer " *dired-snacks-udisks*")
+       :name "dired-snacks-run"
+       :buffer (generate-new-buffer " *dired-snacks-run*")
        :command (car commands)
        :connection-type 'pipe
        :noquery t
@@ -327,198 +308,184 @@ first failing command, which stops the rest."
                            (string-trim (buffer-string)))))
              (kill-buffer (process-buffer proc))
              (if (zerop (process-exit-status proc))
-                 (dired-snacks--places-run (cdr commands) callback)
+                 (dired-snacks--run-commands (cdr commands) callback)
                (funcall callback output)))))))))
 
-(defun dired-snacks--places-mount (device label buffer)
-  "Mount DEVICE, named LABEL, and show its mount point in place of BUFFER.
-The mount runs in the background through udisksctl, which may ask for a
-password through polkit."
+(defun dired-snacks--drives-mount (device label buffer)
+  "Mount DEVICE, named LABEL, and show its mount point in place of BUFFER."
   (unless (executable-find "udisksctl")
     (user-error "Cannot find udisksctl; install udisks2"))
   (message "Mounting %s..." label)
-  (dired-snacks--places-run
+  (dired-snacks--run-commands
    (list (list "udisksctl" "mount" "--block-device" device))
    (lambda (failure)
      (if-let* ((_ (not failure))
-               (dir (dired-snacks--places-mountpoint device)))
+               (dir (dired-snacks--drives-mountpoint device)))
          (progn
            (message "Mounted %s" label)
            (dired-snacks--visit dir buffer))
        (message "Could not mount %s: %s" label failure)))))
 
-(defun dired-snacks--places-eject (disk label)
+(defun dired-snacks--eject-disk (disk label)
   "Unmount the filesystems on DISK, named LABEL, then power DISK off.
 Every mounted partition of DISK is unmounted, including the ones that
-the places menu hides, so that the drive can be safely removed."
+the drive list hides, so that the drive can be safely removed."
   (unless (executable-find "udisksctl")
     (user-error "Cannot find udisksctl; install udisks2"))
   (message "Ejecting %s..." label)
-  (dired-snacks--places-run
+  (dired-snacks--run-commands
    (append (seq-keep (lambda (device)
                        (let-alist device
                          (and .mountpoints
                               (or (equal .path disk)
                                   (equal .pkname (file-name-nondirectory disk)))
                               (list "udisksctl" "unmount" "--block-device" .path))))
-                     (dired-snacks--places-devices))
+                     (dired-snacks--drives-devices))
            (list (list "udisksctl" "power-off" "--block-device" disk)))
    (lambda (failure)
      (if failure
          (message "Could not eject %s: %s" label failure)
        (message "This device can now be safely removed")))))
 
-(defun dired-snacks--places-volume-entry (volume)
-  "Return the places menu entry that opens VOLUME, mounting it first if needed.
-VOLUME is an alist from `dired-snacks--places-devices'.  The label of an
-unmounted volume is dimmed."
-  (let-alist volume
-    (let ((label (or .label (format "%s %s" .size (file-name-nondirectory .path))))
-          (dir (car .mountpoints)))
-      (list (if dir label (propertize label 'face 'shadow))
-            (if dir
-                (dired-snacks--places-open dir)
-              (lambda ()
-                (interactive)
-                (dired-snacks--places-mount .path label (current-buffer))))))))
+(defun dired-snacks--drives-names (volumes)
+  "Return an alist that maps a unique name to each of VOLUMES."
+  (let ((alist nil))
+    (dolist (volume volumes (nreverse alist))
+      (let-alist volume
+        (let* ((device (file-name-nondirectory .path))
+               (name (or .label (format "%s %s" .size device))))
+          (when (assoc name alist)
+            (setq name (format "%s (%s)" name device)))
+          (push (cons name volume) alist))))))
 
-(defun dired-snacks--places-removable-entry (volume)
-  "Return the places menu entry for removable VOLUME, with an eject command.
-The entry is the one from `dired-snacks--places-volume-entry', plus a
-command that ejects the drive holding VOLUME."
-  (let-alist volume
-    (let ((entry (dired-snacks--places-volume-entry volume))
-          (disk (if .pkname (concat "/dev/" .pkname) .path)))
-      (append entry
-              (list (lambda ()
-                      (interactive)
-                      (dired-snacks--places-eject disk (substring-no-properties
-                                                        (car entry)))))))))
+(defun dired-snacks--drives-read (prompt volumes)
+  "Read one of VOLUMES in the minibuffer with PROMPT.
+Return (NAME . VOLUME), where NAME is the name shown for VOLUME."
+  (let* ((drives (dired-snacks--drives-names volumes))
+         (width (apply #'max (mapcar (lambda (drive) (string-width (car drive))) drives)))
+         (annotate
+          (lambda (name)
+            (let ((volume (cdr (assoc name drives))))
+              (let-alist volume
+                (string-trim-right
+                 (format "%s%6s  %11s  %-5s  %s"
+                         (make-string (- (+ width 2) (string-width name)) ?\s)
+                         .size (cond (.fsavail (format "%6s free" .fsavail))
+                                     ((null .mountpoints) "not mounted")
+                                     (t ""))
+                         (or .fstype "")
+                         (if (dired-snacks--drives-removable-p volume) "removable" ""))))))))
+    (assoc (completing-read prompt
+                            (completion-table-with-metadata
+                             drives `((category . dired-snacks-drive)
+                                      (annotation-function . ,annotate)))
+                            nil t)
+           drives)))
 
-(defun dired-snacks--places-trash ()
+(defvar dired-snacks--drives-ejecting nil
+  "Non-nil if the drive chosen in the minibuffer is to be ejected.")
+
+(defun dired-snacks-drives-eject ()
+  "Eject the drive selected in the minibuffer of `dired-snacks-drives'.
+
+The drive is the one that RET would open, and it must be removable
+media.  Every mounted partition of the drive is unmounted, and the drive
+is then powered off with udisksctl, so that it can be safely removed."
+  (interactive nil minibuffer-mode)
+  (setq dired-snacks--drives-ejecting t)
+  (call-interactively (keymap-lookup nil "RET")))
+
+(defvar-keymap dired-snacks-drives-map
+  :doc "Keymap active in the minibuffer of `dired-snacks-drives'."
+  "M-e" #'dired-snacks-drives-eject)
+
+;;;###autoload
+(defun dired-snacks-drives ()
+  "Open a drive in Dired, choosing it in the minibuffer.
+
+The drives are listed with their size, free space and filesystem,
+leaving out system volumes such as the root and boot partitions.  The
+free space is known only for mounted drives, so the others show \"not
+mounted\" in its place.  The drive opens in place of the current Dired
+buffer, if there is one.  An unmounted drive is mounted with udisksctl
+first, which may ask for a password.\\<dired-snacks-drives-map>
+
+In the minibuffer, \\[dired-snacks-drives-eject] ejects the selected drive
+instead of opening it, when it is removable media."
+  (interactive)
+  (let ((dired-snacks--drives-ejecting nil))
+    (pcase-let ((`(,name . ,volume)
+                 (minibuffer-with-setup-hook
+                     (:append (lambda ()
+                                (use-local-map (make-composed-keymap dired-snacks-drives-map
+                                                                     (current-local-map)))))
+                   (dired-snacks--drives-read
+                    "Drive: " (or (dired-snacks--drives-volumes)
+                                  (user-error "No drives found"))))))
+      (let-alist volume
+        (cond
+         (dired-snacks--drives-ejecting
+          (unless (dired-snacks--drives-removable-p volume)
+            (user-error "%s is not removable media" name))
+          (dired-snacks--eject-disk (if .pkname (concat "/dev/" .pkname) .path) name))
+         (.mountpoints
+          (dired-snacks--visit (car .mountpoints) (current-buffer)))
+         (t
+          (dired-snacks--drives-mount .path name (current-buffer))))))))
+
+;; ===============================================================
+;;; trash
+
+(defun dired-snacks--trash-dir ()
   "Return the trash directory defined by the freedesktop.org specification."
   (expand-file-name "Trash/" (or (getenv "XDG_DATA_HOME") "~/.local/share")))
 
-(defun dired-snacks--places-trash-items (subdir)
+(defun dired-snacks--trash-items (subdir)
   "Return the files in SUBDIR of the trash directory.
 SUBDIR is \"files\" for the trashed files or \"info\" for their metadata."
-  (let ((dir (expand-file-name subdir (dired-snacks--places-trash))))
+  (let ((dir (expand-file-name subdir (dired-snacks--trash-dir))))
     (and (file-directory-p dir)
          (directory-files dir t directory-files-no-dot-files-regexp))))
 
-(defun dired-snacks--places-open-trash ()
-  "Show the trashed files in Dired."
+;;;###autoload
+(defun dired-snacks-trash ()
+  "Open the trashed files in Dired.
+
+The trash is the one defined by the freedesktop.org specification,
+shared with the file managers of the desktop.  It opens in place of the
+current Dired buffer, if there is one.  `dired-snacks-empty-trash'
+empties it."
   (interactive)
-  (let ((dir (expand-file-name "files" (dired-snacks--places-trash))))
+  (let ((dir (expand-file-name "files" (dired-snacks--trash-dir))))
     (make-directory dir t)
     (dired-snacks--visit dir (current-buffer))))
 
-(defun dired-snacks--places-empty-trash ()
+;;;###autoload
+(defun dired-snacks-empty-trash ()
   "Permanently delete the files in the trash.
+
 Ask for confirmation first, then delete the trashed files and their
-metadata in the background."
+metadata in the background, and refresh the Dired buffers that show the
+trash."
   (interactive)
-  (let ((count (length (dired-snacks--places-trash-items "files"))))
+  (let ((count (length (dired-snacks--trash-items "files"))))
     (cond
      ((zerop count)
       (message "Trash is empty"))
      ((yes-or-no-p "Do you want to permanently delete all items from the Trash? ")
       (message "Emptying Trash...")
-      (dired-snacks--places-run
+      (dired-snacks--run-commands
        (list (append '("rm" "-rf" "--")
-                     (dired-snacks--places-trash-items "files")
-                     (dired-snacks--places-trash-items "info")))
+                     (dired-snacks--trash-items "files")
+                     (dired-snacks--trash-items "info")))
        (lambda (failure)
          (if failure
              (message "Could not empty the Trash: %s" failure)
            (dired-snacks--map-buffers
             (lambda ()
-              (when (file-in-directory-p default-directory (dired-snacks--places-trash))
+              (when (file-in-directory-p default-directory (dired-snacks--trash-dir))
                 (revert-buffer))))
            (message "Trash emptied"))))))))
-
-(defun dired-snacks--places-sections ()
-  "Return the places menu sections as (TITLE ENTRY...).
-The sections are Home, Pinned, Drives, Removable and Trash.  Each ENTRY
-is either (LABEL COMMAND [EJECT]), which is assigned the next key from
-`dired-snacks--places-keys', or (:key KEY LABEL COMMAND), which always
-uses KEY.  EJECT, when present, is a command that ejects the volume."
-  (let ((volumes (seq-group-by (lambda (volume)
-                                 (and (or (alist-get 'rm volume) (alist-get 'hotplug volume))
-                                      t))
-                               (dired-snacks--places-volumes))))
-    (list (cons "Home"
-                (mapcar (lambda (dir)
-                          (list (file-name-nondirectory dir) (dired-snacks--places-open dir)))
-                        (seq-filter #'file-directory-p (directory-files "~" t "\\`[^.]"))))
-          (cons "Pinned"
-                (mapcar (lambda (dir)
-                          (list (abbreviate-file-name (directory-file-name dir))
-                                (dired-snacks--places-open dir)))
-                        (seq-filter #'file-directory-p
-                                    (mapcar #'expand-file-name dired-snacks-places-directories))))
-          (cons "Drives"
-                (mapcar #'dired-snacks--places-volume-entry (alist-get nil volumes)))
-          (cons "Removable"
-                (mapcar #'dired-snacks--places-removable-entry (alist-get t volumes)))
-          (cons "Trash"
-                (let* ((count (length (dired-snacks--places-trash-items "files")))
-                       (empty (zerop count)))
-                  (list (list (if empty "Trash" (format "Trash (%d)" count))
-                              #'dired-snacks--places-open-trash)
-                        (list :key "E" (if empty (propertize "Empty" 'face 'shadow) "Empty")
-                              #'dired-snacks--places-empty-trash)))))))
-
-(defun dired-snacks--places-suffixes (_)
-  "Return the transient groups of the places menu.
-Entries are assigned keys in order from `dired-snacks--places-keys'.  A
-section with eject commands is followed by an Eject group, whose keys are
-0 followed by the key of the entry to eject."
-  (let ((keys (string-to-list dired-snacks--places-keys)))
-    (transient-parse-suffixes
-     'dired-snacks--places-menu
-     (mapcan (pcase-lambda (`(,title . ,entries))
-               (let* ((ejects nil)
-                      (suffixes
-                       (seq-keep (lambda (entry)
-                                   (if (eq (car entry) :key)
-                                       (cdr entry)
-                                     (pcase-let ((`(,label ,command ,eject) entry))
-                                       (when keys
-                                         (let ((key (string (pop keys))))
-                                           (when eject
-                                             (push (list (concat "0" key) label eject) ejects))
-                                           (list key label command))))))
-                                 entries)))
-                 (and suffixes
-                      (cons (apply #'vector title suffixes)
-                            (and ejects
-                                 (list (apply #'vector "Eject" (nreverse ejects))))))))
-             (dired-snacks--places-sections)))))
-
-(with-eval-after-load 'transient
-  (transient-define-prefix dired-snacks--places-menu ()
-    "Choose a directory, drive or the trash to open in Dired."
-    [:class transient-columns
-     :setup-children dired-snacks--places-suffixes]))
-
-;;;###autoload
-(defun dired-snacks-places ()
-  "Display a menu of directories, drives, and the trash to browse in Dired.
-
-The menu lists the directories in your home directory, the directories
-pinned in `dired-snacks-places-directories', the internal drives, the
-removable media and the trash.  Entries get the keys 1 to 9 and then
-letters, in order, and open in Dired, replacing the current Dired buffer
-if there is one.  Unmounted volumes are dimmed, and choosing one mounts
-it with udisksctl first.
-
-Pressing 0 followed by the key of a removable medium ejects it, which
-unmounts the drive and powers it off.  Pressing E empties the trash
-after asking for confirmation."
-  (interactive)
-  (require 'transient)
-  (transient-setup 'dired-snacks--places-menu))
 
 ;; ===============================================================
 ;;; copy-uri
@@ -2771,7 +2738,7 @@ In each Dired buffer, the mode adds inline subtrees, Git marks in the
 fringe, columns at the right edge, a breadcrumb in the header line and
 its own mode line.  It also registers visited directories in zoxide and
 applies `dired-snacks-side-window'.  The commands, such as
-`dired-snacks-find' and `dired-snacks-places', also work without the
+`dired-snacks-find' and `dired-snacks-drives', also work without the
 mode."
   :global t
   (if dired-snacks-mode

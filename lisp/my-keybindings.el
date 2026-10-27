@@ -336,11 +336,9 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   ("s" save-buffer         "save buffer"))
 
 (my/bind-prefix "C-h" "help"
-  ("h" helpful-at-point "help at point")
-  ("f" helpful-function "desc function")
-  ("v" helpful-variable "desc variable")
-  ("k" describe-key     "desc key")
-  ("d" devdocs-lookup   "devdocs"))
+  ("h" describe-symbol   "desc symbol")
+  ("k" describe-key      "desc key")
+  ("d" devdocs-lookup    "devdocs"))
 
 ;; ===============================================================
 ;;; MODE MAPS

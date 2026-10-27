@@ -60,6 +60,7 @@
   (resize-mini-windows 'grow-only)
   (completion-eager-display 'auto)
   (completion-eager-update t)
+  (completions-detailed t)
   (history-length 25)
 
   ;; editing
@@ -255,7 +256,6 @@
      inf-ruby-mode
      ibuffer-mode
      devdocs-mode
-     helpful-mode
      help-mode)))
 
 (use-package nerd-icons
@@ -313,7 +313,7 @@
   (setcdr (assq 'colorful-mode minor-mode-map-alist)
           (make-sparse-keymap))
   (global-colorful-mode t)
-  (add-to-list 'global-colorful-modes 'helpful-mode))
+  (add-to-list 'global-colorful-modes 'help-mode))
 
 (use-package ansi-color
   :ensure nil
@@ -489,7 +489,7 @@
   (setopt consult-buffer-filter
           (append consult-buffer-filter
                   '("\\*Async Shell Command\\*" "Output\\*$" "\\*Help\\*" "\\*Messages\\*"
-                    "\\*eldoc\\*" "\\*helpful.*\\*" "\\*Ibuffer\\*" "\\*Warnings\\*"
+                    "\\*eldoc\\*" "\\*Ibuffer\\*" "\\*Warnings\\*"
                     "\\`magit: " "\\`magit-process: " "\\`magit-diff: "
                     "\\*ghostel\\*" "\\*Compile-Log\\*" "*scratch*"
                     "\\*Async-native-compile-log\\*" "\\*Diff\\*")))
@@ -622,10 +622,6 @@
 
 ;; ===============================================================
 ;;; DOCS
-
-(use-package helpful
-  :ensure t
-  :defer t)
 
 (use-package devdocs
   :ensure t

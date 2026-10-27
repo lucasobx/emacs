@@ -447,28 +447,31 @@
                       #'cape-file
                       #'cape-dabbrev)))))
 
-(use-package vertico
-  :ensure t
-  :init
-  (vertico-mode)
+(use-package icomplete
+  :ensure nil
+  :hook
+  (icomplete-minibuffer-setup . (lambda () (setq-local max-mini-window-height 6
+                                                       truncate-lines t)))
   :custom
-  (vertico-cycle nil)
-  (vertico-count 5)
+  (icomplete-vertical-render-prefix-indicator t)
+  (icomplete-vertical-in-buffer-adjust-list t)
+  (icomplete-delay-completions-threshold 0)
+  (icomplete-show-matches-on-no-input t)
+  (icomplete-with-completion-tables t)
+  (icomplete-hide-common-prefix nil)
+  (icomplete-max-delay-chars 0)
+  (icomplete-compute-delay 0)
+  (icomplete-separator " . ")
+  (icomplete-in-buffer t)
   :config
-  ;; add a visual indicator to the currently selected candidate
-  (advice-add #'vertico--format-candidate :around
-              (lambda (orig cand prefix suffix index _start)
-                (setq cand (funcall orig cand prefix suffix index _start))
-                (concat
-                 (if (= vertico--index index)
-                     (propertize "» " 'face '(:foreground "#768c9c" :weight bold))
-                   "  ")
-                 cand))))
+  (setq icomplete-scroll t)
+  (keymap-set icomplete-minibuffer-map "RET" #'icomplete-force-complete-and-exit)
+  (icomplete-vertical-mode 1))
 
 (use-package marginalia
   :ensure t
   :defer t
-  :after vertico
+  :after icomplete
   :init
   (marginalia-mode)
   :config
@@ -490,7 +493,7 @@
 
 (use-package consult
   :ensure t
-  :after vertico
+  :after icomplete
   :defer t
   :init
   (setopt consult-fd-args

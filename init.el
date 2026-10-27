@@ -411,8 +411,6 @@
   (corfu-auto nil)
   (corfu-count 5)
   :config
-  (advice-add #'lsp-completion-at-point
-              :around #'cape-wrap-noninterruptible)
   (defun my/corfu-popupinfo-once (&rest _)
     (corfu-popupinfo-mode 1)
     (advice-remove 'corfu--exhibit #'my/corfu-popupinfo-once))
@@ -433,18 +431,6 @@
     (and (derived-mode-p 'org-mode) (org-at-table-p)))
   (add-hook 'completion-preview-inhibit-functions
             #'my/detect-org-table))
-
-(use-package cape
-  :ensure t
-  :init
-  (add-hook 'completion-at-point-functions #'cape-file)
-  (add-hook 'completion-at-point-functions #'cape-dabbrev)
-  :hook
-  (eglot-managed-mode . (lambda ()
-    (setq-local completion-at-point-functions
-                (list #'eglot-completion-at-point
-                      #'cape-file
-                      #'cape-dabbrev)))))
 
 (use-package icomplete
   :ensure nil

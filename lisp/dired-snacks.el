@@ -326,26 +326,44 @@ first failing command, which stops the rest."
            (dired-snacks--visit dir buffer))
        (message "Could not mount %s: %s" label failure)))))
 
+(defun dired-snacks--close-dired (dirs)
+  "Kill the Dired buffers under DIRS, closing their windows as q does."
+  (dolist (buffer (buffer-list))
+    (when (with-current-buffer buffer
+            (and (derived-mode-p 'dired-mode)
+                 (seq-some (lambda (dir) (file-in-directory-p default-directory dir))
+                           dirs)))
+      (dolist (window (get-buffer-window-list buffer nil t))
+        (if (and (window-parameter window 'dired-snacks-pane)
+                 (eq (window-deletable-p window) t))
+            (delete-window window)
+          (quit-window nil window)))
+      (kill-buffer buffer))))
+
 (defun dired-snacks--eject-disk (disk label)
   "Unmount the filesystems on DISK, named LABEL, then power DISK off.
 Every mounted partition of DISK is unmounted, including the ones that
 the drive list hides, so that the drive can be safely removed."
   (unless (executable-find "udisksctl")
     (user-error "Cannot find udisksctl; install udisks2"))
-  (message "Ejecting %s..." label)
-  (dired-snacks--run-commands
-   (append (seq-keep (lambda (device)
-                       (let-alist device
-                         (and .mountpoints
-                              (or (equal .path disk)
-                                  (equal .pkname (file-name-nondirectory disk)))
-                              (list "udisksctl" "unmount" "--block-device" .path))))
-                     (dired-snacks--drives-devices))
-           (list (list "udisksctl" "power-off" "--block-device" disk)))
-   (lambda (failure)
-     (if failure
-         (message "Could not eject %s: %s" label failure)
-       (message "This device can now be safely removed")))))
+  (let ((mounted (seq-filter (lambda (device)
+                               (let-alist device
+                                 (and .mountpoints
+                                      (or (equal .path disk)
+                                          (equal .pkname (file-name-nondirectory disk))))))
+                             (dired-snacks--drives-devices))))
+    (dired-snacks--close-dired
+     (seq-mapcat (lambda (device) (alist-get 'mountpoints device)) mounted))
+    (message "Ejecting %s..." label)
+    (dired-snacks--run-commands
+     (append (mapcar (lambda (device)
+                       (list "udisksctl" "unmount" "--block-device" (alist-get 'path device)))
+                     mounted)
+             (list (list "udisksctl" "power-off" "--block-device" disk)))
+     (lambda (failure)
+       (if failure
+           (message "Could not eject %s: %s" label failure)
+         (message "This device can now be safely removed"))))))
 
 (defun dired-snacks--drives-names (volumes)
   "Return an alist that maps a unique name to each of VOLUMES."
@@ -389,8 +407,9 @@ Return (NAME . VOLUME), where NAME is the name shown for VOLUME."
   "Eject the drive selected in the minibuffer of `dired-snacks-drives'.
 
 The drive is the one that RET would open, and it must be removable
-media.  Every mounted partition of the drive is unmounted, and the drive
-is then powered off with udisksctl, so that it can be safely removed."
+media.  The Dired buffers showing the drive are closed, every mounted
+partition of the drive is unmounted, and the drive is then powered off
+with udisksctl, so that it can be safely removed."
   (interactive nil minibuffer-mode)
   (setq dired-snacks--drives-ejecting t)
   (call-interactively (keymap-lookup nil "RET")))

@@ -345,6 +345,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
     ("TAB"      dired-snacks-subtree-toggle)
     ("M-<left>" dired-up-directory)
     ("M-."      dired-omit-mode)
+    ("s"        dired-snacks-sort-cycle)
     ("<f2>"     wdired-change-to-wdired-mode)
     ("M-f"      dired-create-empty-file)
     ("M-d"      dired-snacks-duplicate)

@@ -357,6 +357,7 @@
 (use-package dired
   :ensure nil
   :custom
+  (dired-listing-switches "-alX")
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-recursive-deletes 'always)
   (dired-recursive-copies 'always)
@@ -382,9 +383,9 @@
   (dired-snacks-columns '(size))
   (dired-snacks-side-window t)
   (dired-snacks-external-app-alist
-   '((("mkv" "mp4" "webm" "avi" "mov" "mpg" "m4v") "vlc")
-     (("mp3" "flac" "wav" "ogg" "opus" "m4a" "aac") "vlc")
-     ("pdf" "zen-browser")
+   '((("mp3" "flac" "wav" "ogg" "opus" "m4a" "aac") "vlc")
+     (("mkv" "mp4" "webm" "avi" "mov" "mpg" "m4v") "vlc")
+     (("pdf") "firefox")
      ;; no app specified: use gio/xdg-open (system default).
      (("png" "jpg" "jpeg" "gif" "bmp" "webp" "tiff" "svg" "ico" "avif"))
      (("xcf" "kra" "psd" "blend" "cbz" "cbr"))))

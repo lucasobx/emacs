@@ -18,6 +18,7 @@
 ;; vc         - mark the Git state of each entry in the fringe
 ;; breadcrumb - show the current directory in the header line
 ;; split      - second Dired pane with independent navigation
+;; sort       - cycle the sort order of the listing
 ;; mode-line  - per-buffer mode line with size, time, sort, position
 ;; columns    - size, time and permissions at the right edge
 ;; copy-uri   - copy files as file:// URIs to the clipboard
@@ -54,6 +55,8 @@
 (declare-function dired-goto-next-file "dired")
 (declare-function dired-advertise "dired")
 (declare-function dired-hide-details-mode "dired")
+(declare-function dired-sort-other "dired")
+(declare-function dired-sort-toggle-or-edit "dired")
 (declare-function dired-add-file "dired-aux")
 (declare-function dired-remove-file "dired-aux")
 (declare-function dired-relist-file "dired-aux")
@@ -925,9 +928,10 @@ uppercase letter.
 
 Press RET to keep the results and go to the find buffer, or \\[keyboard-quit]
 to close it.  In the find buffer, q closes it and g runs the search
-again.  The options `dired-snacks-find-match-path',
-`dired-snacks-find-show-hidden', `dired-snacks-find-directories' and
-`dired-snacks-find-respect-ignore' control what the search finds."
+again, and files are always sorted by name.  The options
+`dired-snacks-find-match-path', `dired-snacks-find-show-hidden',
+`dired-snacks-find-directories' and `dired-snacks-find-respect-ignore'
+control what the search finds."
   (interactive)
   (require 'dired)
   (let* ((origin (expand-file-name default-directory))
@@ -949,8 +953,10 @@ again.  The options `dired-snacks-find-match-path',
       (let ((inhibit-read-only t))
         (erase-buffer)
         (setq-local default-directory (file-name-as-directory root))
-        (let ((dired-buffers nil)) (dired-mode root)))
-      (setq-local dired-omit-mode nil)
+        (let ((dired-buffers nil))
+          (dired-mode root (dired-snacks--sort-switches dired-listing-switches 'name))))
+      (setq-local dired-omit-mode nil
+                  dired-sort-inhibit t)
       (setq-local revert-buffer-function #'dired-snacks--find-revert)
       (when project
         (setq-local mode-line-buffer-identification
@@ -2185,6 +2191,72 @@ marks."
                 (dired-snacks--give-own-buffer w buffer)))))))))
 
 ;; ===============================================================
+;;; sort
+
+(defcustom dired-snacks-sort-criteria '(name type size time)
+  "Sort criteria that `dired-snacks-sort-cycle' goes through, in order.
+
+Each element is one of the symbols name, type, size, time and version.
+Type sorts by extension, size puts the largest files first, time puts
+the newest files first, and version compares the numbers in file names
+by value.  For example, (name time) switches between those two orders."
+  :type '(repeat (choice (const name) (const type) (const size)
+                         (const time) (const version))))
+
+(defconst dired-snacks--sort-flags
+  '((?t . time) (?S . size) (?X . type) (?v . version) (?U . none))
+  "The `ls' switches that change the sort order, with their criteria.")
+
+(defun dired-snacks--sort-criterion (switches)
+  "Return the sort criterion named by the `ls' SWITCHES, as a symbol."
+  (let ((crit 'name))
+    (dolist (switch (split-string switches) crit)
+      (cond
+       ((string-prefix-p "--sort=" switch)
+        (setq crit (pcase (string-remove-prefix "--sort=" switch)
+                     ("extension" 'type)
+                     (word (intern word)))))
+       ((string-match-p "\\`-[^-]" switch)
+        (dolist (c (string-to-list (substring switch 1)))
+          (setq crit (alist-get c dired-snacks--sort-flags crit))))))))
+
+(defun dired-snacks--sort-switches (switches criterion)
+  "Return the `ls' SWITCHES changed to sort by CRITERION.
+CRITERION is a criterion from `dired-snacks--sort-flags', or name for
+the default order of `ls'."
+  (let* ((flags (mapcar #'car dired-snacks--sort-flags))
+         (args (seq-keep (lambda (arg)
+                           (cond ((string-prefix-p "--sort=" arg) nil)
+                                 ((string-match-p "\\`-[^-]" arg)
+                                  (let ((kept (seq-remove (lambda (c) (memq c flags)) arg)))
+                                    (and (length> kept 1) (concat kept))))
+                                 (t arg)))
+                         (split-string-and-unquote switches)))
+         (flag (car (rassq criterion dired-snacks--sort-flags))))
+    (combine-and-quote-strings (if flag (append args (list (string ?- flag))) args))))
+
+;;;###autoload
+(defun dired-snacks-sort-cycle (&optional edit)
+  "Sort the listing by the next criterion in `dired-snacks-sort-criteria'.
+
+Each call moves to the next criterion, for example from name to type,
+and redraws the listing with point on the same file.  The order applies
+to this buffer only, so directories opened later use
+`dired-listing-switches', and expanded subtrees are collapsed.  With
+prefix argument EDIT, edit the `ls' switches instead, as
+`dired-sort-toggle-or-edit' does."
+  (interactive "P" dired-mode)
+  (when dired-sort-inhibit
+    (user-error "Cannot sort this Dired buffer"))
+  (if edit
+      (dired-sort-toggle-or-edit edit)
+    (let* ((criteria dired-snacks-sort-criteria)
+           (current (dired-snacks--sort-criterion dired-actual-switches))
+           (next (or (cadr (memq current criteria)) (car criteria))))
+      (dired-sort-other (dired-snacks--sort-switches dired-actual-switches next))
+      (message "Sorted by %s" next))))
+
+;; ===============================================================
 ;;; mode-line
 
 (defcustom dired-snacks-mode-line-show-size t
@@ -2347,25 +2419,11 @@ as a directory."
   (when (and dired-snacks-mode-line-show-omit (bound-and-true-p dired-omit-mode))
     (propertize "  omit" 'face 'shadow)))
 
-(defun dired-snacks--sort-criterion (switches)
-  "Return the sort criterion named by the `ls' SWITCHES."
-  (let ((crit "name"))
-    (dolist (switch (split-string switches) crit)
-      (cond
-       ((string-prefix-p "--sort=" switch)
-        (setq crit (pcase (string-remove-prefix "--sort=" switch)
-                     ("extension" "type")
-                     (word word))))
-       ((string-match-p "\\`-[^-]" switch)
-        (dolist (c (string-to-list (substring switch 1)))
-          (setq crit (alist-get c '((?t . "time") (?S . "size") (?X . "type")
-                                    (?v . "version") (?U . "none"))
-                                crit))))))))
-
 (defun dired-snacks--mode-line-sort ()
   "Return the sort criterion of this listing, or nil."
   (when (and dired-snacks-mode-line-show-sort (derived-mode-p 'dired-mode))
-    (concat "  " (propertize (dired-snacks--sort-criterion dired-actual-switches)
+    (concat "  " (propertize (symbol-name (dired-snacks--sort-criterion
+                                           dired-actual-switches))
                              'face 'shadow))))
 
 (defconst dired-snacks--mode-line-spinner '("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")

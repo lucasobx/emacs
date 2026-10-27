@@ -287,10 +287,9 @@
 
 (use-package nerd-icons-completion
   :ensure t
-  :after (:all nerd-icons marginalia)
+  :after nerd-icons
   :config
-  (nerd-icons-completion-mode)
-  (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
+  (nerd-icons-completion-mode))
 
 (use-package nerd-icons-corfu
   :ensure t
@@ -467,21 +466,6 @@
   (setq icomplete-scroll t)
   (keymap-set icomplete-minibuffer-map "RET" #'icomplete-force-complete-and-exit)
   (icomplete-vertical-mode 1))
-
-(use-package marginalia
-  :ensure t
-  :defer t
-  :after icomplete
-  :init
-  (marginalia-mode)
-  :config
-  ;; restrict annotations to 'face' category only
-  (setopt marginalia-annotators
-          (mapcar (lambda (pair)
-                    (if (eq (car pair) 'face)
-                        pair
-                      (cons (car pair) '(none))))
-                  marginalia-annotators)))
 
 (use-package orderless
   :ensure t

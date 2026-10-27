@@ -22,6 +22,7 @@
 
 (declare-function magit-restore-window-configuration "magit-mode")
 (declare-function magit-mode-get-buffers "magit-mode")
+(declare-function my/backward-delete "my-text-ops")
 (declare-function ghostel-send-key "ghostel")
 (declare-function consult-buffer "consult")
 
@@ -154,6 +155,18 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
                     (progn (goto-char pos) nil)))))))
          (replace-re-search-function replace-search-function))
     (call-interactively #'isearch-query-replace)))
+
+(defun my/isearch-backward-delete ()
+  "Delete backward in the search string."
+  (interactive)
+  (unless (string-empty-p isearch-string)
+    (let* ((table (syntax-table))
+           (kept (with-temp-buffer
+                   (set-syntax-table table)
+                   (insert isearch-string)
+                   (my/backward-delete)
+                   (buffer-size))))
+      (isearch-del-char (- (length isearch-string) kept)))))
 
 (defun my/ghostel-backward-delete ()
   "Send M-<backspace> to the terminal."
@@ -333,11 +346,12 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 ;;; MODE MAPS
 
 (my/bind-local isearch-mode-map
-  ("<down>" isearch-repeat-forward)
-  ("<up>"   isearch-repeat-backward)
-  ("C-v"    isearch-yank-kill)
-  ("M-w"    my/isearch-copy-selected-word)
-  ("M-r"    my/isearch-query-replace))
+  ("<down>"        isearch-repeat-forward)
+  ("<up>"          isearch-repeat-backward)
+  ("C-v"           isearch-yank-kill)
+  ("C-<backspace>" my/isearch-backward-delete)
+  ("M-w"           my/isearch-copy-selected-word)
+  ("M-r"           my/isearch-query-replace))
 
 (with-eval-after-load 'dired
   (my/bind-local dired-mode-map

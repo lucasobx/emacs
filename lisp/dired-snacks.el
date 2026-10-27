@@ -1497,11 +1497,6 @@ COLLAPSED marks a directory that can be expanded, and EXPANDED marks a
 directory whose subtree is open.  Files get blanks of the same width."
   :type '(cons (string :tag "Collapsed") (string :tag "Expanded")))
 
-(defcustom dired-snacks-subtree-after-change-hook nil
-  "Hook run after a subtree is expanded or collapsed.
-The hook runs in the Dired buffer, for example to redraw file icons."
-  :type 'hook)
-
 (defface dired-snacks-subtree-indicator '((t :inherit shadow))
   "Face for the subtree indicators.")
 
@@ -1631,7 +1626,6 @@ leaves out the hidden files that `dired-snacks-find-show-hidden' hides."
           (push ov dired-snacks--subtree-overlays))
         (jit-lock-refontify parent beg)
         (set-marker end nil)))
-    (run-hooks 'dired-snacks-subtree-after-change-hook)
     (dired-move-to-filename)))
 
 (defun dired-snacks--subtree-remove (ov)
@@ -1647,7 +1641,6 @@ leaves out the hidden files that `dired-snacks-find-show-hidden' hides."
         (delete-overlay o)))
     (delete-region beg end))
   (jit-lock-refontify (pos-bol) (pos-eol))
-  (run-hooks 'dired-snacks-subtree-after-change-hook)
   (dired-move-to-filename))
 
 ;;;###autoload
@@ -1681,8 +1674,7 @@ file.  Reverting the buffer collapses every subtree."
 (defun dired-snacks--subtree-prune ()
   "Collapse the subtrees whose directory line was deleted."
   (when dired-snacks--subtree-overlays
-    (let ((pruned nil)
-          (inhibit-read-only t))
+    (let ((inhibit-read-only t))
       (dolist (ov dired-snacks--subtree-overlays)
         (when-let* ((_ (overlay-buffer ov))
                     (parent (overlay-get ov 'dired-snacks--subtree-parent))
@@ -1690,12 +1682,9 @@ file.  Reverting the buffer collapses every subtree."
                     ;; at the subtree, or past a line inserted in its place.
                     (_ (>= parent (overlay-start ov))))
           (delete-region parent (overlay-end ov))
-          (delete-overlay ov)
-          (setq pruned t)))
+          (delete-overlay ov)))
       (setq dired-snacks--subtree-overlays
-            (seq-filter #'overlay-buffer dired-snacks--subtree-overlays))
-      (when pruned
-        (run-hooks 'dired-snacks-subtree-after-change-hook)))))
+            (seq-filter #'overlay-buffer dired-snacks--subtree-overlays)))))
 
 (defun dired-snacks--subtree-prune-visible ()
   "Collapse the subtrees whose directory line was deleted, in visible windows."
@@ -1793,13 +1782,15 @@ highest priority among the files below it."
               (puthash file face states)))
           (setq name (file-name-directory (directory-file-name name))))))))
 
-(defun dired-snacks--vc-draw ()
-  "Mark the Git state of each entry in the left fringe."
-  (remove-overlays nil nil 'dired-snacks--vc t)
-  (when (and dired-snacks-vc-marks dired-snacks--vc-states)
-    (save-excursion
-      (goto-char (point-min))
-      (while (not (eobp))
+(defun dired-snacks--vc-draw (beg end)
+  "Mark the Git state of the entries between BEG and END in the left fringe."
+  (save-excursion
+    (setq beg (progn (goto-char beg) (pos-bol))
+          end (progn (goto-char end) (min (1+ (pos-eol)) (point-max))))
+    (remove-overlays beg end 'dired-snacks--vc t)
+    (when (and dired-snacks-vc-marks dired-snacks--vc-states)
+      (goto-char beg)
+      (while (< (point) end)
         (when-let* ((file (dired-get-filename nil t))
                     (face (gethash (directory-file-name file) dired-snacks--vc-states)))
           (let ((ov (make-overlay (pos-bol) (pos-eol))))
@@ -1807,7 +1798,8 @@ highest priority among the files below it."
             (overlay-put ov 'evaporate t)
             (overlay-put ov 'before-string
                          (propertize " " 'display `(left-fringe dired-snacks--vc-bar ,face)))))
-        (forward-line 1)))))
+        (forward-line 1)))
+    `(jit-lock-bounds ,beg . ,end)))
 
 (defun dired-snacks--vc-sentinel (proc buffer root)
   "Mark BUFFER with the states PROC read under ROOT."
@@ -1818,7 +1810,7 @@ highest priority among the files below it."
                            (dired-snacks--vc-parse root)))))
         (with-current-buffer buffer
           (setq dired-snacks--vc-states states)
-          (dired-snacks--vc-draw))))
+          (jit-lock-refontify))))
     (kill-buffer (process-buffer proc))))
 
 (defun dired-snacks--vc-schedule (buffer)
@@ -1892,7 +1884,7 @@ In the find buffer, the state is read for the whole search root."
                  :sentinel (lambda (proc _event)
                              (dired-snacks--vc-sentinel proc buffer root)))))
       (setq dired-snacks--vc-states nil)
-      (dired-snacks--vc-draw))))
+      (jit-lock-refontify))))
 
 (defun dired-snacks--vc-after-save ()
   "Refresh the Git marks of the Dired buffers in this file's repository."
@@ -1909,9 +1901,8 @@ In the find buffer, the state is read for the whole search root."
     (dired-snacks--vc-schedule (current-buffer))))
 
 (defun dired-snacks--vc-after-readin ()
-  "Draw the marks with the last known states, then read the states again.
+  "Read the Git states of the listing again.
 The find buffer keeps its states between searches."
-  (dired-snacks--vc-draw)
   (unless (and (eq (current-buffer) dired-snacks--find-buffer)
                dired-snacks--vc-states)
     (dired-snacks--vc-refresh)))
@@ -1920,10 +1911,12 @@ The find buffer keeps its states between searches."
   "Enable the Git marks in the current Dired buffer."
   (add-hook 'dired-after-readin-hook #'dired-snacks--vc-after-readin nil t)
   (add-hook 'window-selection-change-functions #'dired-snacks--vc-on-select nil t)
-  (add-hook 'kill-buffer-hook #'dired-snacks--vc-remove-watch nil t))
+  (add-hook 'kill-buffer-hook #'dired-snacks--vc-remove-watch nil t)
+  (jit-lock-register #'dired-snacks--vc-draw))
 
 (defun dired-snacks--vc-teardown ()
   "Disable the Git marks in the current Dired buffer."
+  (jit-lock-unregister #'dired-snacks--vc-draw)
   (remove-hook 'dired-after-readin-hook #'dired-snacks--vc-after-readin t)
   (remove-hook 'window-selection-change-functions #'dired-snacks--vc-on-select t)
   (remove-hook 'kill-buffer-hook #'dired-snacks--vc-remove-watch t)
@@ -2778,7 +2771,6 @@ This is a `jit-lock' function, so it only runs on the lines on display."
   (add-hook 'find-file-hook #'dired-snacks--zoxide-add-default-directory)
   (add-hook 'dired-mode-hook #'dired-snacks--zoxide-add-default-directory)
   (add-hook 'dired-mode-hook #'dired-snacks--setup)
-  (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--vc-draw)
   (add-hook 'after-save-hook #'dired-snacks--vc-after-save)
   (add-hook 'post-command-hook #'dired-snacks--isolate-panes)
   (add-hook 'post-command-hook #'dired-snacks--columns-refresh-stale)
@@ -2791,7 +2783,6 @@ This is a `jit-lock' function, so it only runs on the lines on display."
   (remove-hook 'find-file-hook #'dired-snacks--zoxide-add-default-directory)
   (remove-hook 'dired-mode-hook #'dired-snacks--zoxide-add-default-directory)
   (remove-hook 'dired-mode-hook #'dired-snacks--setup)
-  (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--vc-draw)
   (remove-hook 'after-save-hook #'dired-snacks--vc-after-save)
   (remove-hook 'post-command-hook #'dired-snacks--isolate-panes)
   (remove-hook 'post-command-hook #'dired-snacks--columns-refresh-stale)

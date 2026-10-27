@@ -2697,6 +2697,14 @@ describe the target."
   "Read the directory again after Wdired restores the old listing."
   (revert-buffer))
 
+(defun dired-snacks--wdired-advertise (fn &rest args)
+  "Call FN with ARGS, letting it change only this buffer in `dired-buffers'.
+Otherwise Wdired may remove another pane or add a find buffer."
+  (let ((others (rassq-delete-all (current-buffer) (copy-sequence dired-buffers))))
+    (apply fn args)
+    (when (or (eq major-mode 'wdired-mode) dired-snacks--find-root)
+      (setq dired-buffers others))))
+
 (defun dired-snacks--setup ()
   "Install the buffer-local features in the current Dired buffer."
   (dired-snacks--subtree-setup)
@@ -2735,6 +2743,8 @@ describe the target."
   (add-hook 'post-command-hook #'dired-snacks--subtree-prune-visible)
   (add-to-list 'display-buffer-alist dired-snacks--side-window-rule)
   (advice-add 'wdired-abort-changes :after #'dired-snacks--wdired-revert)
+  (advice-add 'wdired-change-to-wdired-mode :around #'dired-snacks--wdired-advertise)
+  (advice-add 'wdired-change-to-dired-mode :around #'dired-snacks--wdired-advertise)
   (dired-snacks--map-buffers #'dired-snacks--setup))
 
 (defun dired-snacks--disable ()
@@ -2748,6 +2758,8 @@ describe the target."
   (remove-hook 'post-command-hook #'dired-snacks--subtree-prune-visible)
   (setq display-buffer-alist (delete dired-snacks--side-window-rule display-buffer-alist))
   (advice-remove 'wdired-abort-changes #'dired-snacks--wdired-revert)
+  (advice-remove 'wdired-change-to-wdired-mode #'dired-snacks--wdired-advertise)
+  (advice-remove 'wdired-change-to-dired-mode #'dired-snacks--wdired-advertise)
   (dired-snacks--map-buffers #'dired-snacks--teardown))
 
 ;;;###autoload

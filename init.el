@@ -37,6 +37,7 @@
   (display-fill-column-indicator-warning nil)
   (warning-minimum-level :emergency)
   (server-client-instructions nil)
+  (initial-major-mode 'org-mode)
   (ring-bell-function 'ignore)
   (initial-scratch-message "")
   (inhibit-startup-message t)

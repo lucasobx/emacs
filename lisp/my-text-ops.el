@@ -137,60 +137,30 @@ OPEN and CLOSE are one-character strings."
 ;; ===============================================================
 ;;; SELECTION
 
-(defun my/select-bounds (bounds &optional backward)
-  "Select BOUNDS (START . END) with point at END, or at START if BACKWARD.
-Shifted motions extend the selection."
-  (when bounds
-    (set-mark (if backward (cdr bounds) (car bounds)))
-    (goto-char (if backward (car bounds) (cdr bounds)))
-    (activate-mark)
-    (setq-local shift-select-mode 'permanent)
-    (add-hook 'deactivate-mark-hook #'my/select--restore nil t)))
-
-(defun my/select--restore ()
-  "Restore normal shift selection after a region from `my/select-bounds'."
-  (kill-local-variable 'shift-select-mode)
-  (remove-hook 'deactivate-mark-hook #'my/select--restore t))
-
-;; select thing at point
-(defmacro my/define-select (name thing)
-  "Define NAME selecting THING at point as an active region."
-  `(defun ,name ()
-     ,(format "Select the %s at point." thing)
-     (interactive)
-     (my/select-bounds (bounds-of-thing-at-point ',thing))))
-
-(my/define-select my/select-word      word)
-(my/define-select my/select-symbol    symbol)
-(my/define-select my/select-paragraph paragraph)
-(my/define-select my/select-defun     defun)
-(my/define-select my/select-sexp      sexp)
+(defun my/line-content-bounds ()
+  "Return bounds (BEG . END) of the current line without surrounding blanks."
+  (save-excursion
+    (goto-char (pos-eol))
+    (skip-chars-backward " \t")
+    (let ((end (point)))
+      (goto-char (pos-bol))
+      (skip-chars-forward " \t" end)
+      (cons (point) end))))
 
 (defun my/select-line ()
   "Select the current line without its leading and trailing blanks."
   (interactive)
-  (let ((end (save-excursion
-               (goto-char (pos-eol))
-               (skip-chars-backward " \t")
-               (point))))
-    (my/select-bounds (cons (save-excursion
-                              (goto-char (pos-bol))
-                              (skip-chars-forward " \t" end)
-                              (point))
-                            end))))
+  (let ((bounds (my/line-content-bounds)))
+    (set-mark (car bounds))
+    (goto-char (cdr bounds))
+    (activate-mark)
+    (setq-local shift-select-mode 'permanent)
+    (add-hook 'deactivate-mark-hook #'my/select-line--restore nil t)))
 
-;; select content inside delimiters
-(defmacro my/define-select-inside (name bounds-fn)
-  "Define NAME selecting the region returned by BOUNDS-FN."
-  `(defun ,name ()
-     ,(format "Select the content inside the nearest %s at point."
-              (substring (symbol-name bounds-fn) (length "my/inside-")))
-     (interactive)
-     (my/select-bounds (,bounds-fn))))
-
-(my/define-select-inside my/select-inside-parens   my/inside-parens)
-(my/define-select-inside my/select-inside-brackets my/inside-brackets)
-(my/define-select-inside my/select-inside-braces   my/inside-braces)
+(defun my/select-line--restore ()
+  "Restore normal shift selection after `my/select-line'."
+  (kill-local-variable 'shift-select-mode)
+  (remove-hook 'deactivate-mark-hook #'my/select-line--restore t))
 
 ;; ===============================================================
 ;;; WRAPPING
@@ -329,9 +299,13 @@ Shifted motions extend the selection."
 ;;; COPY COMMANDS
 
 (defun my/copy-line ()
-  "Copy line at point with visual feedback."
+  "Copy the current line without its leading and trailing blanks."
   (interactive)
-  (my/copy-thing 'line))
+  (let ((bounds (my/line-content-bounds)))
+    (when (< (car bounds) (cdr bounds))
+      (pulse-momentary-highlight-region (car bounds) (cdr bounds))
+      (kill-ring-save (car bounds) (cdr bounds))
+      (message "Copied line"))))
 
 (defun my/copy-all ()
   "Copy the entire buffer content to the kill ring with visual feedback."
@@ -406,11 +380,6 @@ A negative N counts lines above it instead."
     (sit-for 0.05)
     (comment-or-uncomment-region (car bounds) (cdr bounds))))
 
-(defun my/select-lines (n)
-  "Select the current line plus N lines below it.
-A negative N counts lines above it instead."
-  (my/select-bounds (my/line-block-bounds n) (< n 0)))
-
 (defmacro my/define-line-counts (helper)
   "Define commands HELPER-1 .. HELPER-9 and HELPER-up-1 .. HELPER-up-9.
 They call HELPER with N or -N, for N lines below or above the current one."
@@ -432,7 +401,6 @@ They call HELPER with N or -N, for N lines below or above the current one."
 (my/define-line-counts my/delete-lines)
 (my/define-line-counts my/copy-lines)
 (my/define-line-counts my/comment-lines)
-(my/define-line-counts my/select-lines)
 
 (provide 'my-text-ops)
 ;;; my-text-ops.el ends here

@@ -211,11 +211,13 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
 (my/bind
   '("C-v"           yank)
   '("C-<backspace>" my/backward-delete)
+  '("M-a"           my/select-line)
   '("M-u"           upcase-dwim)
   '("M-c"           capitalize-dwim)
   '("M-<up>"        my/move-text-up)
   '("M-<down>"      my/move-text-down)
   '("C-<m>"         rectangle-mark-mode)
+  '("C-a"           mark-whole-buffer)
   '("C-0"           my/wrap-parens)
   '("C-]"           my/wrap-brackets))
 
@@ -277,32 +279,22 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   '(";" my/toggle-comment-line      "line")
   '("." my/toggle-comment-all       "all"))
 
-(my/bind-prefix "C-q" "select"
-  '("p" my/select-paragraph     "paragraph")
-  '("q" my/select-line          "line")
-  '("s" my/select-symbol        "symbol")
-  '("0" my/select-inside-parens "inside ()")
-  '("." mark-whole-buffer       "all"))
-
-;; line-block counts (1-9): delete/copy/comment/select, below or above (<up> N)
+;; line-block counts (1-9): delete/copy/comment, below or above (<up> N)
 (dotimes (i 9)
   (let ((n (1+ i)))
     (pcase-dolist (`(,key ,name) '(("" "") ("<up> " "up-")))
       (my/bind
         (list (format "C-; %s%d" key n)
               (intern (format "my/comment-lines-%s%d" name n))))
-      (my/bind
-        (list (format "C-q %s%d" key n)
-              (intern (format "my/select-lines-%s%d" name n))))
       (my/bind-sub my/delete-map "C-d"
         (list (format "%s%d" key n)
               (intern (format "my/delete-lines-%s%d" name n))))
       (my/bind-sub my/copy-map "C-y"
         (list (format "%s%d" key n)
               (intern (format "my/copy-lines-%s%d" name n)))))))
-(push '(("\\`C-[;qdy] \\(?:<up>\\|\\(?:<up> \\)?[1-9]\\)\\'" . nil) . t)
+(push '(("\\`C-[;dy] \\(?:<up>\\|\\(?:<up> \\)?[1-9]\\)\\'" . nil) . t)
       which-key-replacement-alist)
-(push "\\`C-[;qdy] <up>\\'" which-key-inhibit-regexps)
+(push "\\`C-[;dy] <up>\\'" which-key-inhibit-regexps)
 
 (my/bind-prefix "C-." "cursors"
   '("m" mc/mark-all-in-region      "mark matches in region")

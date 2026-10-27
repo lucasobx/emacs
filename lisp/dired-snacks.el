@@ -1949,18 +1949,20 @@ keeps its header line."
 
 (defun dired-snacks--breadcrumb ()
   "Return a breadcrumb for the directory at point, or nil."
-  (when (derived-mode-p 'dired-mode)
-    (let* ((dir (or (dired-snacks--directory-at-point) default-directory))
-           (height dired-snacks-breadcrumb-height)
+  (when (derived-mode-p '(dired-mode wdired-mode))
+    (let* ((height dired-snacks-breadcrumb-height)
            (sep (propertize (dired-snacks--breadcrumb-quote
                              dired-snacks-breadcrumb-separator)
                             'face `(:inherit shadow :height ,height))))
       (concat (dired-snacks--breadcrumb-quote dired-snacks-breadcrumb-margin)
-              (mapconcat (lambda (s)
-                           (propertize (dired-snacks--breadcrumb-quote s)
-                                       'face `(:inherit dired-header :height ,height)))
-                         (dired-snacks--breadcrumb-segments dir)
-                         sep)
+              (if (derived-mode-p 'wdired-mode)
+                  (propertize "Editing file names" 'face `(:inherit warning :height ,height))
+                (mapconcat (lambda (s)
+                             (propertize (dired-snacks--breadcrumb-quote s)
+                                         'face `(:inherit dired-header :height ,height)))
+                           (dired-snacks--breadcrumb-segments
+                            (or (dired-snacks--directory-at-point) default-directory))
+                           sep))
               (when (plusp dired-snacks-breadcrumb-spacing)
                 (propertize " " 'display
                             `(raise ,(- dired-snacks-breadcrumb-spacing))))

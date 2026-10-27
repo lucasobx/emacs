@@ -656,6 +656,7 @@
   (org-catch-invisible-edits 'show-and-error)
   (org-agenda-files '("~/Documents/org"))
   (org-insert-heading-respect-content t)
+  (org-support-shift-select 'always)
   (org-cycle-hide-drawer-startup t)
   (org-return-follows-link t)
   (org-hide-leading-stars t)

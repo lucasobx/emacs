@@ -396,7 +396,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
     ("C-l e" consult-flycheck "list errors")))
 
 (with-eval-after-load 'org
-  (dolist (key '("M-<left>" "M-<right>"))
+  (dolist (key '("M-<left>" "M-<right>" "C-S-<up>" "C-S-<down>"))
     (keymap-unset org-mode-map key t))
   (my/bind-local org-mode-map
     ("C-c t" org-hide-drawers-toggle "toggle drawers")))

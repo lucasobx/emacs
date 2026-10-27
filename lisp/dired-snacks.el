@@ -743,9 +743,6 @@ point moves to that entry."
   (when (buffer-live-p dired-snacks--find-buffer)
     (with-current-buffer dired-snacks--find-buffer
       (let ((inhibit-read-only t))
-        (widen)
-        (remove-overlays nil nil 'dired-snacks--find-icon t)
-        (remove-overlays nil nil 'dired-snacks--find-match t)
         (erase-buffer)
         (setq-local default-directory (file-name-as-directory root))
         (cond

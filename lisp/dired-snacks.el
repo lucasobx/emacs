@@ -73,12 +73,10 @@
 (declare-function file-notify-valid-p "filenotify")
 (declare-function hl-line-unhighlight "hl-line")
 
-(declare-function nerd-icons-dired--refresh "nerd-icons-dired")
-(declare-function nerd-icons-dired-mode "nerd-icons-dired")
-(defvar nerd-icons-dired-dir-icon-function)
-(defvar nerd-icons-dired-infix-string)
-(defvar nerd-icons-dired-icon-size)
-(defvar nerd-icons-dired-mode)
+(declare-function nerd-icons-match-to-alist "nerd-icons")
+(declare-function nerd-icons-icon-for-file "nerd-icons")
+(declare-function nerd-icons-icon-for-dir "nerd-icons")
+(defvar nerd-icons-dir-icon-alist)
 
 (defgroup dired-snacks nil
   "Small Dired enhancements."
@@ -663,16 +661,13 @@ no file name."
 
 (defun dired-snacks--find-icon-header (dir)
   "Add a folder icon for DIR to the header line."
-  (when (bound-and-true-p nerd-icons-dired-mode)
+  (when (memq #'dired-snacks--icons-draw jit-lock-functions)
     (save-excursion
       (goto-char (point-min))
       (skip-chars-forward " \t")
-      (let* ((pos  (point))
-             (icon (funcall nerd-icons-dired-dir-icon-function
-                            dir :height nerd-icons-dired-icon-size
-                            :face 'dired-directory))
-             (str  (concat icon nerd-icons-dired-infix-string))
-             (ov   (make-overlay pos (1+ pos))))
+      (let* ((pos (point))
+             (str (concat (dired-snacks--dir-icon dir :face 'dired-directory) "\t"))
+             (ov  (make-overlay pos (1+ pos))))
         (overlay-put ov 'dired-snacks--find-icon t)
         (overlay-put ov 'evaporate t)
         (overlay-put ov 'before-string (propertize str 'display str))))))
@@ -1726,11 +1721,6 @@ file.  Reverting the buffer collapses every subtree."
   (remove-overlays nil nil 'dired-snacks--subtree-indicator t)
   (remove-from-invisibility-spec 'dired-snacks--subtree-hidden))
 
-(defun dired-snacks--subtree-refresh-icons ()
-  "Redraw file icons after a subtree change, when `nerd-icons-dired' is on."
-  (when (bound-and-true-p nerd-icons-dired-mode)
-    (nerd-icons-dired--refresh)))
-
 ;; ===============================================================
 ;;; vc
 
@@ -2679,6 +2669,62 @@ This is a `jit-lock' function, so it only runs on the lines on display."
   (setq dired-snacks--columns-highlighted nil))
 
 ;; ===============================================================
+;;; icons
+
+(defcustom dired-snacks-icons t
+  "When non-nil, show a nerd-icons icon before each file name."
+  :type 'boolean)
+
+(defun dired-snacks--dir-icon (dir &rest args)
+  "Return the icon matching the name of DIR, with icon properties ARGS."
+  (pcase-let ((`(,icon ,name . ,props)
+               (nerd-icons-match-to-alist (file-name-base (directory-file-name dir))
+                                          nerd-icons-dir-icon-alist)))
+    (apply icon name (append args props))))
+
+(defun dired-snacks--icon (file)
+  "Return the icon for FILE on the current line."
+  (save-excursion
+    (beginning-of-line)
+    (cond ((looking-at-p dired-re-dir) (dired-snacks--dir-icon file))
+          ((and (looking-at-p dired-re-sym) (file-directory-p file))
+           (nerd-icons-icon-for-dir file))
+          (t (nerd-icons-icon-for-file file)))))
+
+(defun dired-snacks--icons-draw (beg end)
+  "Add icons to the files between BEG and END."
+  (save-excursion
+    (setq beg (progn (goto-char beg) (pos-bol))
+          end (progn (goto-char end) (min (1+ (pos-eol)) (point-max))))
+    (remove-overlays beg end 'dired-snacks--icon t)
+    (goto-char beg)
+    (while (< (point) end)
+      (when-let* ((file (dired-get-filename nil t))
+                  (pos (dired-move-to-filename)))
+        (let ((text (if (member (file-name-nondirectory file) '("." ".."))
+                        "  \t"
+                      (concat (dired-snacks--icon file) "\t")))
+              (ov (make-overlay (1- pos) pos)))
+          (overlay-put ov 'dired-snacks--icon t)
+          (overlay-put ov 'evaporate t)
+          (overlay-put ov 'after-string (propertize text 'display text))))
+      (forward-line 1))
+    `(jit-lock-bounds ,beg . ,end)))
+
+(defun dired-snacks--icons-setup ()
+  "Set up the file icons in the current Dired buffer."
+  (when (and dired-snacks-icons (require 'nerd-icons nil t))
+    (setq-local tab-width 1)
+    (jit-lock-register #'dired-snacks--icons-draw)
+    (jit-lock-refontify)))
+
+(defun dired-snacks--icons-teardown ()
+  "Remove the file icons from the current Dired buffer."
+  (jit-lock-unregister #'dired-snacks--icons-draw)
+  (remove-overlays nil nil 'dired-snacks--icon t)
+  (kill-local-variable 'tab-width))
+
+;; ===============================================================
 ;;; last-file
 
 (defun dired-snacks--stay-on-last-file ()
@@ -2700,6 +2746,7 @@ This is a `jit-lock' function, so it only runs on the lines on display."
   (dired-snacks--subtree-setup)
   (dired-snacks--vc-setup)
   (dired-snacks--columns-setup)
+  (dired-snacks--icons-setup)
   (dired-snacks--breadcrumb-setup)
   (dired-snacks--subtree-draw-indicators (point-min) (point-max))
   (dired-snacks--breadcrumb-decorate)
@@ -2715,6 +2762,7 @@ This is a `jit-lock' function, so it only runs on the lines on display."
   (dired-snacks--subtree-teardown)
   (dired-snacks--vc-teardown)
   (dired-snacks--columns-teardown)
+  (dired-snacks--icons-teardown)
   (dired-snacks--breadcrumb-teardown)
   (dired-snacks--mode-line-teardown)
   (remove-hook 'post-command-hook #'dired-snacks--stay-on-last-file t)
@@ -2726,7 +2774,6 @@ This is a `jit-lock' function, so it only runs on the lines on display."
   (add-hook 'find-file-hook #'dired-snacks--zoxide-add-default-directory)
   (add-hook 'dired-mode-hook #'dired-snacks--zoxide-add-default-directory)
   (add-hook 'dired-mode-hook #'dired-snacks--setup)
-  (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (add-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--vc-draw)
   (add-hook 'after-save-hook #'dired-snacks--vc-after-save)
   (add-hook 'post-command-hook #'dired-snacks--isolate-panes)
@@ -2740,7 +2787,6 @@ This is a `jit-lock' function, so it only runs on the lines on display."
   (remove-hook 'find-file-hook #'dired-snacks--zoxide-add-default-directory)
   (remove-hook 'dired-mode-hook #'dired-snacks--zoxide-add-default-directory)
   (remove-hook 'dired-mode-hook #'dired-snacks--setup)
-  (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--subtree-refresh-icons)
   (remove-hook 'dired-snacks-subtree-after-change-hook #'dired-snacks--vc-draw)
   (remove-hook 'after-save-hook #'dired-snacks--vc-after-save)
   (remove-hook 'post-command-hook #'dired-snacks--isolate-panes)

@@ -15,6 +15,7 @@
 (defvar magit-status-mode-map)
 (defvar consult-buffer-filter)
 (defvar ruby-ts-mode-map)
+(defvar wdired-mode-map)
 (defvar eglot-mode-map)
 (defvar dired-mode-map)
 (defvar transient-map)
@@ -369,6 +370,10 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
     ("M-l"            dired-snacks-paste-symlink)
     ("M-q"            dired-snacks-paste-cancel)
     ("M-y"            dired-snacks-copy-file-uri)))
+
+(with-eval-after-load 'wdired
+  (my/bind-local wdired-mode-map
+    ("<escape>" wdired-abort-changes)))
 
 (with-eval-after-load 'completion-preview
   (my/bind-local completion-preview-active-mode-map

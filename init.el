@@ -734,11 +734,8 @@
   (require 'filenotify)
   (defvar my/diff-hl--watches (make-hash-table :test #'equal)
     "Watches on Git directories, keyed by repository root.")
-  (defvar my/diff-hl--timers (make-hash-table :test #'equal)
-    "Pending updates, keyed by repository root.")
   (defun my/diff-hl--update (root)
     "Update the diff-hl indicators of the unmodified buffers under ROOT."
-    (remhash root my/diff-hl--timers)
     (dolist (buffer (buffer-list))
       (with-current-buffer buffer
         (when (and diff-hl-mode
@@ -747,27 +744,24 @@
                    (file-in-directory-p buffer-file-name root))
           (vc-refresh-state)
           (diff-hl-update)))))
-  (defun my/diff-hl--schedule (root)
-    "Update the diff-hl buffers under ROOT once Git has been idle briefly."
-    (when-let* ((timer (gethash root my/diff-hl--timers)))
-      (cancel-timer timer))
-    (puthash root (run-with-timer 0.2 nil #'my/diff-hl--update root)
-             my/diff-hl--timers))
   (defun my/diff-hl--watch ()
     "Watch the Git directory of the repository of this buffer's file."
     (when-let* ((file buffer-file-name)
                 (_ (not (file-remote-p file)))
-                (found (locate-dominating-file file ".git"))
-                (root (expand-file-name found))
+                (root (locate-dominating-file file ".git"))
                 (_ (not (file-notify-valid-p (gethash root my/diff-hl--watches))))
                 (git-dir (let ((default-directory root))
                            (car (ignore-errors
                                   (process-lines "git" "rev-parse" "--absolute-git-dir"))))))
-      (puthash root
-               (ignore-error file-notify-error
-                 (file-notify-add-watch git-dir '(change)
-                                        (lambda (_event) (my/diff-hl--schedule root))))
-               my/diff-hl--watches)))
+      (let (timer)
+        (puthash root
+                 (ignore-error file-notify-error
+                   (file-notify-add-watch
+                    git-dir '(change)
+                    (lambda (_event)
+                      (when timer (cancel-timer timer))
+                      (setq timer (run-with-timer 0.2 nil #'my/diff-hl--update root)))))
+                 my/diff-hl--watches))))
   (add-hook 'diff-hl-mode-on-hook #'my/diff-hl--watch)
   (global-diff-hl-mode 1))
 

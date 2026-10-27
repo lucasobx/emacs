@@ -1474,12 +1474,18 @@ directory whose subtree is open.  Files get blanks of the same width."
 (defvar-local dired-snacks--subtree-overlays nil
   "Overlays of the subtrees expanded in this buffer.")
 
+(defun dired-snacks--subtree-overlay-at (pos)
+  "Return the overlay of the deepest subtree at POS, or nil."
+  (car (sort (seq-filter (lambda (ov) (overlay-get ov 'dired-snacks--subtree))
+                         (overlays-at pos))
+             :key (lambda (ov) (overlay-get ov 'dired-snacks--subtree))
+             :reverse t)))
+
 (defun dired-snacks--subtree-depth-at (pos)
-  "Return the depth of the innermost subtree covering POS, or 0 if none."
-  (let ((depth 0))
-    (dolist (ov (overlays-at pos) depth)
-      (let ((d (overlay-get ov 'dired-snacks--subtree)))
-        (when (and d (> d depth)) (setq depth d))))))
+  "Return the depth of the deepest subtree at POS, or 0 outside subtrees."
+  (if-let* ((ov (dired-snacks--subtree-overlay-at pos)))
+      (overlay-get ov 'dired-snacks--subtree)
+    0))
 
 (defun dired-snacks--subtree-child-overlay ()
   "Return the overlay of the subtree expanded under the current line, or nil."
@@ -1613,16 +1619,21 @@ Each level is two columns wide, with a line under the parent's indicator."
   "Expand the directory at point as an inline subtree, or collapse it.
 
 The subtree lists the contents of the directory below its line, indented
-one level and marked with `dired-snacks-subtree-indicators'.  Subtrees
-can be nested, and Dired commands act on their files as on any other
-file.  Reverting the buffer collapses every subtree."
+one level.  The strings in `dired-snacks-subtree-indicators' show which
+directories are expanded.  Subtrees can be nested, and Dired commands
+also act on the files inside them.  On a file inside a subtree, the
+command collapses that subtree and moves point to its directory.
+Reverting the buffer collapses every subtree."
   (interactive)
   (cond*
-   ((not (dired-snacks--subtree-directory-p))
-    (user-error "No directory to expand on this line"))
-   ((bind-and* (ov (dired-snacks--subtree-child-overlay)))
+   ((dired-snacks--subtree-directory-p)
+    (if-let* ((ov (dired-snacks--subtree-child-overlay)))
+        (dired-snacks--subtree-remove ov)
+      (dired-snacks--subtree-insert)))
+   ((bind-and* (ov (dired-snacks--subtree-overlay-at (point))))
+    (goto-char (overlay-get ov 'dired-snacks--subtree-parent))
     (dired-snacks--subtree-remove ov))
-   (t (dired-snacks--subtree-insert))))
+   (t (user-error "No directory to expand on this line"))))
 
 (defun dired-snacks--subtree-reset ()
   "Collapse every tracked subtree."

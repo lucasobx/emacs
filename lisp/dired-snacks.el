@@ -1264,8 +1264,8 @@ The -T option makes TO the exact target, even when TO is a directory."
 
 (defun dired-snacks--paste-jobs (op dir)
   "Return the jobs for pasting the clipped files into DIR with OP.
-Each job is (FROM TO BACKUP), where BACKUP is non-nil if the existing
-TO should be backed up first.  A file pasted into its own directory gets
+Each job is (FROM TO BACKUP), where BACKUP is non-nil if the replaced
+TO should be kept as a backup.  A file pasted into its own directory gets
 a numbered TO, and the user is asked before an existing TO is replaced."
   (let ((dired-snacks--paste-query nil)
         (dired-snacks--paste-backup-query nil))
@@ -1326,35 +1326,36 @@ Failures and cancelled moves are summarized in the Dired log."
      (t
       (message "%s: %d file%s done" label total plural)))))
 
-(defun dired-snacks--paste-restore (to backup)
-  "Move BACKUP back to TO, unless something took its place."
-  (when backup
+(defun dired-snacks--paste-restore (to old)
+  "Move OLD back to TO, unless something took its place."
+  (when old
     (if (or (file-exists-p to) (file-symlink-p to))
-        (dired-log "Kept the old `%s' as `%s'\n" to backup)
-      (rename-file backup to)
-      (dired-remove-file backup)
+        (dired-log "Kept the old `%s' as `%s'\n" to old)
+      (rename-file old to)
+      (dired-remove-file old)
       (dired-relist-file to))))
 
-(defun dired-snacks--paste-discard (op from to new backup)
-  "Clean up the interrupted job of OP from FROM to TO, using NEW and BACKUP.
-NEW is non-nil if TO did not exist before the job, and BACKUP is the
-name the old TO was moved to, or nil.  A partial copy is deleted, while
-an interrupted move is only logged."
+(defun dired-snacks--paste-delete (file)
+  "Delete FILE and remove it from the Dired buffers."
+  (if (and (file-directory-p file) (not (file-symlink-p file)))
+      (delete-directory file t)
+    (delete-file file))
+  (dired-remove-file file))
+
+(defun dired-snacks--paste-discard (op from to old)
+  "Clean up the interrupted job of OP from FROM to TO, then put OLD back.
+OLD is the name the replaced TO was moved to, or nil."
   (pcase op
     ('copy
-     (when (or new backup)
-       (if (and (file-directory-p to) (not (file-symlink-p to)))
-           (delete-directory to t)
-         (delete-file to))
-       (dired-remove-file to)))
+     (dired-snacks--paste-delete to))
     ('move
      (dired-log "Move `%s' to `%s' was interrupted, check both\n" from to)))
-  (dired-snacks--paste-restore to backup))
+  (dired-snacks--paste-restore to old))
 
-(defun dired-snacks--paste-sentinel (proc event task new backup)
+(defun dired-snacks--paste-sentinel (proc event task old keep)
   "Record how PROC, the first job of TASK, ended with EVENT, then go on.
-The next job starts afterwards.  NEW and BACKUP are as in
-`dired-snacks--paste-discard'."
+The next job starts afterwards.  OLD is the name the replaced target was
+moved to, or nil, and KEEP is non-nil if OLD stays as a backup."
   (unless (process-live-p proc)
     (pcase-let ((`(,from ,to) (car (dired-snacks--paste-task-jobs task)))
                 (op (dired-snacks--paste-task-op task))
@@ -1365,28 +1366,35 @@ The next job starts afterwards.  NEW and BACKUP are as in
           (progn
             (setf (dired-snacks--paste-task-cancelled task) t)
             (with-demoted-errors "dired-snacks: %S"
-              (dired-snacks--paste-discard op from to new backup)))
+              (dired-snacks--paste-discard op from to old)))
         (pop (dired-snacks--paste-task-jobs task))
         (if (zerop (process-exit-status proc))
             (with-demoted-errors "dired-snacks: %S"
-              (dired-snacks--paste-update op from to))
+              (dired-snacks--paste-update op from to)
+              (when (and old (not keep))
+                (dired-snacks--paste-delete old)))
           (push from (dired-snacks--paste-task-failures task))
           (dired-log "%s `%s' to `%s' failed (%s):\n%s\n"
                      (dired-snacks--paste-label op) from to (string-trim event) output)
           (with-demoted-errors "dired-snacks: %S"
-            (dired-snacks--paste-restore to backup))))
+            (when (and old (eq op 'copy))
+              (dired-snacks--paste-delete to))
+            (dired-snacks--paste-restore to old))))
       (dired-snacks--paste-next task))))
 
 (defun dired-snacks--paste-start (task job)
   "Start JOB of TASK and return its process.
-When JOB asks for a backup, the existing target is first renamed to its
-backup name."
-  (pcase-let* ((`(,from ,to ,backup) job)
-               (new (not (or (file-exists-p to) (file-symlink-p to))))
-               (backup (and backup (not new) (car (find-backup-file-name to)))))
-    (when backup
-      (rename-file to backup t)
-      (dired-relist-file backup))
+An existing target is first moved aside, so that the job replaces it
+instead of merging into it."
+  (pcase-let* ((`(,from ,to ,keep) job)
+               (old (cond ((not (or (file-exists-p to) (file-symlink-p to))) nil)
+                          (keep (car (find-backup-file-name to)))
+                          (t (make-temp-name (concat (file-name-directory to) "."
+                                                     (file-name-nondirectory to) "-"))))))
+    (when old
+      (rename-file to old t)
+      (when keep
+        (dired-relist-file old)))
     (let ((default-directory "/"))
       (make-process
        :name "dired-snacks-paste"
@@ -1394,7 +1402,7 @@ backup name."
        :command (dired-snacks--paste-command (dired-snacks--paste-task-op task) from to)
        :connection-type 'pipe
        :sentinel (lambda (proc event)
-                   (dired-snacks--paste-sentinel proc event task new backup))))))
+                   (dired-snacks--paste-sentinel proc event task old keep))))))
 
 (defun dired-snacks--paste-next (task)
   "Start the next job of TASK, or report on TASK when none is left."
@@ -1441,10 +1449,10 @@ supported."
 The copies run in the background with cp -a, one file at a time, and
 the mode line shows their progress.  A file pasted into its own
 directory gets a numbered name, as with `dired-snacks-duplicate'.  When
-a file with the same name exists, ask before replacing it, and back it
-up first if `dired-backup-overwrite' says so.  The clipped files are
-forgotten once the paste starts.  `dired-snacks-paste-cancel' stops the
-copies."
+a file or directory with the same name exists, ask before replacing it,
+and keep it as a backup if `dired-backup-overwrite' says so.  The
+clipped files are forgotten once the paste starts.
+`dired-snacks-paste-cancel' stops the copies."
   (interactive nil dired-mode)
   (dired-snacks--paste 'copy))
 
@@ -1489,9 +1497,9 @@ This works like `dired-snacks-paste', with ln instead of cp."
 (defun dired-snacks-paste-cancel ()
   "Cancel the pastes running in the background.
 
-The file being pasted when the paste stops is deleted, and a replaced
-file is restored from its backup.  An interrupted move is only logged,
-because the file may be split between both places."
+The file being pasted when the paste stops is deleted, and the file it
+was replacing is put back.  An interrupted move is only logged, because
+the file may be split between both places."
   (interactive)
   (unless dired-snacks--paste-tasks
     (user-error "No paste is running"))

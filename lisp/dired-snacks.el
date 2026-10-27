@@ -1553,9 +1553,11 @@ Each level is two columns wide, with a line under the parent's indicator."
 
 (defun dired-snacks--subtree-draw-indicators (beg end)
   "Draw the subtree indicators on the lines between BEG and END."
-  (remove-overlays beg end 'dired-snacks--subtree-indicator t)
-  (let ((blank (make-string (string-width (car dired-snacks-subtree-indicators)) ?\s)))
-    (save-excursion
+  (save-excursion
+    (setq beg (progn (goto-char beg) (pos-bol))
+          end (progn (goto-char end) (min (1+ (pos-eol)) (point-max))))
+    (remove-overlays beg end 'dired-snacks--subtree-indicator t)
+    (let ((blank (make-string (string-width (car dired-snacks-subtree-indicators)) ?\s)))
       (goto-char beg)
       (while (< (point) end)
         (when-let* ((pos (dired-move-to-filename)))
@@ -1567,7 +1569,8 @@ Each level is two columns wide, with a line under the parent's indicator."
             (overlay-put ov 'dired-snacks--subtree-indicator t)
             (overlay-put ov 'evaporate t)
             (overlay-put ov 'display (propertize indicator 'face 'dired-snacks-subtree-indicator))))
-        (forward-line 1)))))
+        (forward-line 1)))
+    `(jit-lock-bounds ,beg . ,end)))
 
 (defun dired-snacks--subtree-absolutize (beg end dir)
   "Make the file names between BEG and END absolute under DIR.
@@ -1626,7 +1629,7 @@ leaves out the hidden files that `dired-snacks-find-show-hidden' hides."
           (overlay-put ov 'line-prefix prefix)
           (overlay-put ov 'evaporate t)
           (push ov dired-snacks--subtree-overlays))
-        (dired-snacks--subtree-draw-indicators parent end)
+        (jit-lock-refontify parent beg)
         (set-marker end nil)))
     (run-hooks 'dired-snacks-subtree-after-change-hook)
     (dired-move-to-filename)))
@@ -1643,7 +1646,7 @@ leaves out the hidden files that `dired-snacks-find-show-hidden' hides."
         (setq dired-snacks--subtree-overlays (delq o dired-snacks--subtree-overlays))
         (delete-overlay o)))
     (delete-region beg end))
-  (dired-snacks--subtree-draw-indicators (pos-bol) (pos-eol))
+  (jit-lock-refontify (pos-bol) (pos-eol))
   (run-hooks 'dired-snacks-subtree-after-change-hook)
   (dired-move-to-filename))
 
@@ -1703,20 +1706,22 @@ file.  Reverting the buffer collapses every subtree."
                   'no-minibuf 'visible)))
 
 (defun dired-snacks--subtree-after-readin ()
-  "Collapse every subtree on a full readin, then draw the indicators."
+  "Collapse every subtree on a full readin."
   (unless (buffer-narrowed-p)
-    (dired-snacks--subtree-reset))
-  (dired-snacks--subtree-draw-indicators (point-min) (point-max)))
+    (dired-snacks--subtree-reset)))
 
 (defun dired-snacks--subtree-setup ()
   "Enable inline subtrees in the current Dired buffer."
   (remove-from-invisibility-spec 'dired-snacks--subtree-hidden)
   (add-to-invisibility-spec 'dired-snacks--subtree-hidden)
-  (add-hook 'dired-after-readin-hook #'dired-snacks--subtree-after-readin nil t))
+  (add-hook 'dired-after-readin-hook #'dired-snacks--subtree-after-readin nil t)
+  (jit-lock-register #'dired-snacks--subtree-draw-indicators)
+  (jit-lock-refontify))
 
 (defun dired-snacks--subtree-teardown ()
   "Disable inline subtrees in the current Dired buffer."
   (remove-hook 'dired-after-readin-hook #'dired-snacks--subtree-after-readin t)
+  (jit-lock-unregister #'dired-snacks--subtree-draw-indicators)
   (dired-snacks--subtree-reset)
   (remove-overlays nil nil 'dired-snacks--subtree-indicator t)
   (remove-from-invisibility-spec 'dired-snacks--subtree-hidden))
@@ -2748,7 +2753,6 @@ This is a `jit-lock' function, so it only runs on the lines on display."
   (dired-snacks--columns-setup)
   (dired-snacks--icons-setup)
   (dired-snacks--breadcrumb-setup)
-  (dired-snacks--subtree-draw-indicators (point-min) (point-max))
   (dired-snacks--breadcrumb-decorate)
   (unless (zerop (buffer-size))
     (dired-snacks--vc-refresh))

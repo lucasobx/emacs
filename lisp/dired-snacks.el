@@ -2697,6 +2697,10 @@ describe the target."
 ;; ===============================================================
 ;;; minor mode
 
+(defun dired-snacks--wdired-revert ()
+  "Read the directory again after Wdired restores the old listing."
+  (revert-buffer))
+
 (defun dired-snacks--setup ()
   "Install the buffer-local features in the current Dired buffer."
   (dired-snacks--subtree-setup)
@@ -2734,6 +2738,7 @@ describe the target."
   (add-hook 'post-command-hook #'dired-snacks--columns-refresh-stale)
   (add-hook 'post-command-hook #'dired-snacks--subtree-prune-visible)
   (add-to-list 'display-buffer-alist dired-snacks--side-window-rule)
+  (advice-add 'wdired-abort-changes :after #'dired-snacks--wdired-revert)
   (dired-snacks--map-buffers #'dired-snacks--setup))
 
 (defun dired-snacks--disable ()
@@ -2746,6 +2751,7 @@ describe the target."
   (remove-hook 'post-command-hook #'dired-snacks--columns-refresh-stale)
   (remove-hook 'post-command-hook #'dired-snacks--subtree-prune-visible)
   (setq display-buffer-alist (delete dired-snacks--side-window-rule display-buffer-alist))
+  (advice-remove 'wdired-abort-changes #'dired-snacks--wdired-revert)
   (dired-snacks--map-buffers #'dired-snacks--teardown))
 
 ;;;###autoload

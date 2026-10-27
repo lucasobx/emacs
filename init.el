@@ -263,23 +263,6 @@
   :custom
   (nerd-icons-scale-factor 1.0))
 
-(use-package nerd-icons-dired
-  :ensure t
-  :hook
-  (dired-mode . nerd-icons-dired-mode)
-  :custom
-  (nerd-icons-dired-dir-icon-function #'my/nerd-icons-dir-icon)
-  :config
-  (defun my/nerd-icons-dir-icon (dir &rest args)
-    "Return the icon of DIR, ignoring whether it is a Git repository."
-    (if (file-symlink-p dir)
-        (apply #'nerd-icons-icon-for-dir dir args)
-      (pcase-let ((`(,icon ,name . ,props)
-                   (nerd-icons-match-to-alist
-                    (file-name-base (directory-file-name dir))
-                    nerd-icons-dir-icon-alist)))
-        (apply icon name (append args props))))))
-
 (use-package nerd-icons-ibuffer
   :ensure t
   :hook

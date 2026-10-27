@@ -465,6 +465,8 @@
   :config
   (setq icomplete-scroll t)
   (keymap-set icomplete-minibuffer-map "RET" #'icomplete-force-complete-and-exit)
+  (keymap-set icomplete-minibuffer-map "SPC" #'self-insert-command)
+  (keymap-set icomplete-minibuffer-map "?" #'self-insert-command)
   (icomplete-vertical-mode 1))
 
 (use-package orderless

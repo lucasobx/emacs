@@ -60,7 +60,9 @@
       '((horizontal-scroll-bars . nil)
         (vertical-scroll-bars . nil)
         (menu-bar-lines . 0)
-        (tool-bar-lines . 0)))
+        (tool-bar-lines . 0)
+        (right-fringe . 4)
+        (left-fringe . 4)))
 
 ;; package.el + quickstart
 (setq package-enable-at-startup t

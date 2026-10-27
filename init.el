@@ -364,7 +364,6 @@
   (dired-no-confirm '(delete))
   (dired-auto-revert-buffer t)
   (dired-backup-overwrite t)
-  (hl-line-sticky-flag nil)
   (dired-omit-files "^\\.")
   (dired-omit-verbose nil)
   (dired-dwim-target t)

@@ -71,6 +71,7 @@
 (declare-function file-notify-add-watch "filenotify")
 (declare-function file-notify-rm-watch "filenotify")
 (declare-function file-notify-valid-p "filenotify")
+(declare-function hl-line-unhighlight "hl-line")
 (declare-function transient-parse-suffixes "transient")
 (declare-function transient-setup "transient")
 (declare-function transient-prefix "transient")
@@ -2190,6 +2191,18 @@ marks."
               (with-demoted-errors "dired-snacks: %S"
                 (dired-snacks--give-own-buffer w buffer)))))))))
 
+(defun dired-snacks--unhighlight-other-panes (window)
+  "Clear `hl-line' in the other Dired windows when WINDOW gets selected.
+This keeps the highlight in one pane at a time."
+  (when (eq window (selected-window))
+    (dolist (other (remq window (dired-snacks--windows)))
+      (let ((buffer (window-buffer other)))
+        (unless (eq buffer (window-buffer window))
+          (with-current-buffer buffer
+            (when (bound-and-true-p hl-line-mode)
+              (hl-line-unhighlight)
+              (dired-snacks--columns-follow-hl-line))))))))
+
 ;; ===============================================================
 ;;; sort
 
@@ -2700,6 +2713,7 @@ This is a `jit-lock' function, so it only runs on the lines on display."
     (dired-snacks--vc-refresh))
   (dired-snacks--mode-line-setup)
   (add-hook 'post-command-hook #'dired-snacks--stay-on-last-file nil t)
+  (add-hook 'window-selection-change-functions #'dired-snacks--unhighlight-other-panes nil t)
   (dired-snacks--quit-mode 1))
 
 (defun dired-snacks--teardown ()
@@ -2710,6 +2724,7 @@ This is a `jit-lock' function, so it only runs on the lines on display."
   (dired-snacks--breadcrumb-teardown)
   (dired-snacks--mode-line-teardown)
   (remove-hook 'post-command-hook #'dired-snacks--stay-on-last-file t)
+  (remove-hook 'window-selection-change-functions #'dired-snacks--unhighlight-other-panes t)
   (dired-snacks--quit-mode -1))
 
 (defun dired-snacks--enable ()
@@ -2745,11 +2760,11 @@ This is a `jit-lock' function, so it only runs on the lines on display."
   "Toggle the dired-snacks features in every Dired buffer.
 
 In each Dired buffer, the mode adds inline subtrees, Git marks in the
-fringe, columns at the right edge, a breadcrumb in the header line, its
-own mode line, and makes q close split panes.  It also registers visited
-directories in zoxide and applies `dired-snacks-side-window'.  The
-commands, such as `dired-snacks-find' and `dired-snacks-places', also
-work without the mode."
+fringe, columns at the right edge, a breadcrumb in the header line and
+its own mode line.  It also registers visited directories in zoxide and
+applies `dired-snacks-side-window'.  The commands, such as
+`dired-snacks-find' and `dired-snacks-places', also work without the
+mode."
   :global t
   (if dired-snacks-mode
       (dired-snacks--enable)

@@ -204,6 +204,8 @@ directory name instead, with completion.  The directory replaces the
 current Dired buffer, if there is one, and is added to the zoxide
 database."
   (interactive)
+  (unless (executable-find "zoxide")
+    (user-error "Cannot find zoxide"))
   (let* ((orig (current-buffer))
          (input (minibuffer-with-setup-hook
                     (lambda ()
@@ -223,7 +225,7 @@ database."
         (progn
           (dired-snacks--zoxide-add dir)
           (dired-snacks--visit dir orig))
-      (user-error "No zoxide match for: %s" input))))
+      (user-error "No directory matches %S" input))))
 
 ;; ===============================================================
 ;;; drives
@@ -511,7 +513,7 @@ wl-clipboard package."
   (unless (executable-find "wl-copy")
     (user-error "Cannot find wl-copy; install wl-clipboard"))
   (require 'browse-url)
-  (let* ((files (dired-get-marked-files))
+  (let* ((files (or (dired-get-marked-files) (user-error "No file to copy")))
          (uris (mapconcat (lambda (file)
                             (concat (browse-url-file-url file) "\r\n"))
                           files "")))
@@ -1043,7 +1045,7 @@ opens PDF files in the default application of the desktop."
     (dolist (file files)
       (if-let* ((opener (dired-snacks--opener-for-file file)))
           (push (expand-file-name file) (alist-get opener groups nil nil #'equal))
-        (user-error "No external opener found; install glib2 (gio) or xdg-utils")))
+        (user-error "No program in `dired-snacks-external-openers' is installed")))
     (pcase-dolist (`(,opener . ,names) groups)
       (dired-snacks--call-opener opener (nreverse names)))))
 
@@ -1380,7 +1382,7 @@ OP is a key of `dired-snacks--paste-operations'."
     (unless dired-snacks--clipped
       (user-error "No files to paste"))
     (when (seq-some #'file-remote-p (cons dir dired-snacks--clipped))
-      (user-error "Cannot paste remote files"))
+      (user-error "Cannot paste to or from a remote host"))
     (if-let* ((jobs (dired-snacks--paste-jobs op dir)))
         (let ((task (make-dired-snacks--paste-task
                      :op op :jobs jobs :total (length jobs))))

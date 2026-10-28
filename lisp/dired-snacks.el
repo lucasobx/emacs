@@ -2020,11 +2020,12 @@ keeps its header line."
 ;;; split
 
 (defcustom dired-snacks-side-window nil
-  "When non-nil, show Dired buffers in a bottom side window.
+  "When non-nil, show Dired buffers in a side window.
 
-The side window takes half the height of the frame, and a new Dired
-buffer replaces the one shown there.  Panes opened with
-`dired-snacks-split' appear beside it, in the same side area."
+The side window takes the bottom half of a portrait frame, or the right
+half of a landscape frame, and stays there until it is closed.  A new
+Dired buffer replaces the one in the side window, and panes opened with
+`dired-snacks-split' appear in the same side area."
   :type 'boolean)
 
 (defun dired-snacks--side-window-p (buffer &rest _)
@@ -2043,10 +2044,26 @@ ALIST is the action alist of `display-buffer'."
       (set-window-buffer window buffer)
       window)))
 
+(defun dired-snacks--landscape-p (window)
+  "Return non-nil if WINDOW is wider than it is tall."
+  (> (window-pixel-width window) (window-pixel-height window)))
+
+(defun dired-snacks--display-in-side-window (buffer alist)
+  "Show BUFFER in a side window at the bottom or the right of the frame.
+ALIST is the action alist of `display-buffer'."
+  (let ((side (or (seq-some (lambda (window)
+                              (and (buffer-match-p '(derived-mode . dired-mode)
+                                                   (window-buffer window))
+                                   (window-parameter window 'window-side)))
+                            (window-list nil 'no-minibuf))
+                  (if (dired-snacks--landscape-p (frame-root-window)) 'right 'bottom))))
+    (display-buffer-in-side-window
+     buffer `((side . ,side) (slot . 0) (window-height . 0.5) (window-width . 0.5)
+              ,@alist))))
+
 (defconst dired-snacks--side-window-rule
   '(dired-snacks--side-window-p
-    (dired-snacks--display-in-side-pane display-buffer-in-side-window)
-    (side . bottom) (slot . 0) (window-height . 0.5))
+    (dired-snacks--display-in-side-pane dired-snacks--display-in-side-window))
   "The `display-buffer-alist' entry behind `dired-snacks-side-window'.")
 
 (defun dired-snacks--windows ()
@@ -2084,10 +2101,9 @@ place of `quit-window', usually on q."
   "Open a second Dired pane on the current directory.
 
 The pane opens to the right of the selected window when that window is
-wide enough, or below it otherwise.  From a side window, the pane opens
-beside it in the same side area.  Each pane keeps its own buffer, so
-the panes can show different directories, and `dired-snacks-quit'
-closes a pane."
+wider than it is tall, or below it otherwise.  From a side window, such
+as the one `dired-snacks-side-window' uses, the pane opens in the same
+side area."
   (interactive)
   (let* ((dir default-directory)
          (win (selected-window))
@@ -2101,7 +2117,7 @@ closes a pane."
                  (side . ,side)
                  (slot . ,(1+ (or (window-parameter win 'window-slot) 0))))))
           (select-window (display-buffer buf)))
-      (select-window (if (window-splittable-p win t)
+      (select-window (if (dired-snacks--landscape-p win)
                          (split-window-right)
                        (split-window-below)))
       (switch-to-buffer buf))

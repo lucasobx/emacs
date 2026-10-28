@@ -1576,6 +1576,8 @@ Each level is two columns wide, with a line under the parent's indicator."
          (prefix (dired-snacks--subtree-line-prefix depth))
          (parent (pos-bol))
          (inhibit-read-only t))
+    (unless (invisible-p 'dired-snacks--subtree-hidden)
+      (add-to-invisibility-spec 'dired-snacks--subtree-hidden))
     (save-excursion
       (forward-line 1)
       (let ((beg (point))
@@ -1679,8 +1681,6 @@ Reverting the buffer collapses every subtree."
 
 (defun dired-snacks--subtree-setup ()
   "Enable inline subtrees in the current Dired buffer."
-  (remove-from-invisibility-spec 'dired-snacks--subtree-hidden)
-  (add-to-invisibility-spec 'dired-snacks--subtree-hidden)
   (add-hook 'dired-after-readin-hook #'dired-snacks--subtree-after-readin nil t)
   (jit-lock-register #'dired-snacks--subtree-draw-indicators)
   (jit-lock-refontify))
@@ -2647,7 +2647,9 @@ describe the target."
   (remove-hook 'window-selection-change-functions #'dired-snacks--columns-follow-hl-line t)
   (remove-overlays nil nil 'dired-snacks--columns t)
   (kill-local-variable 'truncate-lines)
-  (setq dired-snacks--columns-highlighted nil))
+  (setq dired-snacks--columns-highlighted nil)
+  (when dired-snacks-hide-details
+    (dired-hide-details-mode -1)))
 
 ;; ===============================================================
 ;;; icons

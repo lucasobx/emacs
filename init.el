@@ -415,28 +415,28 @@
   (add-hook 'completion-preview-inhibit-functions
             #'my/detect-org-table))
 
-(use-package icomplete
-  :ensure nil
-  :hook
-  (icomplete-minibuffer-setup . (lambda () (setq-local max-mini-window-height 6
-                                                       truncate-lines t)))
+(use-package vertico
+  :ensure t
+  :init
+  (vertico-mode)
+  (vertico-multiform-mode)
   :custom
-  (icomplete-vertical-render-prefix-indicator t)
-  (icomplete-vertical-in-buffer-adjust-list t)
-  (icomplete-delay-completions-threshold 0)
-  (icomplete-show-matches-on-no-input t)
-  (icomplete-with-completion-tables t)
-  (icomplete-hide-common-prefix nil)
-  (icomplete-max-delay-chars 0)
-  (icomplete-compute-delay 0)
-  (icomplete-separator " . ")
-  (icomplete-in-buffer t)
+  (vertico-cycle nil)
+  (vertico-count 5)
+  (vertico-multiform-commands
+   '((dired-create-directory flat (vertico-count-format . nil))
+     (dired-create-empty-file flat (vertico-count-format . nil))
+     (save-buffer flat (vertico-count-format . nil))))
   :config
-  (setq icomplete-scroll t)
-  (keymap-set icomplete-minibuffer-map "RET" #'icomplete-force-complete-and-exit)
-  (keymap-set icomplete-minibuffer-map "SPC" #'self-insert-command)
-  (keymap-set icomplete-minibuffer-map "?" #'self-insert-command)
-  (icomplete-vertical-mode 1))
+  ;; add a visual indicator to the currently selected candidate
+  (advice-add #'vertico--format-candidate :around
+              (lambda (orig cand prefix suffix index _start)
+                (setq cand (funcall orig cand prefix suffix index _start))
+                (concat
+                 (if (= vertico--index index)
+                     (propertize "» " 'face '(:foreground "#768c9c" :weight bold))
+                   "  ")
+                 cand))))
 
 (use-package orderless
   :ensure t
@@ -448,7 +448,7 @@
 
 (use-package consult
   :ensure t
-  :after icomplete
+  :after vertico
   :defer t
   :init
   (setopt consult-fd-args

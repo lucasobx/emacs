@@ -334,7 +334,37 @@
     (let ((isearch-forward t)
           (isearch-success t)
           (isearch-wrapped nil))
-      (apply fn args))))
+      (apply fn args)))
+  ;; Prefer matches visible in the current window. Search the current
+  ;; line first, then the nearest match below the point, then above it.
+  ;; Only search outside the window if no visible match is found.
+  ;; Repeating the search with <down> or <up> works as usual.
+  (defvar my/isearch--string-changed nil
+    "Non-nil while Isearch updates the search after the search string changes.")
+  (define-advice isearch-search-and-update (:around (fn) string-changed)
+    (let ((my/isearch--string-changed t))
+      (funcall fn)))
+  (define-advice isearch-search (:around (fn) prefer-visible)
+    (let ((start (point))
+          (bol (pos-bol))
+          (eol (pos-eol)))
+      (funcall fn)
+      (when (and my/isearch--string-changed isearch-forward
+                 (not (and isearch-success (<= (match-beginning 0) eol))))
+        (let ((limit (if (and isearch-success (pos-visible-in-window-p))
+                         bol
+                       (window-start))))
+          (goto-char start)
+          (save-restriction
+            (narrow-to-region limit (point-max))
+            (let ((isearch-forward nil))
+              (funcall fn)))
+          (if isearch-success
+              (progn
+                (goto-char (match-end 0))
+                (setq isearch-other-end (match-beginning 0)))
+            (goto-char start)
+            (funcall fn)))))))
 
 (use-package dired
   :ensure nil

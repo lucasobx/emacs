@@ -263,11 +263,6 @@
   :custom
   (nerd-icons-scale-factor 1.0))
 
-(use-package nerd-icons-ibuffer
-  :ensure t
-  :hook
-  (ibuffer-mode . nerd-icons-ibuffer-mode))
-
 (use-package nerd-icons-completion
   :ensure t
   :after nerd-icons

@@ -78,6 +78,8 @@
 (declare-function nerd-icons-icon-for-dir "nerd-icons")
 (defvar nerd-icons-dir-icon-alist)
 
+(defvar dired-snacks-mode)
+
 (defgroup dired-snacks nil
   "Small Dired enhancements."
   :group 'dired
@@ -1629,6 +1631,8 @@ also act on the files inside them.  On a file inside a subtree, the
 command collapses that subtree and moves point to its directory.
 Reverting the buffer collapses every subtree."
   (interactive)
+  (unless dired-snacks-mode
+    (user-error "This command requires `dired-snacks-mode'"))
   (cond*
    ((dired-snacks--subtree-directory-p)
     (if-let* ((ov (dired-snacks--subtree-child-overlay)))
@@ -2079,6 +2083,8 @@ A pane opened by `dired-snacks-split' is killed along with its window.
 Elsewhere this works like `quit-window'.  `dired-snacks-mode' runs it in
 place of `quit-window', usually on q."
   (interactive)
+  (unless dired-snacks-mode
+    (user-error "This command requires `dired-snacks-mode'"))
   (let ((win (selected-window))
         (others (remq (selected-window) (dired-snacks--windows))))
     (if (not (window-parameter win 'dired-snacks-pane))
@@ -2105,6 +2111,8 @@ wider than it is tall, or below it otherwise.  From a side window, such
 as the one `dired-snacks-side-window' uses, the pane opens in the same
 side area."
   (interactive)
+  (unless dired-snacks-mode
+    (user-error "This command requires `dired-snacks-mode'"))
   (let* ((dir default-directory)
          (win (selected-window))
          (side (window-parameter win 'window-side))

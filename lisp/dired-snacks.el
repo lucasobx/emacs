@@ -2709,6 +2709,7 @@ describe the target."
   "Remove the file icons from the current Dired buffer."
   (jit-lock-unregister #'dired-snacks--icons-draw)
   (remove-overlays nil nil 'dired-snacks--icon t)
+  (remove-overlays nil nil 'dired-snacks--find-icon t)
   (kill-local-variable 'tab-width))
 
 ;; ===============================================================

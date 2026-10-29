@@ -2795,14 +2795,7 @@ Otherwise Wdired may remove another pane or add a find buffer."
 
 ;;;###autoload
 (define-minor-mode dired-snacks-mode
-  "Toggle the dired-snacks features in every Dired buffer.
-
-In each Dired buffer, the mode adds inline subtrees, Git marks in the
-fringe, columns at the right edge, a breadcrumb in the header line and
-its own mode line.  It also registers visited directories in zoxide and
-applies `dired-snacks-side-window'.  The commands, such as
-`dired-snacks-find' and `dired-snacks-drives', also work without the
-mode."
+  "Enhance Dired with icons, columns, Git marks, a breadcrumb and more."
   :global t
   (if dired-snacks-mode
       (dired-snacks--enable)

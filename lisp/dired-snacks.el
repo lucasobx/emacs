@@ -1172,14 +1172,13 @@ process, and CANCELLED is non-nil once the paste is cancelled."
 
 ;;;###autoload
 (defun dired-snacks-clip (&optional replace)
-  "Add the marked files, or the file at point, to the files to paste.
+  "Add the marked files, or the file at point, to the clipped files.
 
 The files stay clipped until a paste uses them, so files from several
-directories can be gathered first.  With prefix argument REPLACE, clip
-only these files and forget the others.  The marks are removed, and the
-mode line shows how many files are waiting.  Paste the files with
-`dired-snacks-paste', `dired-snacks-paste-move' or one of the link
-commands, such as `dired-snacks-paste-symlink'."
+directories can be gathered first.  Paste them with
+`dired-snacks-paste' or a variant such as `dired-snacks-paste-move'.
+With prefix argument REPLACE, forget the previously clipped files.
+Clipping removes the marks."
   (interactive "P" dired-mode)
   (let ((files (or (dired-get-marked-files) (user-error "No file to clip"))))
     (setq dired-snacks--clipped
@@ -1400,11 +1399,7 @@ OP is a key of `dired-snacks--paste-operations'."
   "Copy the clipped files into the current directory.
 
 The copies run in the background with cp -a, one file at a time, and
-the mode line shows their progress.  A file pasted into its own
-directory gets a numbered name, as with `dired-snacks-duplicate'.  When
-a file or directory with the same name exists, ask before replacing it,
-and keep it as a backup if `dired-backup-overwrite' says so.  The
-clipped files are forgotten once the paste starts.
+`dired-snacks-mode' shows their progress in the mode line.
 `dired-snacks-paste-cancel' stops the copies."
   (interactive nil dired-mode)
   (dired-snacks--paste 'copy))
@@ -2430,13 +2425,14 @@ ATTRS are the attributes of FILE."
 
 (defun dired-snacks--mode-line-animate-pastes ()
   "Animate the mode lines while a paste runs, and refresh them."
-  (cond
-   ((and dired-snacks--paste-tasks (not dired-snacks--mode-line-spinner-timer))
-    (setq dired-snacks--mode-line-spinner-timer
-          (run-with-timer 0.1 0.1 #'dired-snacks--mode-line-spin)))
-   ((and (not dired-snacks--paste-tasks) dired-snacks--mode-line-spinner-timer)
-    (cancel-timer dired-snacks--mode-line-spinner-timer)
-    (setq dired-snacks--mode-line-spinner-timer nil)))
+  (let ((animate (and dired-snacks-mode dired-snacks--paste-tasks)))
+    (cond
+     ((and animate (not dired-snacks--mode-line-spinner-timer))
+      (setq dired-snacks--mode-line-spinner-timer
+            (run-with-timer 0.1 0.1 #'dired-snacks--mode-line-spin)))
+     ((and (not animate) dired-snacks--mode-line-spinner-timer)
+      (cancel-timer dired-snacks--mode-line-spinner-timer)
+      (setq dired-snacks--mode-line-spinner-timer nil))))
   (force-mode-line-update t))
 
 (defun dired-snacks--mode-line-paste ()
@@ -2784,7 +2780,8 @@ Otherwise Wdired may remove another pane or add a find buffer."
   (advice-add 'wdired-abort-changes :after #'dired-snacks--wdired-revert)
   (advice-add 'wdired-change-to-wdired-mode :around #'dired-snacks--wdired-advertise)
   (advice-add 'wdired-change-to-dired-mode :around #'dired-snacks--wdired-advertise)
-  (dired-snacks--map-buffers #'dired-snacks--setup))
+  (dired-snacks--map-buffers #'dired-snacks--setup)
+  (dired-snacks--mode-line-animate-pastes))
 
 (defun dired-snacks--disable ()
   "Remove the global hooks and settings of `dired-snacks-mode'."
@@ -2799,7 +2796,8 @@ Otherwise Wdired may remove another pane or add a find buffer."
   (advice-remove 'wdired-abort-changes #'dired-snacks--wdired-revert)
   (advice-remove 'wdired-change-to-wdired-mode #'dired-snacks--wdired-advertise)
   (advice-remove 'wdired-change-to-dired-mode #'dired-snacks--wdired-advertise)
-  (dired-snacks--map-buffers #'dired-snacks--teardown))
+  (dired-snacks--map-buffers #'dired-snacks--teardown)
+  (dired-snacks--mode-line-animate-pastes))
 
 ;;;###autoload
 (define-minor-mode dired-snacks-mode

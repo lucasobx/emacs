@@ -361,7 +361,7 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
     ("s"        dired-snacks-sort-cycle)
     ("<f2>"     wdired-change-to-wdired-mode)
     ("M-f"      dired-create-empty-file)
-    ("M-d"      dired-snacks-duplicate)
+    ("M-p"      dired-snacks-duplicate)
     ("M-s"      dired-snacks-split))
   (my/bind-local dired-mode-map
     ("M-w"            dired-snacks-clip)

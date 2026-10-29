@@ -261,9 +261,7 @@
      help-mode)))
 
 (use-package nerd-icons
-  :ensure t
-  :custom
-  (nerd-icons-scale-factor 1.0))
+  :ensure t)
 
 (use-package nerd-icons-completion
   :ensure t

@@ -404,7 +404,8 @@ Each which-key label is registered under PREFIX + KEY.  DESC t hides it."
   (dolist (key '("M-<left>" "M-<right>" "C-S-<up>" "C-S-<down>"))
     (keymap-unset org-mode-map key t))
   (my/bind-local org-mode-map
-    ("C-c t" org-hide-drawers-toggle "toggle drawers")))
+    ("C-c t"   org-hide-drawers-toggle "toggle drawers")
+    ("C-c C-l" my/org-insert-link      "insert link")))
 
 (with-eval-after-load 'ghostel
   ;; `keymap-set' rejects a slash in the command name of a <remap> key.

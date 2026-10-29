@@ -171,7 +171,9 @@
 ;;; THEMES
 
 (use-package pixel-themes
-  :vc (:url "https://github.com/lucasobx/pixel-themes"))
+  :vc (:url "https://github.com/lucasobx/pixel-themes")
+  :config
+  (pixel-themes-load-theme 'pixel-themes-alia16))
 
 ;; (use-package pixel-themes
 ;;   :ensure nil
@@ -417,7 +419,7 @@
   (corfu-max-width 40)
   (corfu-bar-width 0)
   (corfu-auto nil)
-  (corfu-count 5)
+  (corfu-count 3)
   :config
   (defun my/corfu-popupinfo-once (&rest _)
     (corfu-popupinfo-mode 1)
@@ -647,7 +649,20 @@
   (org-mode . org-indent-mode)
   (org-mode . hl-line-mode)
   :config
-  (set-face-attribute 'org-ellipsis nil :underline nil))
+  (set-face-attribute 'org-ellipsis nil :underline nil)
+  (defun my/org-insert-link ()
+    "Insert an Org link."
+    (interactive)
+    (if (org-in-regexp org-link-any-re 1)
+        (call-interactively #'org-insert-link)
+      (let ((link (read-string "Link: ")))
+        (unless (org-string-nw-p link)
+          (user-error "Empty link"))
+        (org-insert-link nil link
+                         (read-string "Description: "
+                                      (and (use-region-p)
+                                           (buffer-substring-no-properties
+                                            (region-beginning) (region-end)))))))))
 
 (use-package org-appear
   :vc (:url "https://github.com/awth13/org-appear")

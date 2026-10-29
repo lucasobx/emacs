@@ -424,22 +424,6 @@
     (advice-remove 'corfu--exhibit #'my/corfu-popupinfo-once))
   (advice-add 'corfu--exhibit :before #'my/corfu-popupinfo-once))
 
-(use-package completion-preview
-  :ensure nil
-  :hook (after-init . global-completion-preview-mode)
-  :custom
-  (completion-preview-minimum-symbol-length 1)
-  (completion-preview-exact-match-only nil)
-  (completion-preview-idle-delay 0.3)
-  :config
-  (with-eval-after-load 'org
-    (push 'org-self-insert-command completion-preview-commands))
-  (defun my/detect-org-table ()
-    "Return true if point in Org table."
-    (and (derived-mode-p 'org-mode) (org-at-table-p)))
-  (add-hook 'completion-preview-inhibit-functions
-            #'my/detect-org-table))
-
 (use-package vertico
   :ensure t
   :init

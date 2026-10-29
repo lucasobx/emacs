@@ -28,7 +28,6 @@
 
 (eval-when-compile
   (require 'cl-lib)
-  (require 'cond-star)
   (require 'dired)
   (require 'dired-aux)
   (require 'dired-x)
@@ -95,7 +94,7 @@
   "Return the directory that INPUT names, or else zoxide's best match for it."
   (when (and input (not (string-empty-p input)))
     (let ((expanded (expand-file-name input)))
-      (if (and (string-match-p "[/~]" input) (file-directory-p expanded))
+      (if (and (dired-snacks--zoxide-file-name-p input) (file-directory-p expanded))
           expanded
         (when (executable-find "zoxide")
           (with-work-buffer
@@ -122,7 +121,7 @@
 
 (defun dired-snacks--zoxide-file-name-p (input)
   "Return non-nil if INPUT looks like a file name, because it has / or ~."
-  (and (string-match-p "[/~]" input) t))
+  (string-match-p "[/~]" input))
 
 (defun dired-snacks--zoxide-update-ghost (&rest _)
   "Show the best zoxide match after the minibuffer input."
@@ -148,8 +147,7 @@
 (defun dired-snacks--zoxide-complete-file-name ()
   "Complete the minibuffer input as a directory name."
   (interactive)
-  (let* ((beg (minibuffer-prompt-end))
-         (input (buffer-substring-no-properties beg (point-max)))
+  (let* ((input (minibuffer-contents-no-properties))
          (expanded (expand-file-name input))
          (dir (file-name-directory expanded))
          (base (file-name-nondirectory expanded))
@@ -160,13 +158,12 @@
      ((eq comp t) (minibuffer-message "Sole completion"))
      ((string= comp base)
       (minibuffer-message
-       "%s" (mapconcat #'identity
-                       (seq-filter (lambda (f) (string-suffix-p "/" f))
-                                   (file-name-all-completions base dir))
-                       "  ")))
+       "%s" (string-join (seq-filter #'directory-name-p
+                                     (file-name-all-completions base dir))
+                         "  ")))
      (t
-      (delete-region beg (point-max))
-      (insert (concat (or (file-name-directory input) "") comp))))))
+      (delete-minibuffer-contents)
+      (insert (or (file-name-directory input) "") comp)))))
 
 (defun dired-snacks-zoxide-complete ()
   "Complete the minibuffer input, as a file name or as a zoxide match.
@@ -189,12 +186,10 @@ input is replaced by the best zoxide match."
       (with-current-buffer buffer (find-alternate-file dir))
     (dired dir)))
 
-(defvar dired-snacks--zoxide-minibuffer-map
-  (let ((map (make-sparse-keymap)))
-    (set-keymap-parent map minibuffer-local-map)
-    (keymap-set map "TAB" #'dired-snacks-zoxide-complete)
-    map)
-  "Minibuffer keymap for `dired-snacks-zoxide'.")
+(defvar-keymap dired-snacks--zoxide-minibuffer-map
+  :doc "Minibuffer keymap for `dired-snacks-zoxide'."
+  :parent minibuffer-local-map
+  "TAB" #'dired-snacks-zoxide-complete)
 
 ;;;###autoload
 (defun dired-snacks-zoxide ()
@@ -222,12 +217,10 @@ database."
                                   completion-preview-overlay-priority 1200)
                       (completion-preview-mode 1))
                   (read-from-minibuffer "zoxide: " nil dired-snacks--zoxide-minibuffer-map)))
-         (dir (dired-snacks--zoxide-query input)))
-    (if dir
-        (progn
-          (dired-snacks--zoxide-add dir)
-          (dired-snacks--visit dir orig))
-      (user-error "No directory matches %S" input))))
+         (dir (or (dired-snacks--zoxide-query input)
+                  (user-error "No directory matches %S" input))))
+    (dired-snacks--zoxide-add dir)
+    (dired-snacks--visit dir orig)))
 
 ;; ===============================================================
 ;;; drives
@@ -481,24 +474,23 @@ Ask for confirmation first, then delete the trashed files and their
 metadata in the background, and refresh the Dired buffers that show the
 trash."
   (interactive)
-  (let ((count (length (dired-snacks--trash-items "files"))))
-    (cond
-     ((zerop count)
-      (message "Trash is empty"))
-     ((yes-or-no-p "Do you want to permanently delete all items from the Trash? ")
-      (message "Emptying Trash...")
-      (dired-snacks--run-commands
-       (list (append '("rm" "-rf" "--")
-                     (dired-snacks--trash-items "files")
-                     (dired-snacks--trash-items "info")))
-       (lambda (failure)
-         (if failure
-             (message "Could not empty the Trash: %s" failure)
-           (dired-snacks--map-buffers
-            (lambda ()
-              (when (file-in-directory-p default-directory (dired-snacks--trash-dir))
-                (revert-buffer))))
-           (message "Trash emptied"))))))))
+  (cond
+   ((null (dired-snacks--trash-items "files"))
+    (message "Trash is empty"))
+   ((yes-or-no-p "Do you want to permanently delete all items from the Trash? ")
+    (message "Emptying Trash...")
+    (dired-snacks--run-commands
+     (list (append '("rm" "-rf" "--")
+                   (dired-snacks--trash-items "files")
+                   (dired-snacks--trash-items "info")))
+     (lambda (failure)
+       (if failure
+           (message "Could not empty the Trash: %s" failure)
+         (dired-snacks--map-buffers
+          (lambda ()
+            (when (file-in-directory-p default-directory (dired-snacks--trash-dir))
+              (revert-buffer))))
+         (message "Trash emptied")))))))
 
 ;; ===============================================================
 ;;; copy-uri
@@ -518,14 +510,14 @@ wl-clipboard package."
   (let* ((files (or (dired-get-marked-files) (user-error "No file to copy")))
          (uris (mapconcat (lambda (file)
                             (concat (browse-url-file-url file) "\r\n"))
-                          files "")))
-    (let ((proc (make-process
-                 :name "wl-copy"
-                 :command '("wl-copy" "--type" "text/uri-list")
-                 :connection-type 'pipe
-                 :noquery t)))
-      (process-send-string proc uris)
-      (process-send-eof proc))
+                          files))
+         (proc (make-process
+                :name "wl-copy"
+                :command '("wl-copy" "--type" "text/uri-list")
+                :connection-type 'pipe
+                :noquery t)))
+    (process-send-string proc uris)
+    (process-send-eof proc)
     (dired-unmark-all-marks)
     (message "Copied %d file URI%s to clipboard"
              (length files)
@@ -923,10 +915,8 @@ control what the search finds."
       (when project
         (setq-local mode-line-buffer-identification
                     (list mode-line-buffer-identification " (project)")))
-      (let ((map (make-sparse-keymap)))
-        (set-keymap-parent map dired-mode-map)
-        (keymap-set map "q" #'kill-current-buffer)
-        (use-local-map map)))
+      (use-local-map (define-keymap :parent dired-mode-map
+                       "q" #'kill-current-buffer)))
     (dired-snacks--find-dispatch buf "")
     (let ((display-buffer-overriding-action
            (and side `(display-buffer-in-side-window
@@ -964,10 +954,8 @@ files opened in external applications are not affected."
 
 (defun dired-snacks--kde-session-p ()
   "Return non-nil in a KDE Plasma session."
-  (or (and (getenv "KDE_FULL_SESSION") t)
-      (and (member "KDE" (split-string (or (getenv "XDG_CURRENT_DESKTOP") "")
-                                       ":" t))
-           t)))
+  (or (getenv "KDE_FULL_SESSION")
+      (member "KDE" (split-string (or (getenv "XDG_CURRENT_DESKTOP") "") ":" t))))
 
 (defun dired-snacks--system-openers ()
   "Return the default openers for this desktop session, in order.
@@ -1064,8 +1052,7 @@ as with `dired-find-file'."
   (interactive)
   (let ((file (dired-get-file-for-visit)))
     (cond
-     ((and (not (file-directory-p file))
-           (dired-snacks--external-file-p file))
+     ((dired-snacks--external-file-p file)
       (dired-snacks--open-external
        (or (dired-get-marked-files nil nil #'dired-snacks--external-file-p)
            (list file))))
@@ -1117,7 +1104,7 @@ for example foo-1.txt for foo.txt."
   "Copy FILE to a numbered name and return that name."
   (let ((copy (dired-snacks--unique-copy-name file)))
     (if (file-directory-p file)
-        (copy-directory file copy nil t nil)
+        (copy-directory file copy nil t)
       (copy-file file copy))
     (dired-add-file copy)
     copy))
@@ -1488,11 +1475,9 @@ directory whose subtree is open.  Files get blanks of the same width."
 
 (defun dired-snacks--subtree-child-overlay ()
   "Return the overlay of the subtree expanded under the current line, or nil."
-  (let ((start (save-excursion (forward-line 1) (line-beginning-position))))
+  (let ((start (pos-bol 2)))
     (seq-find (lambda (ov)
-                (and (overlay-buffer ov)
-                     (overlay-get ov 'dired-snacks--subtree)
-                     (= (overlay-start ov) start)))
+                (and (overlay-buffer ov) (= (overlay-start ov) start)))
               dired-snacks--subtree-overlays)))
 
 (defun dired-snacks--subtree-line-prefix (depth)
@@ -1519,26 +1504,36 @@ Each level is two columns wide, with a line under the parent's indicator."
              (and (looking-at-p dired-re-sym)
                   (file-directory-p (dired-get-filename nil t)))))))
 
-(defun dired-snacks--subtree-draw-indicators (beg end)
-  "Draw the subtree indicators on the lines between BEG and END."
+(defun dired-snacks--redraw-lines (beg end prop draw)
+  "Replace the overlays with PROP on the lines between BEG and END.
+DRAW is called at the start of each line to add the new overlays, unless
+it is nil.  Return the region covered, as `jit-lock-register' expects."
   (save-excursion
     (setq beg (progn (goto-char beg) (pos-bol))
           end (progn (goto-char end) (min (1+ (pos-eol)) (point-max))))
-    (remove-overlays beg end 'dired-snacks--subtree-indicator t)
-    (let ((blank (make-string (string-width (car dired-snacks-subtree-indicators)) ?\s)))
+    (remove-overlays beg end prop t)
+    (when draw
       (goto-char beg)
       (while (< (point) end)
-        (when-let* ((pos (dired-move-to-filename)))
-          (let ((indicator (cond ((not (dired-snacks--subtree-directory-p)) blank)
-                                 ((dired-snacks--subtree-child-overlay)
-                                  (cdr dired-snacks-subtree-indicators))
-                                 (t (car dired-snacks-subtree-indicators))))
-                (ov (make-overlay (1- pos) pos)))
-            (overlay-put ov 'dired-snacks--subtree-indicator t)
-            (overlay-put ov 'evaporate t)
-            (overlay-put ov 'display (propertize indicator 'face 'dired-snacks-subtree-indicator))))
+        (funcall draw)
         (forward-line 1)))
     `(jit-lock-bounds ,beg . ,end)))
+
+(defun dired-snacks--subtree-draw-indicators (beg end)
+  "Draw the subtree indicators on the lines between BEG and END."
+  (let ((blank (make-string (string-width (car dired-snacks-subtree-indicators)) ?\s)))
+    (dired-snacks--redraw-lines
+     beg end 'dired-snacks--subtree-indicator
+     (lambda ()
+       (when-let* ((pos (dired-move-to-filename)))
+         (let ((indicator (cond ((not (dired-snacks--subtree-directory-p)) blank)
+                                ((dired-snacks--subtree-child-overlay)
+                                 (cdr dired-snacks-subtree-indicators))
+                                (t (car dired-snacks-subtree-indicators))))
+               (ov (make-overlay (1- pos) pos)))
+           (overlay-put ov 'dired-snacks--subtree-indicator t)
+           (overlay-put ov 'evaporate t)
+           (overlay-put ov 'display (propertize indicator 'face 'dired-snacks-subtree-indicator))))))))
 
 (defun dired-snacks--subtree-absolutize (beg end dir)
   "Make the file names between BEG and END absolute under DIR."
@@ -1580,7 +1575,7 @@ Each level is two columns wide, with a line under the parent's indicator."
       (let ((beg (point))
             (end (point-marker)))
         (let ((dired-free-space nil))
-          (dired-insert-directory dir dired-actual-switches nil nil nil))
+          (dired-insert-directory dir dired-actual-switches))
         (set-marker end (point))
         (dired-snacks--subtree-absolutize beg end dir)
         (dired-snacks--subtree-delete-dots
@@ -1640,15 +1635,12 @@ Reverting the buffer collapses every subtree."
 
 (defun dired-snacks--subtree-reset ()
   "Collapse every tracked subtree."
-  (when dired-snacks--subtree-overlays
-    (let ((inhibit-read-only t))
-      (dolist (ov (sort dired-snacks--subtree-overlays
-                        :key (lambda (o) (or (overlay-get o 'dired-snacks--subtree) 0))
-                        :reverse t))
-        (when (overlay-buffer ov)
-          (delete-region (overlay-start ov) (overlay-end ov)))
-        (delete-overlay ov)))
-    (setq dired-snacks--subtree-overlays nil)))
+  (let ((inhibit-read-only t))
+    (dolist (ov dired-snacks--subtree-overlays)
+      (when (overlay-buffer ov)
+        (delete-region (overlay-start ov) (overlay-end ov)))
+      (delete-overlay ov)))
+  (setq dired-snacks--subtree-overlays nil))
 
 (defun dired-snacks--subtree-prune ()
   "Collapse the subtrees whose directory line was deleted."
@@ -1657,8 +1649,6 @@ Reverting the buffer collapses every subtree."
       (dolist (ov dired-snacks--subtree-overlays)
         (when-let* ((_ (overlay-buffer ov))
                     (parent (overlay-get ov 'dired-snacks--subtree-parent))
-                    ;; Once the directory line is deleted, its marker sits
-                    ;; at the subtree, or past a line inserted in its place.
                     (_ (>= parent (overlay-start ov))))
           (delete-region parent (overlay-end ov))
           (delete-overlay ov)))
@@ -1761,22 +1751,18 @@ highest priority among the files below it."
 
 (defun dired-snacks--vc-draw (beg end)
   "Mark the Git state of the entries between BEG and END in the left fringe."
-  (save-excursion
-    (setq beg (progn (goto-char beg) (pos-bol))
-          end (progn (goto-char end) (min (1+ (pos-eol)) (point-max))))
-    (remove-overlays beg end 'dired-snacks--vc t)
-    (when (and dired-snacks-vc-marks dired-snacks--vc-states)
-      (goto-char beg)
-      (while (< (point) end)
-        (when-let* ((file (dired-get-filename nil t))
-                    (face (gethash (directory-file-name file) dired-snacks--vc-states)))
-          (let ((ov (make-overlay (pos-bol) (pos-eol))))
-            (overlay-put ov 'dired-snacks--vc t)
-            (overlay-put ov 'evaporate t)
-            (overlay-put ov 'before-string
-                         (propertize " " 'display `(left-fringe dired-snacks--vc-bar ,face)))))
-        (forward-line 1)))
-    `(jit-lock-bounds ,beg . ,end)))
+  (dired-snacks--redraw-lines
+   beg end 'dired-snacks--vc
+   (and dired-snacks-vc-marks
+        dired-snacks--vc-states
+        (lambda ()
+          (when-let* ((file (dired-get-filename nil t))
+                      (face (gethash (directory-file-name file) dired-snacks--vc-states)))
+            (let ((ov (make-overlay (pos-bol) (pos-eol))))
+              (overlay-put ov 'dired-snacks--vc t)
+              (overlay-put ov 'evaporate t)
+              (overlay-put ov 'before-string
+                           (propertize " " 'display `(left-fringe dired-snacks--vc-bar ,face)))))))))
 
 (defun dired-snacks--vc-sentinel (proc buffer root)
   "Mark BUFFER with the states PROC read under ROOT."
@@ -1845,8 +1831,6 @@ A .git file, as in worktrees and submodules, is followed to its gitdir."
         (let ((buffer (current-buffer))
               (root (expand-file-name root)))
           (dired-snacks--vc-add-watch root)
-          ;; `--no-optional-locks' keeps git from writing the index, which
-          ;; could collide with a git command the user is running.
           (setq dired-snacks--vc-proc
                 (make-process
                  :name "dired-snacks-vc"
@@ -2335,15 +2319,13 @@ For a directory, the number of items in it is shown instead."
 
 (defun dired-snacks--mode-line-index ()
   "Return the entry counter, such as \"12/40\"."
-  (when (derived-mode-p 'dired-mode)
-    (let ((s (concat (number-to-string (dired-snacks--mode-line-current))
-                     "/" (number-to-string (dired-snacks--mode-line-total)))))
-      (concat "  " (string-pad s dired-snacks-mode-line-index-width nil t)))))
+  (let ((s (concat (number-to-string (dired-snacks--mode-line-current))
+                   "/" (number-to-string (dired-snacks--mode-line-total)))))
+    (concat "  " (string-pad s dired-snacks-mode-line-index-width nil t))))
 
 (defun dired-snacks--mode-line-file-attrs ()
   "Return the attributes of the entry at point, or nil."
-  (when-let* ((name (and (derived-mode-p 'dired-mode)
-                         (not (file-remote-p default-directory))
+  (when-let* ((name (and (not (file-remote-p default-directory))
                          (dired-get-filename nil t))))
     (let ((key (cons name (buffer-chars-modified-tick))))
       (unless (equal key (car dired-snacks--mode-line-attr-cache))
@@ -2383,19 +2365,19 @@ ATTRS are the attributes of FILE."
 
 (defun dired-snacks--mode-line-size ()
   "Return the mode line text with the size of the entry at point, or nil."
-  (when dired-snacks-mode-line-show-size
-    (when-let* ((attrs (dired-snacks--mode-line-file-attrs)))
-      (let ((text (dired-snacks--size-text (dired-get-filename nil t) attrs)))
-        (concat "  " (propertize (string-pad text dired-snacks-mode-line-size-width nil t)
-                                 'face 'shadow))))))
+  (when-let* ((_ dired-snacks-mode-line-show-size)
+              (attrs (dired-snacks--mode-line-file-attrs)))
+    (let ((text (dired-snacks--size-text (dired-get-filename nil t) attrs)))
+      (concat "  " (propertize (string-pad text dired-snacks-mode-line-size-width nil t)
+                               'face 'shadow)))))
 
 (defun dired-snacks--mode-line-time ()
   "Return the modification time of the entry at point, or nil."
-  (when dired-snacks-mode-line-show-time
-    (when-let* ((attrs (dired-snacks--mode-line-file-attrs)))
-      (concat "  " (propertize (format-time-string dired-snacks-mode-line-time-format
-                                                   (file-attribute-modification-time attrs))
-                               'face 'shadow)))))
+  (when-let* ((_ dired-snacks-mode-line-show-time)
+              (attrs (dired-snacks--mode-line-file-attrs)))
+    (concat "  " (propertize (format-time-string dired-snacks-mode-line-time-format
+                                                 (file-attribute-modification-time attrs))
+                             'face 'shadow))))
 
 (defun dired-snacks--mode-line-omit ()
   "Return the `dired-omit-mode' indicator, or nil."
@@ -2404,7 +2386,7 @@ ATTRS are the attributes of FILE."
 
 (defun dired-snacks--mode-line-sort ()
   "Return the sort criterion of this listing, or nil."
-  (when (and dired-snacks-mode-line-show-sort (derived-mode-p 'dired-mode))
+  (when dired-snacks-mode-line-show-sort
     (concat "  " (propertize (symbol-name (dired-snacks--sort-criterion
                                            dired-actual-switches))
                              'face 'shadow))))
@@ -2599,37 +2581,32 @@ describe the target."
 
 (defun dired-snacks--columns-draw (beg end)
   "Draw the columns on the lines between BEG and END."
-  (save-excursion
-    (setq beg (progn (goto-char beg) (pos-bol))
-          end (progn (goto-char end) (min (1+ (pos-eol)) (point-max))))
-    (remove-overlays beg end 'dired-snacks--columns t)
-    (when (and dired-hide-details-mode
-               dired-snacks-columns
-               (not (file-remote-p default-directory)))
-      (let ((hl (dired-snacks--columns-hl-line)))
-        (goto-char beg)
-        (while (< (point) end)
-          (when-let* ((_ (not (invisible-p (point))))
-                      (file (dired-get-filename nil t))
-                      (attrs (file-attributes file)))
-            (let ((text (concat "  " (mapconcat (lambda (column)
-                                                  (dired-snacks--column-text column file attrs))
-                                                dired-snacks-columns "  ")))
-                  (ov (make-overlay (pos-bol) (pos-eol))))
-              (overlay-put ov 'dired-snacks--columns t)
-              (overlay-put ov 'evaporate t)
-              (overlay-put ov 'dired-snacks--columns-file file)
-              (overlay-put ov 'dired-snacks--columns-stamp
-                           (dired-snacks--columns-stamp file attrs))
-              (overlay-put ov 'dired-snacks--columns-string
-                           (concat (propertize " " 'display
-                                               `(space :align-to
-                                                       (- right (,(1+ (string-width text)) . width))))
-                                   (propertize text 'face 'dired-snacks-column)))
-              (dired-snacks--columns-paint
-               ov (and hl (= (overlay-start hl) (pos-bol)) hl))))
-          (forward-line 1))))
-    `(jit-lock-bounds ,beg . ,end)))
+  (dired-snacks--redraw-lines
+   beg end 'dired-snacks--columns
+   (when (and dired-hide-details-mode
+              dired-snacks-columns
+              (not (file-remote-p default-directory)))
+     (let ((hl (dired-snacks--columns-hl-line)))
+       (lambda ()
+         (when-let* ((_ (not (invisible-p (point))))
+                     (file (dired-get-filename nil t))
+                     (attrs (file-attributes file)))
+           (let ((text (concat "  " (mapconcat (lambda (column)
+                                                 (dired-snacks--column-text column file attrs))
+                                               dired-snacks-columns "  ")))
+                 (ov (make-overlay (pos-bol) (pos-eol))))
+             (overlay-put ov 'dired-snacks--columns t)
+             (overlay-put ov 'evaporate t)
+             (overlay-put ov 'dired-snacks--columns-file file)
+             (overlay-put ov 'dired-snacks--columns-stamp
+                          (dired-snacks--columns-stamp file attrs))
+             (overlay-put ov 'dired-snacks--columns-string
+                          (concat (propertize " " 'display
+                                              `(space :align-to
+                                                      (- right (,(1+ (string-width text)) . width))))
+                                  (propertize text 'face 'dired-snacks-column)))
+             (dired-snacks--columns-paint
+              ov (and hl (= (overlay-start hl) (pos-bol)) hl)))))))))
 
 (defun dired-snacks--columns-setup ()
   "Show the columns in the current Dired buffer."
@@ -2680,23 +2657,18 @@ describe the target."
 
 (defun dired-snacks--icons-draw (beg end)
   "Add icons to the files between BEG and END."
-  (save-excursion
-    (setq beg (progn (goto-char beg) (pos-bol))
-          end (progn (goto-char end) (min (1+ (pos-eol)) (point-max))))
-    (remove-overlays beg end 'dired-snacks--icon t)
-    (goto-char beg)
-    (while (< (point) end)
-      (when-let* ((file (dired-get-filename nil t))
-                  (pos (dired-move-to-filename)))
-        (let ((text (if (member (file-name-nondirectory file) '("." ".."))
-                        "  \t"
-                      (concat (dired-snacks--icon file) "\t")))
-              (ov (make-overlay (1- pos) pos)))
-          (overlay-put ov 'dired-snacks--icon t)
-          (overlay-put ov 'evaporate t)
-          (overlay-put ov 'after-string (propertize text 'display text))))
-      (forward-line 1))
-    `(jit-lock-bounds ,beg . ,end)))
+  (dired-snacks--redraw-lines
+   beg end 'dired-snacks--icon
+   (lambda ()
+     (when-let* ((file (dired-get-filename nil t))
+                 (pos (dired-move-to-filename)))
+       (let ((text (if (member (file-name-nondirectory file) '("." ".."))
+                       "  \t"
+                     (concat (dired-snacks--icon file) "\t")))
+             (ov (make-overlay (1- pos) pos)))
+         (overlay-put ov 'dired-snacks--icon t)
+         (overlay-put ov 'evaporate t)
+         (overlay-put ov 'after-string (propertize text 'display text)))))))
 
 (defun dired-snacks--icons-setup ()
   "Set up the file icons in the current Dired buffer."
